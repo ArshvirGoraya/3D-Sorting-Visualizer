@@ -1,0 +1,31 @@
+{
+  // my default cspell lint config (used with nvim)
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "language": "en",
+  // Import other cspell config
+  //"import": [
+  //  "cspell_global.json"
+  //],
+  // relative to cwd, but if IDE opens a file from some other directory, can use /**/ to block them too
+  "ignorePaths": [
+    // Ignore IDE stuff:
+    "**/nvim/runtime/**",
+    "**/nvim-data/**",
+    // Ignore spellfile
+    "en.utf-8.add",
+    // Ignore git stuff
+    ".git/**",
+  ],
+  "dictionaryDefinitions": [
+    {
+      "name": "nvim-words",
+      // holds spelling for the nvim editor AND for cspell to ignore
+      "path": ".nvim/spell/en.utf-8.add",
+      "addWords": false
+    }
+  ],
+  "dictionaries": [
+    "nvim-words",
+  ]
+}
