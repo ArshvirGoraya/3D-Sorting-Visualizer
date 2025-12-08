@@ -20,7 +20,6 @@ struct MySayer(String);
 
 fn main() {
     log::info!("hellope");
-    // println!("hello world 1");
     // plugins can be used to add entire sections of your app at once.
     App::new().add_plugins(MyWholeApp).run();
 }

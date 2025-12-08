@@ -1,0 +1,11 @@
+trunk-version = "^0.21.14"  # Trunk version at the start of this project.
+# Just remove above if you want to see if trunk can still build in a different version. Otherwise, building results in an error.
+
+# https://trunkrs.dev/configuration/#build-section
+
+[build]
+target = "index.html"  # The index HTML file to drive the bundling process.
+minify = "on_release"  # Control minification: can be one of: never, on_release, always
+
+[serve]
+no_autoreload = false  # Disable auto-reload of the web app.
