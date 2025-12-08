@@ -5,18 +5,23 @@ edition = "2024"
 
 [dependencies]
 bevy = { version = "0.17.3" }
+console_error_panic_hook = "0.1.7"
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 
 [dev-dependencies]  # only for debug builds
-bevy = { version = "0.17.3", features = ["dynamic_linking"] }
+bevy = { version = "0.17.3", default-features = false, features = [
+  "dynamic_linking",
+  "web",
+  "webgl2"
+] }
 
 ## ######################## Bevy Compilation Settings #############################################
 # https://bevy.org/learn/quick-start/getting-started/setup/#compile-with-performance-optimizations
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
-opt-level = 1  # higher = faster runtime. slower compile time.
-debug = true
+opt-level = 0
+debug = false
 codegen-units = 16
 
 # Enable a large amount of optimization in the dev profile for dependencies.
@@ -35,8 +40,8 @@ lto = "thin"
 codegen-units = 1
 
 [profile.test]
-opt-level = 0
-debug = false
+opt-level = 1  # higher = faster runtime. slower compile time.
+debug = true
 codegen-units = 16
 
 # Development Builds: ########################################################
