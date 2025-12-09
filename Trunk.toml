@@ -1,5 +1,5 @@
 trunk-version = "^0.21.14"  # Trunk version at the start of this project.
-# Just remove above if you want to see if trunk can still build in a different version. Otherwise, building results in an error.
+# Just remove above if you want to see if trunk can still build in a different version.
 
 # https://trunkrs.dev/configuration/#build-section
 

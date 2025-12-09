@@ -1,0 +1,43 @@
+{
+  // These tasks are used in neovim through overseer.nvim! They can ALSO be used in VSCode.
+  // These task are specifically made in windows OS and may not all run on Linux!
+  // These tasks rely on having certain commands available in PATH (e.g., lua to execute lua scripts).
+  // https://code.visualstudio.com/docs/debugtest/tasks#_custom-tasks
+  // https://github.com/stevearc/overseer.nvim/blob/master/doc/guides.md#vs-code-tasks
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Hello World",
+      "type": "shell", // shell or process
+      "command": "echo 'Hello, World!'",
+      // "windows": {
+      //	"command": "./scripts/test.sh",
+      //  }
+      "group": "build",
+      // "presentation": {
+      //   "reveal": "always", // always reveal terminal
+      //   "panel": "new" // always create new terminal
+      // }
+    },
+    {
+      "label": "Trunk Build",
+      "type": "shell", // shell or process
+      "command": "trunk build",
+      "group": "build",
+      // "presentation": {
+      //   "reveal": "always", // always reveal terminal
+      //   "panel": "new" // always create new terminal
+      // }
+    },
+    {
+      "label": "gzip size (wasm)",
+      "type": "shell", // shell or process
+      "command": "scripts\\gzip_wasm_size.ps1",
+      "group": "build",
+      // "presentation": {
+      //   "reveal": "always", // always reveal terminal
+      //   "panel": "new" // always create new terminal
+      // }
+    },
+  ]
+}
