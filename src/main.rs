@@ -1,17 +1,10 @@
 // use bevy::prelude::*;
 
 use bevy::log;
-use bevy::prelude::App;
-use bevy::prelude::Commands;
-use bevy::prelude::Component;
-use bevy::prelude::IntoScheduleConfigs;
-use bevy::prelude::Plugin;
-use bevy::prelude::Query;
-use bevy::prelude::Res;
-use bevy::prelude::ResMut;
-use bevy::prelude::Resource;
-use bevy::prelude::Startup;
-use bevy::prelude::Update;
+use bevy::prelude::{
+    App, Commands, Component, IntoScheduleConfigs, Plugin, Query, Res, ResMut, Resource, Startup,
+    Update,
+};
 
 #[derive(Resource)]
 struct MyGreet(String);

@@ -24,10 +24,10 @@
       "type": "shell", // shell or process
       "command": "trunk build",
       "group": "build",
-      // "presentation": {
-      //   "reveal": "always", // always reveal terminal
-      //   "panel": "new" // always create new terminal
-      // }
+      "presentation": {
+        "reveal": "always", // always reveal terminal
+        // "panel": "new" // always create new terminal
+      }
     },
     {
       "label": "gzip size (wasm)",
@@ -39,5 +39,15 @@
       //   "panel": "new" // always create new terminal
       // }
     },
+    {
+      "label": "Trunk Build & GZip",
+      "type": "shell",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Trunk Build",
+        "gzip size (wasm)"
+      ],
+      "group": "build"
+    }
   ]
 }
