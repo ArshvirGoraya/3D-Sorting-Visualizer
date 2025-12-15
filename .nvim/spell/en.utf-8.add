@@ -6,3 +6,6 @@ cspell
 Hellope
 no_autoreload
 wasm
+recognize_doubletap_gesture
+webgl2
+WinitPlugin

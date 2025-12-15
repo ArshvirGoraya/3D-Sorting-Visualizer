@@ -4,16 +4,29 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "0.17.3" }
+bevy = { version = "0.17.3", default-features = false, features = [
+  "bevy_asset",
+  "bevy_camera",
+  "bevy_color",
+  "bevy_core_pipeline",
+  "bevy_image",
+  "bevy_log",
+  "bevy_mesh",
+  "bevy_pbr",
+  "bevy_render",
+  "bevy_shader",
+  "bevy_window",
+  "bevy_winit",
+  "debug",
+  "dynamic_linking",
+  "web",
+  "webgl2",
+] }
 console_error_panic_hook = "0.1.7"
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 
 [dev-dependencies]  # only for debug builds
-bevy = { version = "0.17.3", default-features = false, features = [
-  "dynamic_linking",
-  "web",
-  "webgl2"
-] }
+bevy = { version = "0.17.3", default-features = false, features = [] }
 
 ## ######################## Bevy Compilation Settings #############################################
 # https://bevy.org/learn/quick-start/getting-started/setup/#compile-with-performance-optimizations

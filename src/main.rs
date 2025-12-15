@@ -1,27 +1,34 @@
-// use bevy::prelude::*;
-
-use bevy::log;
+use bevy::app::TaskPoolPlugin;
+use bevy::asset::{AssetApp, AssetPlugin, Assets};
+use bevy::camera::{Camera3d, CameraPlugin};
+use bevy::color::Color;
+use bevy::core_pipeline::CorePipelinePlugin;
+use bevy::image::ImagePlugin;
+use bevy::input::InputPlugin;
+use bevy::math::primitives::Cuboid;
+use bevy::mesh::{CuboidMeshBuilder, Mesh, Mesh3d, MeshBuilder, MeshPlugin};
 use bevy::prelude::{
     App, Commands, Component, IntoScheduleConfigs, Plugin, Query, Res, ResMut, Resource, Startup,
-    Update,
+    Update, WindowPlugin,
 };
+use bevy::render::RenderPlugin;
+use bevy::shader::Shader;
+use bevy::transform::components::Transform;
+use bevy::window::{MonitorSelection, VideoModeSelection, Window, WindowTheme};
+use bevy::winit::{WakeUp, WinitPlugin};
+use bevy::{log, shader};
 
-#[derive(Resource)]
-struct MyGreet(String);
-#[derive(Component)]
-struct MySayer(String);
+use bevy::a11y::{self, AccessibilityPlugin, AccessibilityRequested, ManageAccessibilityUpdates};
+
+use bevy::ecs::message::{Message, MessageRegistry}; // required by winit to handle Window Messages
+
+use bevy::pbr::{MeshMaterial3d, PbrPlugin, StandardMaterial};
 
 fn main() {
-    log::info!("hellope");
-    // plugins can be used to add entire sections of your app at once.
-    App::new().add_plugins(MyWholeApp).run();
-}
-
-pub struct MyWholeApp;
-
-impl Plugin for MyWholeApp {
-    fn build(&self, app: &mut App) {
-        app.add_plugins((
+    App::new()
+        // sending logs to console in browser:
+        .add_plugins((
+            bevy::app::PanicHandlerPlugin,
             bevy::log::LogPlugin {
                 level: log::Level::DEBUG,
                 filter: "".to_string(),
@@ -29,39 +36,74 @@ impl Plugin for MyWholeApp {
                 custom_layer: |_| None,
                 fmt_layer: |_| None,
             },
-            bevy::app::PanicHandlerPlugin,
-        ));
-        app.insert_resource(MyGreet("Hello, World!".to_string())); // Resources must be inserted to add to global state.
-        app.add_systems(Startup, spawn_sayers); // components must be spawned to add to game world.
-        app.add_systems(
-            Update,
-            (sayer, change_my_sayer, change_my_greet, sayer, test_panic).chain(),
-        );
-        // Components and resources can be accessed/mutated by systems.
-        // .chain() can be used to enforce run order during. Otherwise all Update systems run in
-        // parallel.
-    }
+        ))
+        .add_plugins(TaskPoolPlugin::default())
+        .add_plugins(InputPlugin)
+        // Spawns a primary window
+        // .add_plugins(WindowPlugin::default())
+        .add_plugins(WindowPlugin {
+            primary_window: Some(Window {
+                title: "My Window".to_string(),
+                window_theme: Some(WindowTheme::Dark),
+                recognize_doubletap_gesture: true,
+                recognize_pinch_gesture: true,
+                recognize_rotation_gesture: true,
+                recognize_pan_gesture: Some((1, 1)), // for iOS
+                // present_mode: bevy::window::PresentMode::Fifo..Default::default(),
+                // mode: bevy::window::WindowMode::Fullscreen(
+                //     MonitorSelection::Current,
+                //     VideoModeSelection::Current,
+                // ),
+                // resolution: WindowResolution
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .add_plugins(AccessibilityPlugin)
+        .add_plugins(AssetPlugin::default())
+        // Starts the event loop:
+        // Required for Winit:
+        .add_plugins(WinitPlugin::<WakeUp>::default())
+        .add_plugins(RenderPlugin::default())
+        .add_plugins(ImagePlugin::default())
+        .add_plugins(MeshPlugin)
+        .add_plugins(CameraPlugin)
+        .init_asset::<bevy::shader::Shader>()
+        .add_plugins(CorePipelinePlugin)
+        .add_plugins(PbrPlugin::default())
+        // app.init_asset::<bevy_shader::shader::Shader>()
+        // .add_systems(Startup, spawn_3d_camera)
+        .add_systems(Startup, spawn_a_cube)
+        // .add_systems(Update, test_system)
+        .run();
 }
 
-fn spawn_sayers(mut commands: Commands) {
-    commands.spawn(MySayer("Rust".to_string()));
+fn spawn_a_cube(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // cube mesh
+    // let my_mesh = meshes.add(Cuboid::new(1.2, 3.4, 5.6));
+    // let my_cube_mesh = Mesh3d(my_mesh);
+    // cube color
+    // let my_material = materials.add(Color::srgba_u8(0, 10, 0, 0));
+    // let my_cube_color = MeshMaterial3d(my_material);
+    // cube position
+    // let my_cube_position = Transform::from_xyz(0.0, 0.0, 0.0);
+
+    // let my_cube = (my_cube_mesh, my_cube_color, my_cube_position);
+    // commands.spawn(my_cube);
+
+    // commands.spawn(Mesh::from(
+    //     CuboidMeshBuilder::from(Cuboid::new(1.2, 3.4, 5.6)).build(),
+    // ));
 }
 
-fn change_my_sayer(mut query: Query<&mut MySayer>) {
-    if let Some(mut sayer) = (&mut query).into_iter().next() {
-        sayer.0 = "Odin".to_string();
-    }
+fn spawn_3d_camera(mut commands: Commands) {
+    commands.spawn(Camera3d::default());
 }
 
-fn change_my_greet(mut my_greet: ResMut<MyGreet>) {
-    my_greet.0 = "Hellope!".to_string();
-}
-
-fn sayer(my_greet: Res<MyGreet>, query: Query<&MySayer>) {
-    log::info!("{} says {}", query.single().unwrap().0, my_greet.0)
-    // println!("{} says {}", query.single().unwrap().0, my_greet.0)
-}
-
-fn test_panic() {
-    panic!("THIS IS JUST A TEST DO NOT BE ALARMED!")
+fn test_system() {
+    log::info!("this is my system...")
 }
