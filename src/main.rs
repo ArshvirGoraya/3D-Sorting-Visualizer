@@ -1,50 +1,14 @@
-use bevy::app::TaskPoolPlugin;
-use bevy::asset::{AssetApp, AssetPlugin, Assets};
-use bevy::camera::{Camera3d, CameraPlugin};
-use bevy::color::Color;
-use bevy::core_pipeline::CorePipelinePlugin;
-use bevy::image::ImagePlugin;
-use bevy::input::InputPlugin;
-use bevy::math::primitives::Cuboid;
-use bevy::mesh::{CuboidMeshBuilder, Mesh, Mesh3d, MeshBuilder, MeshPlugin};
-use bevy::prelude::{
-    App, Commands, Component, IntoScheduleConfigs, Plugin, Query, Res, ResMut, Resource, Startup,
-    Update, WindowPlugin,
-};
-use bevy::render::RenderPlugin;
-use bevy::shader::Shader;
-use bevy::transform::components::Transform;
-use bevy::window::{MonitorSelection, VideoModeSelection, Window, WindowTheme};
-use bevy::winit::{WakeUp, WinitPlugin};
-use bevy::{log, shader};
+use bevy::prelude::*;
 
-use bevy::a11y::{self, AccessibilityPlugin, AccessibilityRequested, ManageAccessibilityUpdates};
-
-use bevy::ecs::message::{Message, MessageRegistry}; // required by winit to handle Window Messages
-
-use bevy::pbr::{MeshMaterial3d, PbrPlugin, StandardMaterial};
+use bevy_panorbit_camera;
 
 fn main() {
     App::new()
         // sending logs to console in browser:
-        .add_plugins((
-            bevy::app::PanicHandlerPlugin,
-            bevy::log::LogPlugin {
-                level: log::Level::DEBUG,
-                filter: "".to_string(),
-                // filter: "wgpu=error,bevy_render=info,bevy_ecs=trace".to_string(),
-                custom_layer: |_| None,
-                fmt_layer: |_| None,
-            },
-        ))
-        .add_plugins(TaskPoolPlugin::default())
-        .add_plugins(InputPlugin)
-        // Spawns a primary window
-        // .add_plugins(WindowPlugin::default())
-        .add_plugins(WindowPlugin {
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "My Window".to_string(),
-                window_theme: Some(WindowTheme::Dark),
+                window_theme: Some(bevy::window::WindowTheme::Dark),
                 recognize_doubletap_gesture: true,
                 recognize_pinch_gesture: true,
                 recognize_rotation_gesture: true,
@@ -58,21 +22,10 @@ fn main() {
                 ..Default::default()
             }),
             ..Default::default()
-        })
-        .add_plugins(AccessibilityPlugin)
-        .add_plugins(AssetPlugin::default())
-        // Starts the event loop:
-        // Required for Winit:
-        .add_plugins(WinitPlugin::<WakeUp>::default())
-        .add_plugins(RenderPlugin::default())
-        .add_plugins(ImagePlugin::default())
-        .add_plugins(MeshPlugin)
-        .add_plugins(CameraPlugin)
-        .init_asset::<bevy::shader::Shader>()
-        .add_plugins(CorePipelinePlugin)
-        .add_plugins(PbrPlugin::default())
-        // app.init_asset::<bevy_shader::shader::Shader>()
-        // .add_systems(Startup, spawn_3d_camera)
+        }))
+        // https://github.com/Plonq/bevy_panorbit_camera
+        .add_plugins(bevy_panorbit_camera::PanOrbitCameraPlugin)
+        .add_systems(Startup, spawn_3d_camera)
         .add_systems(Startup, spawn_a_cube)
         // .add_systems(Update, test_system)
         .run();
@@ -84,24 +37,50 @@ fn spawn_a_cube(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // cube mesh
-    // let my_mesh = meshes.add(Cuboid::new(1.2, 3.4, 5.6));
-    // let my_cube_mesh = Mesh3d(my_mesh);
+    let my_mesh = meshes.add(Cuboid::new(1.2, 3.4, 5.6));
+    let my_cube_mesh = Mesh3d(my_mesh);
     // cube color
-    // let my_material = materials.add(Color::srgba_u8(0, 10, 0, 0));
-    // let my_cube_color = MeshMaterial3d(my_material);
+    let my_material = materials.add(StandardMaterial {
+        base_color: Color::srgba_u8(0, u8::MAX, 0, u8::MAX),
+        // unlit: true,
+        // alpha_mode: AlphaMode::Opaque,
+        emissive: LinearRgba {
+            red: 0.0,
+            green: 0.0,
+            blue: 20.0,
+            alpha: 0.0,
+        },
+        ..Default::default()
+    });
+    let my_cube_color = MeshMaterial3d(my_material);
     // cube position
-    // let my_cube_position = Transform::from_xyz(0.0, 0.0, 0.0);
+    let my_cube_position = Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::new(5.0, 5.0, 5.0));
 
-    // let my_cube = (my_cube_mesh, my_cube_color, my_cube_position);
-    // commands.spawn(my_cube);
+    let my_cube = (my_cube_mesh, my_cube_color, my_cube_position);
+    commands.spawn(my_cube);
 
     // commands.spawn(Mesh::from(
     //     CuboidMeshBuilder::from(Cuboid::new(1.2, 3.4, 5.6)).build(),
     // ));
+    log::info!("cube spawned")
 }
 
 fn spawn_3d_camera(mut commands: Commands) {
-    commands.spawn(Camera3d::default());
+    commands.spawn((
+        bevy_panorbit_camera::PanOrbitCamera {
+            focus: Vec3::ZERO,
+            target_focus: Vec3::ZERO,
+            zoom_lower_limit: 10.0,
+            pan_sensitivity: 0.0,   // disable panning
+            orbit_sensitivity: 2.0, // orbit faster
+            // button_orbit: (MouseButton::Right, MouseButton::Left),
+            orbit_smoothness: 0.0, // orbit without any smoothing
+            ..Default::default()
+        },
+        // Camera3d::default(),
+        Transform::from_xyz(100.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+    log::info!("camera spawned")
 }
 
 fn test_system() {

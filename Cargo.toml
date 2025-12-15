@@ -19,9 +19,12 @@ bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_winit",
   "debug",
   "dynamic_linking",
+  "tonemapping_luts",
   "web",
   "webgl2",
+  "zstd_rust",
 ] }
+bevy_panorbit_camera = "0.33.0"
 console_error_panic_hook = "0.1.7"
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 
