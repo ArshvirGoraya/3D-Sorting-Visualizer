@@ -1,7 +1,7 @@
 # This script is to check the size of the .wasm file (produced from Trunk) when it is compressed. 
 # Rationale: Since HTTP protocols compress files before sending them, the .wasm file should be compressed to see what its final size will be when served to the user.
 
-$wasm_dir = "./root/"
+$wasm_dir = "./docs/"
 $wasm_suffix = ".wasm"
 $gz_suffix = ".gz"
 

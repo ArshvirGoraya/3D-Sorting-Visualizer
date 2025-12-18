@@ -6,7 +6,7 @@ trunk-version = "^0.21.14"  # Trunk version at the start of this project.
 [build]
 target = "index.html"  # The index HTML file to drive the bundling process.
 minify = "on_release"  # Control minification: can be one of: never, on_release, always
-dist = "root"  # the folder name can be used by GitHub Pages (if not using GitHub Actions)
+dist = "docs"  # the folder name can be used by GitHub Pages (if not using GitHub Actions)
 
 [serve]
 no_autoreload = false  # Disable auto-reload of the web app.
