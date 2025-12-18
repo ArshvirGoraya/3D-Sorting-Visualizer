@@ -1,6 +1,6 @@
-use bevy::{prelude::*, window::WindowResolution};
+use bevy::prelude::*;
 
-use bevy_panorbit_camera;
+use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
 fn main() {
     App::new()
@@ -24,7 +24,7 @@ fn main() {
             ..Default::default()
         }))
         // https://github.com/Plonq/bevy_panorbit_camera
-        .add_plugins(bevy_panorbit_camera::PanOrbitCameraPlugin)
+        .add_plugins(PanOrbitCameraPlugin)
         .add_systems(Startup, spawn_3d_camera)
         .add_systems(Startup, spawn_a_cube)
         // .add_systems(Update, test_system)
@@ -67,7 +67,7 @@ fn spawn_a_cube(
 
 fn spawn_3d_camera(mut commands: Commands) {
     commands.spawn((
-        bevy_panorbit_camera::PanOrbitCamera {
+        PanOrbitCamera {
             focus: Vec3::ZERO,
             allow_upside_down: true,
             target_focus: Vec3::ZERO,

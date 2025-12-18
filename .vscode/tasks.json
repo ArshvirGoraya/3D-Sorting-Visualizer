@@ -7,22 +7,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Hello World",
-      "type": "shell", // shell or process
-      "command": "echo 'Hello, World!'",
-      // "windows": {
-      //	"command": "./scripts/test.sh",
-      //  }
-      "group": "build",
-      // "presentation": {
-      //   "reveal": "always", // always reveal terminal
-      //   "panel": "new" // always create new terminal
-      // }
-    },
-    {
       "label": "Trunk Build",
       "type": "shell", // shell or process
-      "command": "trunk build",
+      "command": "trunk build --release",
       "group": "build",
       "presentation": {
         "reveal": "always", // always reveal terminal

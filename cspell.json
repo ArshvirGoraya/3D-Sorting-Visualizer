@@ -12,6 +12,8 @@
     // Ignore IDE stuff:
     "**/nvim/runtime/**",
     "**/nvim-data/**",
+    // Ignore Rust libs
+    "**/scoop/**",
     // Ignore spellfile
     "en.utf-8.add",
     // Ignore git stuff

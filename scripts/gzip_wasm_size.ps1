@@ -72,7 +72,7 @@ function Print-File-Size{
 
   Write-Host "wasm.gz: $bytes_mb(mb), $bytes_kb(kb)"
 
-  if ($bytes_mb -gt 3){
+  if ($bytes_mb -gt 3.0){
     Write-Warning "wasm is a little large..."
   }else{
     Write-Host "wasm is OK size" -ForegroundColor Green
