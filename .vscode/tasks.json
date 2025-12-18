@@ -9,7 +9,7 @@
     {
       "label": "Trunk Build",
       "type": "shell", // shell or process
-      "command": "trunk build --release",
+      "command": "trunk build --release --public-url /3D-Sorting-Visualizer/",
       "group": "build",
       "presentation": {
         "reveal": "always", // always reveal terminal
