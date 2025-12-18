@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::WindowResolution};
 
 use bevy_panorbit_camera;
 
@@ -7,18 +7,18 @@ fn main() {
         // sending logs to console in browser:
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "My Window".to_string(),
+                title: "3D Sorting".to_string(),
+                // resolution: WindowResolution {
+                //     ..Default::default()
+                // },
                 window_theme: Some(bevy::window::WindowTheme::Dark),
                 recognize_doubletap_gesture: true,
                 recognize_pinch_gesture: true,
                 recognize_rotation_gesture: true,
                 recognize_pan_gesture: Some((1, 1)), // for iOS
                 // present_mode: bevy::window::PresentMode::Fifo..Default::default(),
-                // mode: bevy::window::WindowMode::Fullscreen(
-                //     MonitorSelection::Current,
-                //     VideoModeSelection::Current,
-                // ),
-                // resolution: WindowResolution
+                mode: bevy::window::WindowMode::Windowed,
+                fit_canvas_to_parent: true, // wasm "fullscreen"
                 ..Default::default()
             }),
             ..Default::default()
@@ -69,6 +69,7 @@ fn spawn_3d_camera(mut commands: Commands) {
     commands.spawn((
         bevy_panorbit_camera::PanOrbitCamera {
             focus: Vec3::ZERO,
+            allow_upside_down: true,
             target_focus: Vec3::ZERO,
             zoom_lower_limit: 10.0,
             pan_sensitivity: 0.0,   // disable panning
@@ -81,8 +82,4 @@ fn spawn_3d_camera(mut commands: Commands) {
         Transform::from_xyz(100.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
     log::info!("camera spawned")
-}
-
-fn test_system() {
-    log::info!("this is my system...")
 }
