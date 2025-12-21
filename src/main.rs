@@ -19,7 +19,7 @@ fn main() {
                 // present_mode: bevy::window::PresentMode::Fifo..Default::default(),
                 mode: bevy::window::WindowMode::Windowed,
                 fit_canvas_to_parent: true, // wasm "fullscreen"
-                prevent_default_event_handling: false,
+                prevent_default_event_handling: true,
                 ..Default::default()
             }),
             ..Default::default()
