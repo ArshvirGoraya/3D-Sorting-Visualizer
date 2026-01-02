@@ -17,18 +17,26 @@ bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_shader",
   "bevy_window",
   "bevy_winit",
-  "dynamic_linking",
+  "png",
+  # "dynamic_linking",
   "tonemapping_luts",
   "web",
   "webgl2",
-  "zstd_rust",
+  "zstd_rust"
 ] }
-bevy_panorbit_camera = "0.33.0"
+bevy_egui = "0.38.1"
+# https://github.com/Plonq/bevy_panorbit_camera/blob/master/Cargo.toml#L14
+bevy_panorbit_camera = { version = "0.33.0", features = ["bevy_egui"] }
 console_error_panic_hook = "0.1.7"
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 
 [dev-dependencies]  # only for debug builds
 bevy = { version = "0.17.3", default-features = false, features = ["debug"] }
+# https://github.com/vladbat00/bevy_egui/blob/main/Cargo.toml#L16
+bevy_egui = { version = "0.38.1", features = [
+  "log_file_dnd_messages",
+  "log_input_messages"
+] }
 
 ## ######################## Bevy Compilation Settings #############################################
 # https://bevy.org/learn/quick-start/getting-started/setup/#compile-with-performance-optimizations

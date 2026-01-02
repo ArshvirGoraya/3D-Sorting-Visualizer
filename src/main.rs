@@ -1,13 +1,27 @@
-use bevy::prelude::*;
+use bevy::{color, prelude::*};
 
+use bevy_egui::{
+    EguiContexts, EguiPlugin, EguiPrimaryContextPass, EguiTextureHandle,
+    egui::{self, Color32},
+};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+
+const PROGRAM_TITLE: &str = "3D Sorting";
+
+#[derive(Default)]
+pub struct UiState {}
+
+#[derive(Resource)]
+pub struct GithubImage {
+    texture_id: egui::TextureId,
+}
 
 fn main() {
     App::new()
         // sending logs to console in browser:
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "3D Sorting".to_string(),
+                title: PROGRAM_TITLE.to_string(),
                 // resolution: WindowResolution {
                 //     ..Default::default()
                 // },
@@ -26,10 +40,47 @@ fn main() {
         }))
         // https://github.com/Plonq/bevy_panorbit_camera
         .add_plugins(PanOrbitCameraPlugin)
+        .add_plugins(EguiPlugin::default())
         .add_systems(Startup, spawn_3d_camera)
         .add_systems(Startup, spawn_a_cube)
+        .add_systems(Startup, get_texture_ids)
+        .add_systems(EguiPrimaryContextPass, ui_system)
         // .add_systems(Update, test_system)
         .run();
+}
+
+fn get_texture_ids(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut egui_textures: ResMut<bevy_egui::EguiUserTextures>,
+) {
+    let handle: Handle<Image> = asset_server.load("github-white.png");
+    let texture_id = egui_textures.add_image(EguiTextureHandle::Strong(handle));
+    commands.insert_resource(GithubImage { texture_id });
+}
+
+fn ui_system(
+    mut contexts: EguiContexts,
+    mut ui_state: Local<UiState>,
+    github_image: Res<GithubImage>,
+    mut img_loaded: Local<bool>,
+    mut rendered_texture_id: Local<egui::TextureId>,
+    image_assets: ResMut<Assets<Image>>,
+) -> Result {
+    egui::Window::new(PROGRAM_TITLE).show(contexts.ctx_mut()?, |ui| {
+        let github_button = egui::Button::image(egui::load::SizedTexture::new(
+            github_image.texture_id,
+            // images.github.1,
+            [25.0, 25.0],
+        ));
+        if ui.add(github_button).clicked() {
+            ui.ctx().open_url(egui::OpenUrl {
+                new_tab: true,
+                url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
+            });
+        }
+    });
+    Ok(())
 }
 
 fn spawn_a_cube(
