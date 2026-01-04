@@ -1,8 +1,8 @@
-use bevy::{color, prelude::*};
+use bevy::{prelude::*};
 
 use bevy_egui::{
     EguiContexts, EguiPlugin, EguiPrimaryContextPass, EguiTextureHandle,
-    egui::{self, Color32},
+    egui::{self, Layout, Margin, Spacing, vec2},
 };
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -11,17 +11,17 @@ use regex_lite::Regex;
 
 const PROGRAM_TITLE: &str = "3D Sorting";
 
-#[derive(Default)]
-pub struct UiState {}
-
 #[derive(Resource)]
-pub struct GithubImage {
-    texture_id: egui::TextureId,
+pub struct FontScale {
+    scale: f32,
 }
 
-#[derive(Resource, Default)]
-pub struct TextInput {
-    val: String,
+#[derive(Resource)]
+pub struct ImageIds{
+    github: egui::TextureId,
+    zoom_in: egui::TextureId,
+    zoom_out: egui::TextureId,
+    clipboard: egui::TextureId,
 }
 
 #[derive(Resource)]
@@ -63,9 +63,9 @@ fn main() {
         // https://github.com/Plonq/bevy_panorbit_camera
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(EguiPlugin::default())
-        .insert_resource(TextInput::default())
         // .insert_resource(NumberRegex::default())
         .init_resource::<NumberRegex>()
+        .insert_resource(FontScale { scale: 1.0 })
         .add_systems(Startup, spawn_3d_camera)
         .add_systems(Startup, spawn_a_cube)
         .add_systems(Startup, get_texture_ids)
@@ -79,9 +79,12 @@ fn get_texture_ids(
     asset_server: Res<AssetServer>,
     mut egui_textures: ResMut<bevy_egui::EguiUserTextures>,
 ) {
-    let handle: Handle<Image> = asset_server.load("github-white.png");
-    let texture_id = egui_textures.add_image(EguiTextureHandle::Strong(handle));
-    commands.insert_resource(GithubImage { texture_id });
+    commands.insert_resource(ImageIds{
+        github: egui_textures.add_image(EguiTextureHandle::Strong(asset_server.load("github-white.png"))),
+        zoom_in: egui_textures.add_image(EguiTextureHandle::Strong(asset_server.load("zoom-in.png"))),
+        zoom_out: egui_textures.add_image(EguiTextureHandle::Strong(asset_server.load("zoom-out.png"))),
+        clipboard: egui_textures.add_image(EguiTextureHandle::Strong(asset_server.load("clipboard.png"))),
+    });
 }
 
 fn detect_precision_loss(original: &str, parsed: f64) -> bool {
@@ -114,31 +117,135 @@ fn normalize_string(s: &str) -> String {
     s
 }
 
+fn get_sort_indices(values: &[f64]) -> Vec<usize> {
+    // todo: sort indices by orinal value to get final positions
+    let mut sorted_indices: Vec<usize> = (0..values.len()).collect();
+
+    sorted_indices.sort_by(|&i, &j| values[i].partial_cmp(&values[j]).unwrap());
+
+    sorted_indices
+}
+
+fn scale_ui(style: &mut egui::Style, scale : f32){
+    use egui::FontFamily::Proportional;
+    use egui::FontId;
+    use egui::TextStyle::*;
+
+
+    // go to definition of egui::Style for these defaults 
+    style.text_styles = [
+        (Heading, FontId::new(30.0 * scale, Proportional)),
+        // (Name("Heading2".into()), FontId::new(25.0 * scale, Proportional)),
+        // (Name("Context".into()), FontId::new(23.0 * scale, Proportional)),
+        (Body, FontId::new(18.0 * scale, Proportional)),
+        (Monospace, FontId::new(14.0 * scale, Proportional)),
+        (Button, FontId::new(14.0 * scale, Proportional)),
+        (Small, FontId::new(10.0 * scale, Proportional)),
+    ].into();
+
+    style.spacing = Spacing  {
+            item_spacing: vec2(8.0, 3.0) * scale,
+            window_margin: Margin::same(6 * scale as i8),
+            menu_margin: Margin::same(6 * scale as i8),
+            button_padding: vec2(4.0, 1.0) * scale,
+            indent: 18.0 * scale,
+            interact_size: vec2(40.0, 18.0) * scale,
+            slider_width: 100.0 * scale,
+            slider_rail_height: 8.0 * scale,
+            combo_width: 100.0 * scale,
+            text_edit_width: 280.0 * scale,
+            icon_width: 14.0 * scale,
+            icon_width_inner: 8.0 * scale,
+            icon_spacing: 4.0 * scale,
+            tooltip_width: 500.0 * scale,
+            // default_area_size: vec2(600.0, 400.0) * scale,
+            // menu_width: 400.0 * scale,
+            // menu_spacing: 2.0 * scale,
+            // combo_height: 200.0 * scale,
+            ..Default::default()
+    };
+}
+
 fn ui_system(
     mut contexts: EguiContexts,
-    mut ui_state: Local<UiState>,
-    github_image: Res<GithubImage>,
-    mut img_loaded: Local<bool>,
-    mut rendered_texture_id: Local<egui::TextureId>,
-    image_assets: ResMut<Assets<Image>>,
+    image_ids: Res<ImageIds>,
     mut my_text: Local<String>,
-    // mut my_text: ResMut<TextInput>,
     number_regex: Res<NumberRegex>,
+    mut clipboard: ResMut<bevy_egui::EguiClipboard>,
+    mut font_scale: ResMut<FontScale>
+
 ) -> Result {
-    egui::Window::new(PROGRAM_TITLE).show(contexts.ctx_mut()?, |ui| {
-        let github_button = egui::Button::image(egui::load::SizedTexture::new(
-            github_image.texture_id,
-            // images.github.1,
-            [25.0, 25.0],
-        ));
-        if ui.add(github_button).on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer").clicked() {
-            ui.ctx().open_url(egui::OpenUrl {
-                new_tab: true,
-                url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
+    let ctx = contexts.ctx_mut()?;
+    let logo_size = 25.0 * font_scale.scale;
+
+    egui::Window::new(PROGRAM_TITLE).show(ctx, |ui| {
+        ui.horizontal(|ui|{
+            if ui.add(egui::Button::image(egui::load::SizedTexture::new(
+                        image_ids.github,
+                        // images.github.1,
+                        [logo_size, logo_size],
+            ))).on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer").clicked() {
+                ui.ctx().open_url(egui::OpenUrl {
+                    new_tab: true,
+                    url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
+                });
+            }
+
+            ui.with_layout(Layout::right_to_left(egui::Align::RIGHT), |ui|{
+                if ui.add(egui::Button::image(egui::load::SizedTexture::new(
+                            image_ids.zoom_in,
+                            [logo_size, logo_size],
+                ))).on_hover_text("Increase Font").clicked() {
+                    font_scale.scale = f32::min(10.0, font_scale.scale + 0.1);
+                    font_scale.set_changed();
+                    log::info!("increased: {}", font_scale.scale)
+                    // ui_state.font_size = f32::min(10.0, ui_state.font_size + 0.1);
+                    // let ui_scale = ui_state.font_size;
+                    // ui.ctx().all_styles_mut(move |style| {
+                    //     scale_ui(style, ui_scale);
+                    // });
+                }
+                if ui.add(egui::Button::image(egui::load::SizedTexture::new(
+                            image_ids.zoom_out,
+                            [logo_size, logo_size],
+                ))).on_hover_text("Decrease Font").clicked() {
+                    font_scale.scale = f32::max(0.1, font_scale.scale - 0.1);
+                    font_scale.set_changed();
+
+                    log::info!("decreased: {}", font_scale.scale)
+
+                    // ui_state.font_size = f32::max(0.1, ui_state.font_size - 0.1);
+                    // let ui_scale = ui_state.font_size;
+                    // ui.ctx().all_styles_mut(move |style| {
+                    //     scale_ui(style, ui_scale);
+                    // });
+                }
             });
-        }
+        });
+
+
+        // Might be better to use a really small nerd font that in is smaller than all used images
+        // if in aggregate the images are smaller than the font in size.
+        // Can make a font with only the used logos too in order to get a very small font size?
+        // if ui.button("").on_hover_text("go to github page").clicked(){
+        //     ui.ctx().open_url(egui::OpenUrl {
+        //         new_tab: true,
+        //         url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
+        //     });
+        // }
+        
+        ui.horizontal(|ui|{
+            if ui.add(egui::Button::image(egui::load::SizedTexture::new(
+                        image_ids.clipboard,
+                        [logo_size, logo_size],
+            ))).on_hover_text("copy to clipboard").clicked() {
+                clipboard.set_text(&my_text);
+            }
+            ui.colored_label(egui::Color32::from_rgb(255, 0, 0), "parse info");
+        });
+
         if ui
-            .add(egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here")).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
+            .add(egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width())).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex expression: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
             .changed()
         {
             let parsed_numbers: Vec<f64> = number_regex
@@ -171,6 +278,15 @@ fn ui_system(
             log::info!("parsed numbers: {:?}", parsed_numbers);
         }
     });
+
+    if font_scale.is_changed() {
+        log::info!("font is changed");
+        let scale = font_scale.scale;
+        ctx.all_styles_mut(move |style| {
+            scale_ui(style, scale);
+        });
+    }
+
     Ok(())
 }
 
