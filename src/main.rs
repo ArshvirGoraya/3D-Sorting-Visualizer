@@ -1,4 +1,4 @@
-use bevy::{prelude::*};
+use bevy::{input::mouse::MouseWheel, prelude::*};
 
 use bevy_egui::{
     EguiContexts, EguiPlugin, EguiPrimaryContextPass, EguiTextureHandle,
@@ -14,6 +14,9 @@ const PROGRAM_TITLE: &str = "3D Sorting";
 #[derive(Resource)]
 pub struct FontScale {
     scale: f32,
+    max: f32,
+    min: f32,
+    scale_step: f32,
 }
 
 #[derive(Resource)]
@@ -65,10 +68,11 @@ fn main() {
         .add_plugins(EguiPlugin::default())
         // .insert_resource(NumberRegex::default())
         .init_resource::<NumberRegex>()
-        .insert_resource(FontScale { scale: 1.0 })
+        .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
         .add_systems(Startup, spawn_3d_camera)
         .add_systems(Startup, spawn_a_cube)
         .add_systems(Startup, get_texture_ids)
+        .add_systems(Update, font_scale_inputs)
         .add_systems(EguiPrimaryContextPass, ui_system)
         // .add_systems(Update, test_system)
         .run();
@@ -126,6 +130,36 @@ fn get_sort_indices(values: &[f64]) -> Vec<usize> {
     sorted_indices
 }
 
+fn increase_font(font_scale: &mut FontScale){
+    font_scale.scale = f32::min(font_scale.max, font_scale.scale + font_scale.scale_step);
+}
+fn decrease_font(font_scale: &mut FontScale){
+    font_scale.scale = f32::max(font_scale.min, font_scale.scale - font_scale.scale_step);
+}
+
+fn font_scale_inputs(
+    mut font_scale: ResMut<FontScale>,
+    (mut mouse_scroll_event, keyboard_input): (MessageReader<MouseWheel>, Res<ButtonInput<KeyCode>>),
+    ){
+    if keyboard_input.pressed(KeyCode::ControlLeft) || keyboard_input.pressed(KeyCode::ControlRight){
+        // Keyboard:
+        if keyboard_input.pressed(KeyCode::Equal) {
+            increase_font(&mut font_scale);
+        }
+        if keyboard_input.pressed(KeyCode::Minus) {
+            decrease_font(&mut font_scale);
+        }
+        // Mouse scroll:
+        for ev in mouse_scroll_event.read(){
+            if ev.y > 0.0 {
+                increase_font(&mut font_scale);
+            } else {
+                decrease_font(&mut font_scale);
+            }
+        }
+    }
+}
+
 fn scale_ui(style: &mut egui::Style, scale : f32){
     use egui::FontFamily::Proportional;
     use egui::FontId;
@@ -166,6 +200,7 @@ fn scale_ui(style: &mut egui::Style, scale : f32){
     };
 }
 
+
 fn ui_system(
     mut contexts: EguiContexts,
     image_ids: Res<ImageIds>,
@@ -196,8 +231,7 @@ fn ui_system(
                             image_ids.zoom_in,
                             [logo_size, logo_size],
                 ))).on_hover_text("Increase Font").clicked() {
-                    font_scale.scale = f32::min(10.0, font_scale.scale + 0.1);
-                    font_scale.set_changed();
+                    increase_font(&mut font_scale);
                     log::info!("increased: {}", font_scale.scale)
                     // ui_state.font_size = f32::min(10.0, ui_state.font_size + 0.1);
                     // let ui_scale = ui_state.font_size;
@@ -209,8 +243,7 @@ fn ui_system(
                             image_ids.zoom_out,
                             [logo_size, logo_size],
                 ))).on_hover_text("Decrease Font").clicked() {
-                    font_scale.scale = f32::max(0.1, font_scale.scale - 0.1);
-                    font_scale.set_changed();
+                    decrease_font(&mut font_scale);
 
                     log::info!("decreased: {}", font_scale.scale)
 
@@ -325,6 +358,14 @@ fn spawn_a_cube(
 }
 
 fn spawn_3d_camera(mut commands: Commands) {
+    // todo: replace with own camera
+    // add normal keyboard controls
+    // add own mouse controls: right click should also work
+    // add touch controls: left-right is faster than up-down in this solution... Strange.
+    // gamepad controls: unnecessary but add if easy
+    // trackpad: zooms
+    // also: do not zoom when ctrl is pressed: that is for zooming in and out UI
+    // do not zoom when pinching in within ui: in that case scale the UI instead?
     commands.spawn((
         PanOrbitCamera {
             focus: Vec3::ZERO,
