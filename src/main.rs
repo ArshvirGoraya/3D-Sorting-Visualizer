@@ -200,14 +200,16 @@ fn scale_ui(style: &mut egui::Style, scale : f32){
     };
 }
 
-
+#[allow(clippy::too_many_arguments)]
 fn ui_system(
     mut contexts: EguiContexts,
     image_ids: Res<ImageIds>,
     mut my_text: Local<String>,
     number_regex: Res<NumberRegex>,
     mut clipboard: ResMut<bevy_egui::EguiClipboard>,
-    mut font_scale: ResMut<FontScale>
+    mut font_scale: ResMut<FontScale>,
+    mut parsed_numbers: Local<Vec<f64>>,
+    mut text_is_dirty: Local<bool>,
 
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
@@ -256,7 +258,7 @@ fn ui_system(
             });
         });
 
-
+        // todo:
         // Might be better to use a really small nerd font that in is smaller than all used images
         // if in aggregate the images are smaller than the font in size.
         // Can make a font with only the used logos too in order to get a very small font size?
@@ -267,6 +269,7 @@ fn ui_system(
         //     });
         // }
         
+
         ui.horizontal(|ui|{
             if ui.add(egui::Button::image(egui::load::SizedTexture::new(
                         image_ids.clipboard,
@@ -274,14 +277,28 @@ fn ui_system(
             ))).on_hover_text("copy to clipboard").clicked() {
                 clipboard.set_text(&my_text);
             }
+            if ui.add_enabled(*text_is_dirty,egui::Button::new("clean text")).on_hover_text("clean text into detected numbers seperated by commas").clicked(){
+                *my_text = parsed_numbers.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", ");
+                *text_is_dirty = false;
+                log::info!("cleaned text");
+
+            }
             ui.colored_label(egui::Color32::from_rgb(255, 0, 0), "parse info");
         });
 
+        let text_edit = egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width());
+
         if ui
-            .add(egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width())).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex expression: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
+            .add(text_edit).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex expression: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
             .changed()
         {
-            let parsed_numbers: Vec<f64> = number_regex
+            // todo: maybe add fancy stuff like remembering which parts of the string are already
+            // parsed, and parsing only new stuff and deleting any removed stuff.
+            // Could carry over to spawning cubes where not all cubes are respawned: instead only
+            // new cubes are added?
+
+            *text_is_dirty = true;
+            *parsed_numbers = number_regex
                 .re
                 .find_iter(&my_text)
                 .filter_map(|m|{
@@ -313,7 +330,6 @@ fn ui_system(
     });
 
     if font_scale.is_changed() {
-        log::info!("font is changed");
         let scale = font_scale.scale;
         ctx.all_styles_mut(move |style| {
             scale_ui(style, scale);
