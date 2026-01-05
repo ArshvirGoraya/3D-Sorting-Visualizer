@@ -1,4 +1,6 @@
-use bevy::{input::mouse::MouseWheel, prelude::*};
+use core::{f64, fmt};
+
+use bevy::{ecs::relationship::RelationshipSourceCollection, input::mouse::MouseWheel, platform::collections::HashMap, prelude::*, render::render_resource::encase::private::Truncate};
 
 use bevy_egui::{
     EguiContexts, EguiPlugin, EguiPrimaryContextPass, EguiTextureHandle,
@@ -41,6 +43,82 @@ impl Default for NumberRegex {
     }
 }
 
+#[derive(Default, Hash, Eq, PartialEq, Clone, Copy)]
+enum ParsedWarning{
+    #[default] Ok,
+    Error,
+    Overflow,
+    Underflow,
+    PrecisionLoss
+}
+
+impl fmt::Display for ParsedWarning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParsedWarning::Ok => write!(f, "Ok"),
+            ParsedWarning::Error => write!(f, "Error"),
+            ParsedWarning::Overflow => write!(f, "Overflow"),
+            ParsedWarning::Underflow => write!(f, "Underflow"),
+            ParsedWarning::PrecisionLoss => write!(f, "PrecisionLoss"),
+        }
+    }
+}
+
+
+
+#[derive(Default)]
+pub struct StringInfo{
+    start_index: usize,
+    end_index: usize,
+}
+
+#[derive(Default)]
+pub struct ParsedValue{
+    raw_string: StringInfo,
+    matched_string: StringInfo,
+    converted_value: f64,
+    parsed_warning: ParsedWarning,
+    // final_posiion: int,
+    // box_handle: int
+}
+
+#[derive(Resource)]
+pub struct ProblemValues{
+    // Stores indices in ParsedValues that have parse problems.
+    map: HashMap<ParsedWarning, Vec<usize>>,
+}
+
+impl ProblemValues{
+    fn new() -> Self{
+        let mut map: HashMap<ParsedWarning, Vec<usize>> = HashMap::new();
+        for key in [ParsedWarning::Ok, ParsedWarning::Error, ParsedWarning::Overflow, ParsedWarning::Underflow, ParsedWarning::PrecisionLoss]{
+            map.insert(key, Vec::new());
+        }
+        Self{
+            map
+        }
+    }
+}
+
+
+#[derive(Resource, Default)]
+pub struct ParsedValues{
+    vals: Vec<ParsedValue>
+}
+
+#[derive(Default)]
+pub struct NumString{
+    requires_restring: bool,
+    val: String,
+}
+
+#[derive(Default)]
+pub struct ColoredStrings{
+    requires_restring: bool,
+    vals: Vec<egui::RichText>
+}
+
+
 fn main() {
     App::new()
         // sending logs to console in browser:
@@ -68,7 +146,9 @@ fn main() {
         .add_plugins(EguiPlugin::default())
         // .insert_resource(NumberRegex::default())
         .init_resource::<NumberRegex>()
+        .init_resource::<ParsedValues>()
         .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
+        .insert_resource(ProblemValues::new())
         .add_systems(Startup, spawn_3d_camera)
         .add_systems(Startup, spawn_a_cube)
         .add_systems(Startup, get_texture_ids)
@@ -122,7 +202,7 @@ fn normalize_string(s: &str) -> String {
 }
 
 fn get_sort_indices(values: &[f64]) -> Vec<usize> {
-    // todo: sort indices by orinal value to get final positions
+    // todo: sort indices by original value to get final positions
     let mut sorted_indices: Vec<usize> = (0..values.len()).collect();
 
     sorted_indices.sort_by(|&i, &j| values[i].partial_cmp(&values[j]).unwrap());
@@ -200,17 +280,82 @@ fn scale_ui(style: &mut egui::Style, scale : f32){
     };
 }
 
+fn add_parsed_value(parsed_values: &mut ParsedValues, converted_value: f64, parsed_warning: ParsedWarning, index: usize, match_start: usize, match_end: usize){
+    let previous_raw_string_end_index = {
+        if index == 0{
+            0
+        }else{
+            parsed_values.vals.get(index - 1).unwrap().raw_string.end_index
+        }
+    };
+
+    if let Some(parsed_value) = parsed_values.vals.get_mut(index) {
+        // If vector already contains a parsed_value object at this index, just change its values:
+        parsed_value.raw_string.start_index = previous_raw_string_end_index;
+        parsed_value.raw_string.end_index = match_end;
+
+        parsed_value.converted_value = converted_value;
+        parsed_value.parsed_warning = parsed_warning;
+        parsed_value.matched_string.start_index = match_start;
+        parsed_value.matched_string.end_index = match_end;
+    }else{
+        parsed_values.vals.push(ParsedValue{
+            converted_value,
+            parsed_warning,
+            matched_string: StringInfo{start_index: match_start, end_index: match_end},
+            raw_string: StringInfo{start_index: previous_raw_string_end_index, end_index: match_end}
+        });
+    }
+}
+
+#[allow(clippy::collapsible_if)]
+fn set_worse_parse_problem(worse_parse_problem: &ParsedWarning, parsed_problem: ParsedWarning) -> ParsedWarning{
+    if parsed_problem == ParsedWarning::PrecisionLoss{
+        if *worse_parse_problem != ParsedWarning::Error && *worse_parse_problem != ParsedWarning::Overflow && *worse_parse_problem != ParsedWarning::Underflow {
+            return ParsedWarning::PrecisionLoss;
+        }
+    }
+    if parsed_problem == ParsedWarning::Overflow{
+        if *worse_parse_problem != ParsedWarning::Error{
+            return ParsedWarning::Overflow;
+        }
+    }
+    if parsed_problem == ParsedWarning::Underflow{
+        if *worse_parse_problem != ParsedWarning::Error{
+            return ParsedWarning::Underflow;
+        }
+    }
+    ParsedWarning::Error
+}
+
+fn get_parse_warning_color(worse_parse_problem: &ParsedWarning) -> (egui::Color32, &'static str){
+    match *worse_parse_problem {
+        ParsedWarning::Ok => (egui::Color32::LIGHT_GREEN, "No Parse Problems"),
+        ParsedWarning::Error => (egui::Color32::LIGHT_RED, "Cannot Parse"),
+        ParsedWarning::Overflow=> (egui::Color32::LIGHT_YELLOW, "Overflow"),
+        ParsedWarning::Underflow=> (egui::Color32::LIGHT_YELLOW, "Underflow"),
+        ParsedWarning::PrecisionLoss => (egui::Color32::ORANGE, "Precision Loss"),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn ui_system(
     mut contexts: EguiContexts,
     image_ids: Res<ImageIds>,
     mut my_text: Local<String>,
+    // mut my_parsed_text: Local<String>,
     number_regex: Res<NumberRegex>,
     mut clipboard: ResMut<bevy_egui::EguiClipboard>,
     mut font_scale: ResMut<FontScale>,
-    mut parsed_numbers: Local<Vec<f64>>,
+    // mut parsed_numbers: Local<Vec<f64>>,
     mut text_is_dirty: Local<bool>,
 
+    mut colored_strings: Local<ColoredStrings>,
+    mut num_strings: Local<NumString>,
+
+    mut parsed_values: ResMut<ParsedValues>,
+    mut problem_values: ResMut<ProblemValues>,
+    mut worse_parse_problem: Local<ParsedWarning>
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     let logo_size = 25.0 * font_scale.scale;
@@ -219,7 +364,6 @@ fn ui_system(
         ui.horizontal(|ui|{
             if ui.add(egui::Button::image(egui::load::SizedTexture::new(
                         image_ids.github,
-                        // images.github.1,
                         [logo_size, logo_size],
             ))).on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer").clicked() {
                 ui.ctx().open_url(egui::OpenUrl {
@@ -268,7 +412,6 @@ fn ui_system(
         //         url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
         //     });
         // }
-        
 
         ui.horizontal(|ui|{
             if ui.add(egui::Button::image(egui::load::SizedTexture::new(
@@ -277,17 +420,61 @@ fn ui_system(
             ))).on_hover_text("copy to clipboard").clicked() {
                 clipboard.set_text(&my_text);
             }
-            if ui.add_enabled(*text_is_dirty,egui::Button::new("clean text")).on_hover_text("clean text into detected numbers seperated by commas").clicked(){
-                *my_text = parsed_numbers.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", ");
-                *text_is_dirty = false;
-                log::info!("cleaned text");
-
-            }
-            ui.colored_label(egui::Color32::from_rgb(255, 0, 0), "parse info");
         });
 
-        let text_edit = egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width());
+        let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
 
+        let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
+            .default_open(true)
+            .show(ui, |_ui| {
+        });
+
+        if !collapse_response.fully_closed(){
+            // ui.add(egui::RichText::new("am I inside the collapsible?").color(parse_warning_color))
+            if *worse_parse_problem == ParsedWarning::Ok{
+                // just the parsed numbers
+                if num_strings.requires_restring {
+                    num_strings.requires_restring = false;
+                    num_strings.val = parsed_values.vals.iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
+                }
+                ui.add_enabled(false, 
+                    egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
+                );
+            }
+            else{
+                //
+                if colored_strings.requires_restring {
+                    colored_strings.requires_restring = false;
+                    colored_strings.vals.clear();
+                    parsed_values.vals.iter().for_each(|x|{
+                        let (color, _) = get_parse_warning_color(&x.parsed_warning);
+
+                        log::info!("attempt to get raw string for number: {}", x.converted_value);
+                        let raw_string = &my_text[x.raw_string.start_index..x.raw_string.end_index];
+                        colored_strings.vals.push(egui::RichText::new(raw_string).color(color));
+                    });
+                }
+
+                ui.group(|ui|{
+                    ui.horizontal(|ui|{
+                        let mut index: usize = 0;
+                        parsed_values.vals.iter().for_each(|x|{
+                            let (_, msg) = get_parse_warning_color(&x.parsed_warning);
+                            let colored_widget = colored_strings.vals.get(index).unwrap();
+                            let label = ui.label(colored_widget.clone());
+                            if x.parsed_warning != ParsedWarning::Ok{
+                                label.on_hover_text(format!("{}{}[{}]", msg, ". Converted to: ", x.converted_value));
+                            }else{
+                                label.on_hover_text(msg);
+                            }
+                            index += 1;
+                        });
+                    })
+                });
+            }
+        };
+
+        let text_edit = egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width());
         if ui
             .add(text_edit).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex expression: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
             .changed()
@@ -297,35 +484,72 @@ fn ui_system(
             // Could carry over to spawning cubes where not all cubes are respawned: instead only
             // new cubes are added?
 
-            *text_is_dirty = true;
-            *parsed_numbers = number_regex
+
+            num_strings.requires_restring = true;
+            colored_strings.requires_restring = true;
+
+            problem_values.map.values_mut().for_each(|vec|{
+                vec.clear();
+            });
+            *worse_parse_problem = ParsedWarning::Ok;
+
+            let mut index: usize = 0;
+            log::info!("--");
+            number_regex
                 .re
                 .find_iter(&my_text)
-                .filter_map(|m|{
+                .for_each(|m|{
                     let s = m.as_str();
                     match s.parse::<f64>(){
                         Ok(n) =>{
+                            let mut parsed_warning = ParsedWarning::Ok;
+                            let mut converted_val = n;
+             
                             if n.is_infinite(){
                                 log::warn!("over-flowed number: {}", s);
+                                parsed_warning = ParsedWarning::Overflow;
+                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Overflow);
+                                converted_val = f64::MAX;
                             }else if n == 0.0 && !s.trim().starts_with('0'){
                                 log::warn!("under-flowed number: {}", s);
+                                parsed_warning = ParsedWarning::Underflow;
+                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Underflow);
                             }
                             else if detect_precision_loss(s, n){
                                 log::warn!("precision loss on number: {}", s);
+                                parsed_warning = ParsedWarning::PrecisionLoss;
+                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
                             }
                             else if n.is_nan(){
                                 log::error!("number is NaN: {}", s);
+                                parsed_warning = ParsedWarning::Error;
+                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
+                                converted_val = 0.0;
                             }
-                            Some(n)
+                            add_parsed_value(&mut parsed_values, converted_val, parsed_warning, index, m.start(), m.end());
+                            log::info!("added raw string: {}", &my_text[parsed_values.vals.get(index).unwrap().raw_string.start_index..parsed_values.vals.get(index).unwrap().raw_string.end_index])
                         },
                         Err(err) => {
                             log::error!("failed to parse: {} with err {}", s, err);
-                            None
+                            *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
+                            add_parsed_value(&mut parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end());
                         }
                     }
-                })
-                .collect();
-            log::info!("parsed numbers: {:?}", parsed_numbers);
+                    index += 1;
+                });
+
+             parsed_values.vals.truncate(index);
+
+            // log::info!("parsed numbers: {:?}", parsed_numbers);
+
+            // let mut map: HashMap<ParsedWarning, Vec<ParsedValues>> = HashMap::new();
+            // map.insert(ParsedWarning::Error, Vec::new());
+
+            // for (i, parsed_value) in parsed_values.vals.iter().enumerate(){
+            //     let raw_string = &my_text[parsed_value.raw_string.start_index..parsed_value.raw_string.end_index];
+            //     let matched_string = &my_text[parsed_value.matched_string.start_index..parsed_value.matched_string.end_index];
+            //     log::info!("{i}:\n\traw string: {raw_string}\n\tmatched string: {matched_string}");
+            // }
         }
     });
 
@@ -374,12 +598,19 @@ fn spawn_a_cube(
 }
 
 fn spawn_3d_camera(mut commands: Commands) {
+    // let problem_values = ProblemValues::new();
+    // for key in problem_values.map.keys(){
+    //     log::info!("{}", key)
+    // }
+    // log::info!("all keys printed");
+
+
     // todo: replace with own camera
     // add normal keyboard controls
     // add own mouse controls: right click should also work
     // add touch controls: left-right is faster than up-down in this solution... Strange.
-    // gamepad controls: unnecessary but add if easy
-    // trackpad: zooms
+    // game pad controls: unnecessary but add if easy
+    // track pad: zooms
     // also: do not zoom when ctrl is pressed: that is for zooming in and out UI
     // do not zoom when pinching in within ui: in that case scale the UI instead?
     commands.spawn((
