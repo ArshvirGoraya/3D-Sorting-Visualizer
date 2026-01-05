@@ -36,9 +36,11 @@ pub struct NumberRegex {
 
 impl Default for NumberRegex {
     fn default() -> Self {
-        // matches integers, floats, scientific notion
+        // matches integers, floats, scientific notation
         Self {
-            re: Regex::new(r"-?\d+(?:\.\d+)?(?:[eE]-?\d+)?").expect("valid regex"),
+            // re: Regex::new(r"-?\d+(?:\.\d+)?(?:[eE]-?\d+)?").expect("valid regex"),
+            // no scientific notations included:
+            re: Regex::new(r"-?\d+(?:\.\d+)?").expect("valid regex"),
         }
     }
 }
@@ -476,7 +478,8 @@ fn ui_system(
 
         let text_edit = egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width());
         if ui
-            .add(text_edit).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex expression: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
+            // .add(text_edit).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex expression: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
+            .add(text_edit).on_hover_text("supports positive and negative ints, floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"")
             .changed()
         {
             // todo: maybe add fancy stuff like remembering which parts of the string are already
@@ -506,22 +509,22 @@ fn ui_system(
                             let mut converted_val = n;
              
                             if n.is_infinite(){
-                                log::warn!("over-flowed number: {}", s);
+                                // log::warn!("over-flowed number: {}", s);
                                 parsed_warning = ParsedWarning::Overflow;
                                 *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Overflow);
                                 converted_val = f64::MAX;
                             }else if n == 0.0 && !s.trim().starts_with('0'){
-                                log::warn!("under-flowed number: {}", s);
+                                // log::warn!("under-flowed number: {}", s);
                                 parsed_warning = ParsedWarning::Underflow;
                                 *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Underflow);
                             }
                             else if detect_precision_loss(s, n){
-                                log::warn!("precision loss on number: {}", s);
+                                // log::warn!("precision loss on number: {}", s);
                                 parsed_warning = ParsedWarning::PrecisionLoss;
                                 *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
                             }
                             else if n.is_nan(){
-                                log::error!("number is NaN: {}", s);
+                                // log::error!("number is NaN: {}", s);
                                 parsed_warning = ParsedWarning::Error;
                                 *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
                                 converted_val = 0.0;
@@ -529,8 +532,8 @@ fn ui_system(
                             add_parsed_value(&mut parsed_values, converted_val, parsed_warning, index, m.start(), m.end());
                             log::info!("added raw string: {}", &my_text[parsed_values.vals.get(index).unwrap().raw_string.start_index..parsed_values.vals.get(index).unwrap().raw_string.end_index])
                         },
-                        Err(err) => {
-                            log::error!("failed to parse: {} with err {}", s, err);
+                        Err(_err) => {
+                            // log::error!("failed to parse: {} with err {}", s, err);
                             *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
                             add_parsed_value(&mut parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end());
                         }
