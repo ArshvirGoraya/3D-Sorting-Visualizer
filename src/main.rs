@@ -79,7 +79,7 @@ pub struct ParsedValue{
     matched_string: StringInfo,
     converted_value: f64,
     parsed_warning: ParsedWarning,
-    // final_posiion: int,
+    // final_position: int,
     // box_handle: int
 }
 
@@ -119,7 +119,6 @@ pub struct ColoredStrings{
     vals: Vec<egui::RichText>
 }
 
-
 fn main() {
     App::new()
         // sending logs to console in browser:
@@ -150,6 +149,7 @@ fn main() {
         .init_resource::<ParsedValues>()
         .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
         .insert_resource(ProblemValues::new())
+        // .add_systems(Startup, tests)
         .add_systems(Startup, spawn_3d_camera)
         .add_systems(Startup, spawn_a_cube)
         .add_systems(Startup, get_texture_ids)
@@ -172,92 +172,125 @@ fn get_texture_ids(
     });
 }
 
+
+fn tests(){
+    // test_detect_precision_loss
+    let regex_matches = [
+        // positives:
+        "1.1", ".1", "1", "0.0", ".0", "0",
+        // negatives:
+        "-1.1", "-.1", "-1", "-0.0", "-.0", "-0",
+        // extras:
+        "0000001.1", "0000001", "000000100000000",
+        "1.0000000000000000", 
+        // precision loss: this should NOT match
+        "1.00000000000000000000001"
+    ];
+    regex_matches.iter().for_each(|original|{
+        detect_precision_loss(original, original.parse::<f64>().unwrap());
+    });
+}
+
 fn detect_precision_loss(original: &str, parsed: f64) -> bool {
-
-    // num_string will have no leading zeros, but may have trailing zeros, so have to clean that:
-    let mut num_string = format!("{}", parsed); // parses to only use as many decimals as needed,
-                                                // but may pop out a scientific notation string
-                                                // instead for extremely large/small floats.
-    log::info!("{original} converted to: {num_string}");
-    // remove trailing zeros and fractional point if it just has a fractional point at the end
-    // after 0s are removed:
-    // At this point: could be: 0.0, 1.0, 1.010
-    num_string = num_string.trim_end_matches("0").to_string().trim_end_matches(".").to_string();
-    // At this point: could be: 0, 1, 1.01
-
-    // regex_match may have trailing and leading zeros and may not have a fractional point.
-    // Remove trailing zeros and fractional point if it just has a fractional point at the end:
-    // At this point: could be: 0, 0.0, 01.0, 01.010
-    let mut regex_match = original.trim_end_matches('0').to_string().trim_end_matches(".").to_string();
-    // At this point: could be: '', 0, 01, 01.01
-    // Remove all leading zeros
-    regex_match = original.trim_start_matches('0').to_string();
-    // At this point: could be: '', '', 1, 1.01
-    if regex_match.is_empty(){
-        regex_match = "0".to_string();
+    let num_string = parsed.to_string();
+    let new_string = string_trim_zeros(original);
+    log::info!("{original} turned to {new_string} == {parsed}");
+    if new_string != num_string{
+        log::info!("\tno match!")
     }
-
-
-    // if (num_string != regex_match){
-    //     log::info!("{num_string} != {regex_match}");
-    // }
-
-
-    num_string != regex_match
+    new_string != num_string
 }
 
-fn normalize_string(s: &str) -> String {
-    let mut trimmed = s.trim().to_lowercase();
-    trimmed = trimmed.trim_start_matches('0').to_string();
-
-
-    // trimmed = trimmed.trim_start_matches('0');
-    // if trimmed.starts_with("."){
-    //     trimmed = format!("0{}", trimmed);
-    // }
-    // if let Some(pos) = s.find('.') {}
-    trimmed
-}
+// fn normalize_string(s: &str) -> String {
+//     let mut trimmed = s.trim().to_lowercase();
+//     trimmed = trimmed.trim_start_matches('0').to_string();
+//
+//
+//     // trimmed = trimmed.trim_start_matches('0');
+//     // if trimmed.starts_with("."){
+//     //     trimmed = format!("0{}", trimmed);
+//     // }
+//     // if let Some(pos) = s.find('.') {}
+//     trimmed
+// }
 
 // fn detect_precision_loss(original: &str, parsed: f64) -> bool {
 //     let roundtrip = format!("{:.17}", parsed); // max precision
 //     normalize_string(original) != normalize_string(&roundtrip)
 // }
+//
+fn string_trim_zeros(s: &str) -> String{
+    let mut int = s;
+    let mut frac: &str = "";
+    let mut requires_minus = false;
+    let mut requires_zero = false;
 
-fn normalize_string_old(s: &str) -> String {
-    let mut s = s.trim().to_lowercase();
-    // Remove leading zeros (except before decimal)
+    // split into int and frac sections
     if let Some(pos) = s.find('.') {
-        let (int, frac) = s.split_at(pos);
-        let int = int.trim_start_matches('0');
-        s = format!("{}{}", if int.is_empty() { "0" } else { int }, frac);
-    } else {
-        s = s.trim_start_matches('0').to_string();
-        if s.is_empty() {
-            s = "0".to_string();
-        }
+        (int, frac) = s.split_at(pos);
+        // for fractional part: remove all trailing 0's. If only '.' remains, remove that too (frac
+        // will be empty in this case).
+        frac = frac.trim_end_matches("0").trim_end_matches(".");
     }
-    // Remove trailing zeros after decimal
-    if s.contains('.') {
-        while s.ends_with('0') {
-            s.pop();
-        }
-        if s.ends_with('.') {
-            s.pop();
-        }
+
+    // remove minus from int slice if need to.
+    if int.starts_with("-"){
+        requires_minus = true;
+        int = &int[1..int.len()];
     }
-    s
+    // remove leading zeros from int slice.
+    int = int.trim_start_matches("0");
+    // check if a zero is required:
+    if int.is_empty(){
+        requires_zero = true;
+    }
+
+    // recombine int and frac. Add minus and zero as required.
+    let requirements = (requires_minus, requires_zero);
+    let new_string = match requirements{
+        (true, true) => format!("-0{}{}", int, frac),
+        (false, true) => format!("0{}{}", int, frac),
+        (true, false) => format!("-{}{}", int, frac),
+        (false, false) => format!("{}{}", int, frac),
+    };
+
+    return new_string;
 }
-//
-// fn get_sort_indices(values: &[f64]) -> Vec<usize> {
-//     // todo: sort indices by original value to get final positions
-//     let mut sorted_indices: Vec<usize> = (0..values.len()).collect();
-//
-//     sorted_indices.sort_by(|&i, &j| values[i].partial_cmp(&values[j]).unwrap());
-//
-//     sorted_indices
+
+// fn normalize_string_old(s: &str) -> String {
+//     let mut s = s.trim().to_lowercase();
+//     // Remove leading zeros (except before decimal)
+//     if let Some(pos) = s.find('.') {
+//         let (int, frac) = s.split_at(pos);
+//         let int = int.trim_start_matches('0');
+//         s = format!("{}{}", if int.is_empty() { "0" } else { int }, frac);
+//     } else {
+//         s = s.trim_start_matches('0').to_string();
+//         if s.is_empty() {
+//             s = "0".to_string();
+//         }
+//     }
+//     // Remove trailing zeros after decimal
+//     if s.contains('.') {
+//         while s.ends_with('0') {
+//             s.pop();
+//         }
+//         if s.ends_with('.') {
+//             s.pop();
+//         }
+//     }
+//     s
 // }
 //
+fn get_sort_indices(values: &[f64]) -> Vec<usize> {
+    // todo: sort indices by original value to get final positions
+    let mut sorted_indices: Vec<usize> = (0..values.len()).collect();
+
+    sorted_indices.sort_by(|&i, &j| values[i].partial_cmp(&values[j]).unwrap());
+
+    sorted_indices
+}
+
 fn increase_font(font_scale: &mut FontScale){
     font_scale.scale = f32::min(font_scale.max, font_scale.scale + font_scale.scale_step);
 }
