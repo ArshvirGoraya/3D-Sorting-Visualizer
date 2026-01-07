@@ -40,7 +40,10 @@ impl Default for NumberRegex {
         Self {
             // re: Regex::new(r"-?\d+(?:\.\d+)?(?:[eE]-?\d+)?").expect("valid regex"),
             // no scientific notations included:
-            re: Regex::new(r"-?\d+(?:\.\d+)?").expect("valid regex"),
+            // re: Regex::new(r"-?\d+(?:\.\d+)?").expect("valid regex"),
+            // positive or minus, d.d, or .d, or d.
+            re: Regex::new(r"-?(?:\d+\.\d*|\.\d+|\d+)").expect("valid regex"),
+            
         }
     }
 }
@@ -49,8 +52,6 @@ impl Default for NumberRegex {
 enum ParsedWarning{
     #[default] Ok,
     Error,
-    Overflow,
-    Underflow,
     PrecisionLoss
 }
 
@@ -59,8 +60,6 @@ impl fmt::Display for ParsedWarning {
         match self {
             ParsedWarning::Ok => write!(f, "Ok"),
             ParsedWarning::Error => write!(f, "Error"),
-            ParsedWarning::Overflow => write!(f, "Overflow"),
-            ParsedWarning::Underflow => write!(f, "Underflow"),
             ParsedWarning::PrecisionLoss => write!(f, "PrecisionLoss"),
         }
     }
@@ -93,7 +92,7 @@ pub struct ProblemValues{
 impl ProblemValues{
     fn new() -> Self{
         let mut map: HashMap<ParsedWarning, Vec<usize>> = HashMap::new();
-        for key in [ParsedWarning::Ok, ParsedWarning::Error, ParsedWarning::Overflow, ParsedWarning::Underflow, ParsedWarning::PrecisionLoss]{
+        for key in [ParsedWarning::Ok, ParsedWarning::Error, ParsedWarning::PrecisionLoss]{
             map.insert(key, Vec::new());
         }
         Self{
@@ -174,11 +173,58 @@ fn get_texture_ids(
 }
 
 fn detect_precision_loss(original: &str, parsed: f64) -> bool {
-    let roundtrip = format!("{:.17}", parsed); // max precision
-    normalize_string(original) != normalize_string(&roundtrip)
+
+    // num_string will have no leading zeros, but may have trailing zeros, so have to clean that:
+    let mut num_string = format!("{}", parsed); // parses to only use as many decimals as needed,
+                                                // but may pop out a scientific notation string
+                                                // instead for extremely large/small floats.
+    log::info!("{original} converted to: {num_string}");
+    // remove trailing zeros and fractional point if it just has a fractional point at the end
+    // after 0s are removed:
+    // At this point: could be: 0.0, 1.0, 1.010
+    num_string = num_string.trim_end_matches("0").to_string().trim_end_matches(".").to_string();
+    // At this point: could be: 0, 1, 1.01
+
+    // regex_match may have trailing and leading zeros and may not have a fractional point.
+    // Remove trailing zeros and fractional point if it just has a fractional point at the end:
+    // At this point: could be: 0, 0.0, 01.0, 01.010
+    let mut regex_match = original.trim_end_matches('0').to_string().trim_end_matches(".").to_string();
+    // At this point: could be: '', 0, 01, 01.01
+    // Remove all leading zeros
+    regex_match = original.trim_start_matches('0').to_string();
+    // At this point: could be: '', '', 1, 1.01
+    if regex_match.is_empty(){
+        regex_match = "0".to_string();
+    }
+
+
+    // if (num_string != regex_match){
+    //     log::info!("{num_string} != {regex_match}");
+    // }
+
+
+    num_string != regex_match
 }
 
 fn normalize_string(s: &str) -> String {
+    let mut trimmed = s.trim().to_lowercase();
+    trimmed = trimmed.trim_start_matches('0').to_string();
+
+
+    // trimmed = trimmed.trim_start_matches('0');
+    // if trimmed.starts_with("."){
+    //     trimmed = format!("0{}", trimmed);
+    // }
+    // if let Some(pos) = s.find('.') {}
+    trimmed
+}
+
+// fn detect_precision_loss(original: &str, parsed: f64) -> bool {
+//     let roundtrip = format!("{:.17}", parsed); // max precision
+//     normalize_string(original) != normalize_string(&roundtrip)
+// }
+
+fn normalize_string_old(s: &str) -> String {
     let mut s = s.trim().to_lowercase();
     // Remove leading zeros (except before decimal)
     if let Some(pos) = s.find('.') {
@@ -202,16 +248,16 @@ fn normalize_string(s: &str) -> String {
     }
     s
 }
-
-fn get_sort_indices(values: &[f64]) -> Vec<usize> {
-    // todo: sort indices by original value to get final positions
-    let mut sorted_indices: Vec<usize> = (0..values.len()).collect();
-
-    sorted_indices.sort_by(|&i, &j| values[i].partial_cmp(&values[j]).unwrap());
-
-    sorted_indices
-}
-
+//
+// fn get_sort_indices(values: &[f64]) -> Vec<usize> {
+//     // todo: sort indices by original value to get final positions
+//     let mut sorted_indices: Vec<usize> = (0..values.len()).collect();
+//
+//     sorted_indices.sort_by(|&i, &j| values[i].partial_cmp(&values[j]).unwrap());
+//
+//     sorted_indices
+// }
+//
 fn increase_font(font_scale: &mut FontScale){
     font_scale.scale = f32::min(font_scale.max, font_scale.scale + font_scale.scale_step);
 }
@@ -313,18 +359,8 @@ fn add_parsed_value(parsed_values: &mut ParsedValues, converted_value: f64, pars
 #[allow(clippy::collapsible_if)]
 fn set_worse_parse_problem(worse_parse_problem: &ParsedWarning, parsed_problem: ParsedWarning) -> ParsedWarning{
     if parsed_problem == ParsedWarning::PrecisionLoss{
-        if *worse_parse_problem != ParsedWarning::Error && *worse_parse_problem != ParsedWarning::Overflow && *worse_parse_problem != ParsedWarning::Underflow {
+        if *worse_parse_problem != ParsedWarning::Error {
             return ParsedWarning::PrecisionLoss;
-        }
-    }
-    if parsed_problem == ParsedWarning::Overflow{
-        if *worse_parse_problem != ParsedWarning::Error{
-            return ParsedWarning::Overflow;
-        }
-    }
-    if parsed_problem == ParsedWarning::Underflow{
-        if *worse_parse_problem != ParsedWarning::Error{
-            return ParsedWarning::Underflow;
         }
     }
     ParsedWarning::Error
@@ -334,8 +370,6 @@ fn get_parse_warning_color(worse_parse_problem: &ParsedWarning) -> (egui::Color3
     match *worse_parse_problem {
         ParsedWarning::Ok => (egui::Color32::LIGHT_GREEN, "No Parse Problems"),
         ParsedWarning::Error => (egui::Color32::LIGHT_RED, "Cannot Parse"),
-        ParsedWarning::Overflow=> (egui::Color32::LIGHT_YELLOW, "Overflow"),
-        ParsedWarning::Underflow=> (egui::Color32::LIGHT_YELLOW, "Underflow"),
         ParsedWarning::PrecisionLoss => (egui::Color32::ORANGE, "Precision Loss"),
     }
 }
@@ -451,7 +485,7 @@ fn ui_system(
                     parsed_values.vals.iter().for_each(|x|{
                         let (color, _) = get_parse_warning_color(&x.parsed_warning);
 
-                        log::info!("attempt to get raw string for number: {}", x.converted_value);
+                        // log::info!("attempt to get raw string for number: {}", x.converted_value);
                         let raw_string = &my_text[x.raw_string.start_index..x.raw_string.end_index];
                         colored_strings.vals.push(egui::RichText::new(raw_string).color(color));
                     });
@@ -479,7 +513,7 @@ fn ui_system(
         let text_edit = egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width());
         if ui
             // .add(text_edit).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex expression: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
-            .add(text_edit).on_hover_text("supports positive and negative ints, floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"")
+            .add(text_edit).on_hover_text("supports positive and negative ints and floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"")
             .changed()
         {
             // todo: maybe add fancy stuff like remembering which parts of the string are already
@@ -510,13 +544,9 @@ fn ui_system(
              
                             if n.is_infinite(){
                                 // log::warn!("over-flowed number: {}", s);
-                                parsed_warning = ParsedWarning::Overflow;
-                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Overflow);
+                                parsed_warning = ParsedWarning::PrecisionLoss;
+                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
                                 converted_val = f64::MAX;
-                            }else if n == 0.0 && !s.trim().starts_with('0'){
-                                // log::warn!("under-flowed number: {}", s);
-                                parsed_warning = ParsedWarning::Underflow;
-                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Underflow);
                             }
                             else if detect_precision_loss(s, n){
                                 // log::warn!("precision loss on number: {}", s);
@@ -530,7 +560,7 @@ fn ui_system(
                                 converted_val = 0.0;
                             }
                             add_parsed_value(&mut parsed_values, converted_val, parsed_warning, index, m.start(), m.end());
-                            log::info!("added raw string: {}", &my_text[parsed_values.vals.get(index).unwrap().raw_string.start_index..parsed_values.vals.get(index).unwrap().raw_string.end_index])
+                            // log::info!("added raw string: {}", &my_text[parsed_values.vals.get(index).unwrap().raw_string.start_index..parsed_values.vals.get(index).unwrap().raw_string.end_index])
                         },
                         Err(_err) => {
                             // log::error!("failed to parse: {} with err {}", s, err);
