@@ -104,8 +104,18 @@ impl ProblemValues{
 
 #[derive(Resource, Default)]
 pub struct ParsedValues{
-    vals: Vec<ParsedValue>
+    vals: Vec<ParsedValue>,
+    end_index: usize,
 }
+
+// impl ParsedValues{
+//     // when iterating, use parsed_values.iter() instead of parsed_values.vals.iter() to get the 
+//     // an iterator that iterates up to the end_index!
+//     pub fn iter(&self) -> impl Iterator<Item = &ParsedValue>{
+//         self.vals[..self.end_index].iter()
+//     }
+// }
+
 
 #[derive(Default)]
 pub struct NumString{
@@ -201,24 +211,7 @@ fn detect_precision_loss(original: &str, parsed: f64) -> bool {
     new_string != num_string
 }
 
-// fn normalize_string(s: &str) -> String {
-//     let mut trimmed = s.trim().to_lowercase();
-//     trimmed = trimmed.trim_start_matches('0').to_string();
-//
-//
-//     // trimmed = trimmed.trim_start_matches('0');
-//     // if trimmed.starts_with("."){
-//     //     trimmed = format!("0{}", trimmed);
-//     // }
-//     // if let Some(pos) = s.find('.') {}
-//     trimmed
-// }
 
-// fn detect_precision_loss(original: &str, parsed: f64) -> bool {
-//     let roundtrip = format!("{:.17}", parsed); // max precision
-//     normalize_string(original) != normalize_string(&roundtrip)
-// }
-//
 fn string_trim_zeros(s: &str) -> String{
     let mut int = s;
     let mut frac: &str = "";
@@ -257,31 +250,6 @@ fn string_trim_zeros(s: &str) -> String{
     return new_string;
 }
 
-// fn normalize_string_old(s: &str) -> String {
-//     let mut s = s.trim().to_lowercase();
-//     // Remove leading zeros (except before decimal)
-//     if let Some(pos) = s.find('.') {
-//         let (int, frac) = s.split_at(pos);
-//         let int = int.trim_start_matches('0');
-//         s = format!("{}{}", if int.is_empty() { "0" } else { int }, frac);
-//     } else {
-//         s = s.trim_start_matches('0').to_string();
-//         if s.is_empty() {
-//             s = "0".to_string();
-//         }
-//     }
-//     // Remove trailing zeros after decimal
-//     if s.contains('.') {
-//         while s.ends_with('0') {
-//             s.pop();
-//         }
-//         if s.ends_with('.') {
-//             s.pop();
-//         }
-//     }
-//     s
-// }
-//
 fn get_sort_indices(values: &[f64]) -> Vec<usize> {
     // todo: sort indices by original value to get final positions
     let mut sorted_indices: Vec<usize> = (0..values.len()).collect();
@@ -380,6 +348,7 @@ fn add_parsed_value(parsed_values: &mut ParsedValues, converted_value: f64, pars
         parsed_value.matched_string.start_index = match_start;
         parsed_value.matched_string.end_index = match_end;
     }else{
+        log::info!("new Parsed value!");
         parsed_values.vals.push(ParsedValue{
             converted_value,
             parsed_warning,
@@ -504,7 +473,7 @@ fn ui_system(
                 // just the parsed numbers
                 if num_strings.requires_restring {
                     num_strings.requires_restring = false;
-                    num_strings.val = parsed_values.vals.iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
+                    num_strings.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
                 }
                 ui.add_enabled(false, 
                     egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
@@ -515,7 +484,7 @@ fn ui_system(
                 if colored_strings.requires_restring {
                     colored_strings.requires_restring = false;
                     colored_strings.vals.clear();
-                    parsed_values.vals.iter().for_each(|x|{
+                    parsed_values.vals[..parsed_values.end_index].iter().for_each(|x|{
                         let (color, _) = get_parse_warning_color(&x.parsed_warning);
 
                         // log::info!("attempt to get raw string for number: {}", x.converted_value);
@@ -527,7 +496,7 @@ fn ui_system(
                 ui.group(|ui|{
                     ui.horizontal(|ui|{
                         let mut index: usize = 0;
-                        parsed_values.vals.iter().for_each(|x|{
+                        parsed_values.vals[..parsed_values.end_index].iter().for_each(|x|{
                             let (_, msg) = get_parse_warning_color(&x.parsed_warning);
                             let colored_widget = colored_strings.vals.get(index).unwrap();
                             let label = ui.label(colored_widget.clone());
@@ -604,7 +573,8 @@ fn ui_system(
                     index += 1;
                 });
 
-             parsed_values.vals.truncate(index);
+            parsed_values.end_index = index;  // truncates to end_index when 'sort' is clicked.
+            // parsed_values.vals.truncate(index);
 
             // log::info!("parsed numbers: {:?}", parsed_numbers);
 
