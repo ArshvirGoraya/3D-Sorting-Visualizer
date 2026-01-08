@@ -523,9 +523,20 @@ fn ui_system(
                     num_strings.requires_restring = false;
                     num_strings.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
                 }
-                ui.add_enabled(false, 
-                    egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
-                );
+
+                ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
+                    ui.push_id("scroll_parsed", |ui|{
+                        egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
+                            ui.add_enabled(false, 
+                                egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
+                            );
+                        });
+                    });
+                });
+
+                // ui.add_enabled(false, 
+                //     egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
+                // );
             }
             else{
                 //
@@ -560,82 +571,79 @@ fn ui_system(
             }
         };
 
-        let text_edit = egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width());
-        if ui
-            // .add(text_edit).on_hover_text("supports positive and negative ints, floats and scientific notations with the following regex expression: r\"-?\\d+(?:\\.\\d+)?(?:[eE]-?\\d+)?\"")
-            .add(text_edit).on_hover_text("supports positive and negative ints and floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"")
-            .changed()
-        {
-            // todo: maybe add fancy stuff like remembering which parts of the string are already
-            // parsed, and parsing only new stuff and deleting any removed stuff.
-            // Could carry over to spawning cubes where not all cubes are respawned: instead only
-            // new cubes are added?
+        ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
+            egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
+                let text_edit = egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width());
+
+                if ui
+                    .add(text_edit).on_hover_text("supports positive and negative ints and floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"")
+                    .changed()
+                {
+                    // TODO: maybe add fancy stuff like remembering which parts of the string are already
+                    // parsed, and parsing only new stuff and deleting any removed stuff.
+                    // Could carry over to spawning cubes where not all cubes are respawned: instead only
+                    // new cubes are added?
 
 
-            *text_is_dirty = true;
-            num_strings.requires_restring = true;
-            colored_strings.requires_restring = true;
+                    *text_is_dirty = true;
+                    num_strings.requires_restring = true;
+                    colored_strings.requires_restring = true;
 
-            problem_values.map.values_mut().for_each(|vec|{
-                vec.clear();
+                    problem_values.map.values_mut().for_each(|vec|{
+                        vec.clear();
+                    });
+                    *worse_parse_problem = ParsedWarning::Ok;
+
+                    let mut index: usize = 0;
+                    log::info!("--");
+                    number_regex
+                        .re
+                        .find_iter(&my_text)
+                        .for_each(|m|{
+                            let s = m.as_str();
+                            match s.parse::<f64>(){
+                                Ok(n) =>{
+                                    let mut parsed_warning = ParsedWarning::Ok;
+                                    let mut converted_val = n;
+                     
+                                    if n.is_infinite(){
+                                        // log::warn!("over-flowed number: {}", s);
+                                        parsed_warning = ParsedWarning::PrecisionLoss;
+                                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
+                                        converted_val = f64::MAX;
+                                    }
+                                    else if detect_precision_loss(s, n){
+                                        // log::warn!("precision loss on number: {}", s);
+                                        parsed_warning = ParsedWarning::PrecisionLoss;
+                                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
+                                    }
+                                    else if n.is_nan(){
+                                        // log::error!("number is NaN: {}", s);
+                                        parsed_warning = ParsedWarning::Error;
+                                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
+                                        converted_val = 0.0;
+                                    }
+                                    add_parsed_value(&mut parsed_values, converted_val, parsed_warning, index, m.start(), m.end());
+                                    // log::info!("added raw string: {}", &my_text[parsed_values.vals.get(index).unwrap().raw_string.start_index..parsed_values.vals.get(index).unwrap().raw_string.end_index])
+                                },
+                                Err(_err) => {
+                                    // log::error!("failed to parse: {} with err {}", s, err);
+                                    *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
+                                    add_parsed_value(&mut parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end());
+                                }
+                            }
+                            index += 1;
+                        });
+
+                    parsed_values.end_index = index;  // truncates to end_index when 'sort' is clicked.
+                    // parsed_values.vals.truncate(index);
+                }
+
+
             });
-            *worse_parse_problem = ParsedWarning::Ok;
+        });
 
-            let mut index: usize = 0;
-            log::info!("--");
-            number_regex
-                .re
-                .find_iter(&my_text)
-                .for_each(|m|{
-                    let s = m.as_str();
-                    match s.parse::<f64>(){
-                        Ok(n) =>{
-                            let mut parsed_warning = ParsedWarning::Ok;
-                            let mut converted_val = n;
-             
-                            if n.is_infinite(){
-                                // log::warn!("over-flowed number: {}", s);
-                                parsed_warning = ParsedWarning::PrecisionLoss;
-                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
-                                converted_val = f64::MAX;
-                            }
-                            else if detect_precision_loss(s, n){
-                                // log::warn!("precision loss on number: {}", s);
-                                parsed_warning = ParsedWarning::PrecisionLoss;
-                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
-                            }
-                            else if n.is_nan(){
-                                // log::error!("number is NaN: {}", s);
-                                parsed_warning = ParsedWarning::Error;
-                                *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
-                                converted_val = 0.0;
-                            }
-                            add_parsed_value(&mut parsed_values, converted_val, parsed_warning, index, m.start(), m.end());
-                            // log::info!("added raw string: {}", &my_text[parsed_values.vals.get(index).unwrap().raw_string.start_index..parsed_values.vals.get(index).unwrap().raw_string.end_index])
-                        },
-                        Err(_err) => {
-                            // log::error!("failed to parse: {} with err {}", s, err);
-                            *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
-                            add_parsed_value(&mut parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end());
-                        }
-                    }
-                    index += 1;
-                });
 
-            parsed_values.end_index = index;  // truncates to end_index when 'sort' is clicked.
-            // parsed_values.vals.truncate(index);
-
-            // log::info!("parsed numbers: {:?}", parsed_numbers);
-
-            // let mut map: HashMap<ParsedWarning, Vec<ParsedValues>> = HashMap::new();
-            // map.insert(ParsedWarning::Error, Vec::new());
-
-            // for (i, parsed_value) in parsed_values.vals.iter().enumerate(){
-            //     let raw_string = &my_text[parsed_value.raw_string.start_index..parsed_value.raw_string.end_index];
-            //     let matched_string = &my_text[parsed_value.matched_string.start_index..parsed_value.matched_string.end_index];
-            //     log::info!("{i}:\n\traw string: {raw_string}\n\tmatched string: {matched_string}");
-            // }
-        }
     });
 
     if font_scale.is_changed() {
