@@ -24,7 +24,7 @@ OS2Version: 4
 OS2_WeightWidthSlopeOnly: 1
 OS2_UseTypoMetrics: 1
 CreationTime: 1554657509
-ModificationTime: 1767843462
+ModificationTime: 1767905718
 PfmFamily: 17
 TTFWeight: 400
 TTFWidth: 5
@@ -4922,7 +4922,7 @@ NameList: AGL For New Fonts
 DisplaySize: -72
 AntiAlias: 0
 FitToEm: 0
-WinInfo: 983216 26 11
+WinInfo: 60164 26 11
 AnchorClass2: "Anchor-0" "'mark' Mark Positioning lookup 0 subtable" "Anchor-1" "'mark' Mark Positioning lookup 1 subtable" "Anchor-2" "'mark' Mark Positioning lookup 2 subtable" "Anchor-3" "'mark' Mark Positioning lookup 3 subtable" "Anchor-4" "'mark' Mark Positioning lookup 4 subtable" "Anchor-5" "'mark' Mark Positioning lookup 5 subtable" "Anchor-6" "'mark' Mark Positioning lookup 6 subtable" "Anchor-7" "'mark' Mark Positioning lookup 7 subtable" "Anchor-8" "'mark' Mark Positioning lookup 8 subtable" "Anchor-9" "'mark' Mark Positioning lookup 9 subtable" "Anchor-10" "'mark' Mark Positioning lookup 10 subtable" "Anchor-11" "'mkmk' Mark to Mark lookup 11 subtable" "Anchor-12" "'mkmk' Mark to Mark lookup 12 subtable" "Anchor-13" "'mkmk' Mark to Mark lookup 13 subtable" "Anchor-14" "'mkmk' Mark to Mark lookup 14 subtable" "Anchor-15" "'mkmk' Mark to Mark lookup 15 subtable" "Anchor-16" "'mkmk' Mark to Mark lookup 16 subtable" "Anchor-17" "'mkmk' Mark to Mark lookup 17 subtable" "Anchor-18" "'mkmk' Mark to Mark lookup 18 subtable"
 BeginChars: 1116007 14725
 
@@ -231898,7 +231898,7 @@ EndChar
 
 StartChar: cod-text_size
 Encoding: 60265 60265 3223
-Width: 1200
+Width: 1788
 GlyphClass: 2
 Flags: W
 LayerCount: 4
@@ -231935,29 +231935,42 @@ SplineSet
 EndSplineSet
 EndChar
 
-StartChar: cod-three_bars
+StartChar: cod-text_size_decrease
 Encoding: 60266 60266 3224
-Width: 1200
+Width: 1788
 GlyphClass: 2
 Flags: W
 LayerCount: 4
 Fore
 SplineSet
-1536 1092 m 1,0,-1
- 0 1092 l 1,1,-1
- 0 1352 l 1,2,-1
- 1536 1352 l 1,3,-1
- 1536 1092 l 1,0,-1
-1536 580 m 1,4,-1
- 0 580 l 1,5,-1
- 0 840 l 1,6,-1
- 1536 840 l 1,7,-1
- 1536 580 l 1,4,-1
-0 68 m 1,8,-1
- 1536 68 l 1,9,-1
- 1536 328 l 1,10,-1
- 0 328 l 1,11,-1
- 0 68 l 1,8,-1
+1488 905 m 1,0,-1
+ 1788 133 l 1,1,-1
+ 1618 133 l 1,2,-1
+ 1556 324 l 1,3,-1
+ 1263 324 l 1,4,-1
+ 1194 133 l 1,5,-1
+ 1024 133 l 1,6,-1
+ 1324 905 l 1,7,-1
+ 1488 905 l 1,0,-1
+1508 454 m 1,8,-1
+ 1406 727 l 1,9,-1
+ 1310 454 l 1,10,-1
+ 1508 454 l 1,8,-1
+402 1287 m 1,11,-1
+ 607 1287 l 1,12,-1
+ 1024 133 l 1,13,-1
+ 819 133 l 1,14,-1
+ 723 427 l 1,15,-1
+ 293 427 l 1,16,-1
+ 198 133 l 1,17,-1
+ 0 133 l 1,18,-1
+ 402 1287 l 1,11,-1
+682 584 m 1,19,-1
+ 532 1041 l 2,20,21
+ 518 1082 518 1082 512 1116 c 1,22,-1
+ 498 1041 l 1,23,-1
+ 341 584 l 1,24,-1
+ 682 584 l 1,19,-1
 EndSplineSet
 EndChar
 
@@ -422454,7 +422467,7 @@ StartChar: md-broom
 Encoding: 983266 983266 6162
 Width: 1584
 GlyphClass: 2
-Flags: WO
+Flags: W
 LayerCount: 4
 Fore
 SplineSet

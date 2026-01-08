@@ -400,15 +400,15 @@ fn setup_font(ctx: &mut egui::Context){
 
     // symbols in added from font: https://www.nerdfonts.com/cheat-sheet
         // font ONLY has these symbols in it and NOTHING else:
-            //  (github - e709)
-            //  (zoom in - eb81)
-            //  (zoom out - eb82)
-            // 󰨸 (clipboard - f0a38)
-            // 󰃢 (broom - f00e2)
+            //  (github - U+E709)
+            //  (font increase - U+EB69)
+            //  (font decrease - U+EB6A) // this glyph was changed from the standard nerd font glyph at this position to a flipped version of U+eb69.
+            // 󰨸 (clipboard - U+F0A38)
+            // 󰃢 (broom - U+F00E2)
         // this makes the font very small in size AND allows no pixelation when displaying these
         // symbols in different sizes (since they are essentially SVGs).
 
-    let font_bytes = include_bytes!("../embedded_assets/fonts/CaskaydiaMonoNF-Regular.ttf");
+    let font_bytes = include_bytes!("../embedded_assets/fonts/symbol_font.ttf");
     let mut fonts = egui::FontDefinitions::default(); 
     fonts.font_data.insert("symbol_font".to_owned(), egui::FontData::from_static(font_bytes).into());
     fonts.families.entry(egui::FontFamily::Proportional).or_default().push("symbol_font".to_owned());
@@ -469,10 +469,10 @@ fn ui_system(
             ui.with_layout(Layout::right_to_left(egui::Align::RIGHT), |ui|{
                 ui.allocate_ui(logo_size_vec, |ui|{
                     ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-                     if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("Decrease Font").clicked(){
+                     if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("Decrease Font").clicked(){
                         decrease_font(&mut font_scale);
                     }
-                    if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("Increase Font").clicked(){
+                    if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("Increase Font").clicked(){
                         increase_font(&mut font_scale);
                     }
                     ui.style_mut().override_text_style = None;
