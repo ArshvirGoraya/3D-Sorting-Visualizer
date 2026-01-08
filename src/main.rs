@@ -3,8 +3,7 @@ use core::{f64, fmt};
 use bevy::{ecs::relationship::RelationshipSourceCollection, input::mouse::MouseWheel, platform::collections::HashMap, prelude::*, render::render_resource::encase::private::Truncate};
 
 use bevy_egui::{
-    EguiContexts, EguiPlugin, EguiPrimaryContextPass, EguiTextureHandle,
-    egui::{self, Layout, Margin, Spacing, vec2},
+    EguiContexts, EguiPlugin, EguiPrimaryContextPass, EguiStartupSet, EguiTextureHandle, egui::{self, Layout, Margin, Spacing, vec2}
 };
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -16,10 +15,21 @@ const PROGRAM_TITLE: &str = "3D Sorting";
 #[derive(Resource)]
 pub struct FontScale {
     scale: f32,
+    scale_step: f32,
     max: f32,
     min: f32,
-    scale_step: f32,
 }
+impl Default for FontScale{
+    fn default() -> Self {
+        Self{
+            scale: 1.0,
+            scale_step: 0.1,
+            max: 10.0,
+            min: 0.1,
+        }
+    }
+}
+
 
 #[derive(Resource)]
 pub struct ImageIds{
@@ -43,7 +53,6 @@ impl Default for NumberRegex {
             // re: Regex::new(r"-?\d+(?:\.\d+)?").expect("valid regex"),
             // positive or minus, d.d, or .d, or d.
             re: Regex::new(r"-?(?:\d+\.\d*|\.\d+|\d+)").expect("valid regex"),
-            
         }
     }
 }
@@ -157,7 +166,8 @@ fn main() {
         // .insert_resource(NumberRegex::default())
         .init_resource::<NumberRegex>()
         .init_resource::<ParsedValues>()
-        .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
+        .init_resource::<FontScale>()
+        // .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
         .insert_resource(ProblemValues::new())
         // .add_systems(Startup, tests)
         .add_systems(Startup, spawn_3d_camera)
@@ -295,6 +305,10 @@ fn scale_ui(style: &mut egui::Style, scale : f32){
     use egui::TextStyle::*;
 
 
+    // for (text_style, _font_id) in &style.text_styles{
+    //     log::info!("textstyle: {}", text_style);
+    // }
+
     // go to definition of egui::Style for these defaults 
     style.text_styles = [
         (Heading, FontId::new(30.0 * scale, Proportional)),
@@ -304,6 +318,8 @@ fn scale_ui(style: &mut egui::Style, scale : f32){
         (Monospace, FontId::new(14.0 * scale, Proportional)),
         (Button, FontId::new(14.0 * scale, Proportional)),
         (Small, FontId::new(10.0 * scale, Proportional)),
+        // ((Name("symbol_font".into())), FontId::new(14.0 * scale, egui::FontFamily::Name("symbol_font".into())))
+        ((Name("symbol_font".into())), FontId::new(25.0 * scale, Proportional))
     ].into();
 
     style.spacing = Spacing  {
@@ -376,6 +392,20 @@ fn get_parse_warning_color(worse_parse_problem: &ParsedWarning) -> (egui::Color3
     }
 }
 
+fn setup_font(ctx: &mut egui::Context){
+    // push font data into the proportional font family. Egui will use it if it cant find the glyph it needs from
+    // any other font in the family. You can make a new font family and put the font in that one
+    // and choose when to use that font instead. But this is just for nerd font glyhps, so can just
+    // add it to the normal font family and will be used when needed.
+
+    let font_bytes = include_bytes!("../embedded_assets/fonts/CaskaydiaMonoNF-Regular.ttf");
+    let mut fonts = egui::FontDefinitions::default(); 
+    fonts.font_data.insert("symbol_font".to_owned(), egui::FontData::from_static(font_bytes).into());
+    fonts.families.entry(egui::FontFamily::Proportional).or_default().push("symbol_font".to_owned());
+    ctx.set_fonts(fonts);
+}
+
+
 #[allow(clippy::too_many_arguments)]
 fn ui_system(
     mut contexts: EguiContexts,
@@ -385,6 +415,7 @@ fn ui_system(
     number_regex: Res<NumberRegex>,
     mut clipboard: ResMut<bevy_egui::EguiClipboard>,
     mut font_scale: ResMut<FontScale>,
+    mut font_added: Local<bool>,
     // mut parsed_numbers: Local<Vec<f64>>,
     mut text_is_dirty: Local<bool>,
 
@@ -393,12 +424,26 @@ fn ui_system(
 
     mut parsed_values: ResMut<ParsedValues>,
     mut problem_values: ResMut<ProblemValues>,
-    mut worse_parse_problem: Local<ParsedWarning>
+    mut worse_parse_problem: Local<ParsedWarning>,
+
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     let logo_size = 25.0 * font_scale.scale;
 
-    egui::Window::new(PROGRAM_TITLE).show(ctx, |ui| {
+
+    if !*font_added{
+        *font_added = true;
+        setup_font(ctx);
+        let scale = font_scale.scale;
+        ctx.all_styles_mut(move |style| {
+            scale_ui(style, scale);
+        });
+    }
+
+    // log::info!("max_width: {max_width}");
+
+
+    egui::Window::new(PROGRAM_TITLE).max_width(ctx.content_rect().width() * 0.37).show(ctx, |ui| {
         ui.horizontal(|ui|{
             if ui.add(egui::Button::image(egui::load::SizedTexture::new(
                         image_ids.github,
@@ -411,6 +456,22 @@ fn ui_system(
             }
 
             ui.with_layout(Layout::right_to_left(egui::Align::RIGHT), |ui|{
+
+                ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+
+                // ui.label("");
+                // ui.button("");
+                ui.button("");
+                ui.button("");
+                ui.add_sized(vec2(30.0 * font_scale.scale, 25.0 * font_scale.scale), egui::Button::new(""));
+
+                ui.style_mut().override_text_style = None;
+
+
+                // egui::Button::min_size([logo_size, logo_size])
+
+                // ui.button("").intrinsic_size = vec2(logo_size, logo_size);
+
                 if ui.add(egui::Button::image(egui::load::SizedTexture::new(
                             image_ids.zoom_in,
                             [logo_size, logo_size],
@@ -437,6 +498,7 @@ fn ui_system(
                     //     scale_ui(style, ui_scale);
                     // });
                 }
+                //
             });
         });
 
