@@ -398,6 +398,16 @@ fn setup_font(ctx: &mut egui::Context){
     // and choose when to use that font instead. But this is just for nerd font glyhps, so can just
     // add it to the normal font family and will be used when needed.
 
+    // symbols in added from font: https://www.nerdfonts.com/cheat-sheet
+        // font ONLY has these symbols in it and NOTHING else:
+            //  (github - e709)
+            //  (zoom in - eb81)
+            //  (zoom out - eb82)
+            // 󰨸 (clipboard - f0a38)
+            // 󰃢 (broom - f00e2)
+        // this makes the font very small in size AND allows no pixelation when displaying these
+        // symbols in different sizes (since they are essentially SVGs).
+
     let font_bytes = include_bytes!("../embedded_assets/fonts/CaskaydiaMonoNF-Regular.ttf");
     let mut fonts = egui::FontDefinitions::default(); 
     fonts.font_data.insert("symbol_font".to_owned(), egui::FontData::from_static(font_bytes).into());
@@ -428,7 +438,8 @@ fn ui_system(
 
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
-    let logo_size = 25.0 * font_scale.scale;
+    let logo_size = 30.0 * font_scale.scale;
+    let logo_size_vec = vec2(logo_size, logo_size);
 
 
     if !*font_added{
@@ -445,82 +456,57 @@ fn ui_system(
 
     egui::Window::new(PROGRAM_TITLE).max_width(ctx.content_rect().width() * 0.37).show(ctx, |ui| {
         ui.horizontal(|ui|{
-            if ui.add(egui::Button::image(egui::load::SizedTexture::new(
-                        image_ids.github,
-                        [logo_size, logo_size],
-            ))).on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer").clicked() {
-                ui.ctx().open_url(egui::OpenUrl {
-                    new_tab: true,
-                    url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
-                });
-            }
-
-            ui.with_layout(Layout::right_to_left(egui::Align::RIGHT), |ui|{
-
+            ui.allocate_ui(logo_size_vec, |ui|{
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-
-                // ui.label("");
-                // ui.button("");
-                ui.button("");
-                ui.button("");
-                ui.add_sized(vec2(30.0 * font_scale.scale, 25.0 * font_scale.scale), egui::Button::new(""));
-
+                if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer").clicked(){
+                    ui.ctx().open_url(egui::OpenUrl {
+                        new_tab: true,
+                        url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
+                    });
+                }
                 ui.style_mut().override_text_style = None;
-
-
-                // egui::Button::min_size([logo_size, logo_size])
-
-                // ui.button("").intrinsic_size = vec2(logo_size, logo_size);
-
-                if ui.add(egui::Button::image(egui::load::SizedTexture::new(
-                            image_ids.zoom_in,
-                            [logo_size, logo_size],
-                ))).on_hover_text("Increase Font").clicked() {
-                    increase_font(&mut font_scale);
-                    log::info!("increased: {}", font_scale.scale)
-                    // ui_state.font_size = f32::min(10.0, ui_state.font_size + 0.1);
-                    // let ui_scale = ui_state.font_size;
-                    // ui.ctx().all_styles_mut(move |style| {
-                    //     scale_ui(style, ui_scale);
-                    // });
-                }
-                if ui.add(egui::Button::image(egui::load::SizedTexture::new(
-                            image_ids.zoom_out,
-                            [logo_size, logo_size],
-                ))).on_hover_text("Decrease Font").clicked() {
-                    decrease_font(&mut font_scale);
-
-                    log::info!("decreased: {}", font_scale.scale)
-
-                    // ui_state.font_size = f32::max(0.1, ui_state.font_size - 0.1);
-                    // let ui_scale = ui_state.font_size;
-                    // ui.ctx().all_styles_mut(move |style| {
-                    //     scale_ui(style, ui_scale);
-                    // });
-                }
-                //
+            });
+            ui.with_layout(Layout::right_to_left(egui::Align::RIGHT), |ui|{
+                ui.allocate_ui(logo_size_vec, |ui|{
+                    ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+                     if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("Decrease Font").clicked(){
+                        decrease_font(&mut font_scale);
+                    }
+                    if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("Increase Font").clicked(){
+                        increase_font(&mut font_scale);
+                    }
+                    ui.style_mut().override_text_style = None;
+                });
             });
         });
 
-        // todo:
-        // Might be better to use a really small nerd font that in is smaller than all used images
-        // if in aggregate the images are smaller than the font in size.
-        // Can make a font with only the used logos too in order to get a very small font size?
-        // if ui.button("").on_hover_text("go to github page").clicked(){
-        //     ui.ctx().open_url(egui::OpenUrl {
-        //         new_tab: true,
-        //         url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
-        //     });
-        // }
-
         ui.horizontal(|ui|{
-            if ui.add(egui::Button::image(egui::load::SizedTexture::new(
-                        image_ids.clipboard,
-                        [logo_size, logo_size],
-            ))).on_hover_text("copy to clipboard").clicked() {
-                clipboard.set_text(&my_text);
-            }
+            ui.allocate_ui(vec2(logo_size, logo_size), |ui|{
+                ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+                if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("󰨸")).on_hover_text("copy text to clipboard").clicked(){
+                    clipboard.set_text(&my_text);
+                }; 
+                ui.style_mut().override_text_style = None;
+            });
+            ui.with_layout(Layout::right_to_left(egui::Align::RIGHT), |ui|{
+                ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
+                ui.centered_and_justified(|ui|{
+                    let clean_button= ui.add_enabled(*text_is_dirty, egui::Button::new("clean 󰃢")).on_disabled_hover_text("replace text to internal representation of your numbers").on_hover_text("replace text to internal representation of numbers");
+                    if clean_button.clicked(){
+                        *text_is_dirty = false;
+                        *my_text = parsed_values.vals.iter().map(|x|{
+                            x.converted_value.to_string()
+                        }).collect::<Vec<_>>().join(", ");
+                        log::info!("cleaned text");
+                    };
+                });
+                ui.style_mut().override_text_style = None;
+            });
         });
+
+
+
+
 
         let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
 
@@ -586,6 +572,7 @@ fn ui_system(
             // new cubes are added?
 
 
+            *text_is_dirty = true;
             num_strings.requires_restring = true;
             colored_strings.requires_restring = true;
 
