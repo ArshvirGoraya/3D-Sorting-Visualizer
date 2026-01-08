@@ -138,6 +138,8 @@ pub struct ColoredStrings{
     vals: Vec<egui::RichText>
 }
 
+
+
 fn main() {
     App::new()
         // sending logs to console in browser:
@@ -419,7 +421,7 @@ fn setup_font(ctx: &mut egui::Context){
 #[allow(clippy::too_many_arguments)]
 fn ui_system(
     mut contexts: EguiContexts,
-    image_ids: Res<ImageIds>,
+    // image_ids: Res<ImageIds>,
     mut my_text: Local<String>,
     // mut my_parsed_text: Local<String>,
     number_regex: Res<NumberRegex>,
@@ -505,70 +507,71 @@ fn ui_system(
         });
 
 
-
-
-
         let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
 
         let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
+            .id_source("scroll_parsed_collapsible")
             .default_open(true)
             .show(ui, |_ui| {
         });
 
         if !collapse_response.fully_closed(){
-            // ui.add(egui::RichText::new("am I inside the collapsible?").color(parse_warning_color))
-            if *worse_parse_problem == ParsedWarning::Ok{
-                // just the parsed numbers
-                if num_strings.requires_restring {
-                    num_strings.requires_restring = false;
-                    num_strings.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
-                }
-
-                ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
-                    ui.push_id("scroll_parsed", |ui|{
-                        egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
-                            ui.add_enabled(false, 
-                                egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
-                            );
-                        });
+            if num_strings.requires_restring {
+                num_strings.requires_restring = false;
+                num_strings.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
+            }
+            ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
+                ui.push_id("scroll_parsed", |ui|{
+                    egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
+                        ui.add_enabled(false, 
+                            egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
+                        );
                     });
                 });
+            });
 
-                // ui.add_enabled(false, 
-                //     egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
-                // );
-            }
-            else{
-                //
-                if colored_strings.requires_restring {
-                    colored_strings.requires_restring = false;
-                    colored_strings.vals.clear();
-                    parsed_values.vals[..parsed_values.end_index].iter().for_each(|x|{
-                        let (color, _) = get_parse_warning_color(&x.parsed_warning);
-
-                        // log::info!("attempt to get raw string for number: {}", x.converted_value);
-                        let raw_string = &my_text[x.raw_string.start_index..x.raw_string.end_index];
-                        colored_strings.vals.push(egui::RichText::new(raw_string).color(color));
-                    });
-                }
-
-                ui.group(|ui|{
-                    ui.horizontal(|ui|{
-                        let mut index: usize = 0;
-                        parsed_values.vals[..parsed_values.end_index].iter().for_each(|x|{
-                            let (_, msg) = get_parse_warning_color(&x.parsed_warning);
-                            let colored_widget = colored_strings.vals.get(index).unwrap();
-                            let label = ui.label(colored_widget.clone());
-                            if x.parsed_warning != ParsedWarning::Ok{
-                                label.on_hover_text(format!("{}{}[{}]", msg, ". Converted to: ", x.converted_value));
-                            }else{
-                                label.on_hover_text(msg);
-                            }
-                            index += 1;
-                        });
-                    })
-                });
-            }
+            // // ui.add(egui::RichText::new("am I inside the collapsible?").color(parse_warning_color))
+            // if *worse_parse_problem == ParsedWarning::Ok{
+            //     // just the parsed numbers
+            //
+            //
+            //     // ui.add_enabled(false, 
+            //     //     egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
+            //     // );
+            // }
+            // else{
+            //     //
+            //     if colored_strings.requires_restring {
+            //         colored_strings.requires_restring = false;
+            //         colored_strings.vals.clear();
+            //         parsed_values.vals[..parsed_values.end_index].iter().for_each(|x|{
+            //             let (color, _) = get_parse_warning_color(&x.parsed_warning);
+            //
+            //             // log::info!("attempt to get raw string for number: {}", x.converted_value);
+            //             let raw_string = &my_text[x.raw_string.start_index..x.raw_string.end_index];
+            //             colored_strings.vals.push(egui::RichText::new(raw_string).color(color));
+            //         });
+            //     }
+            //
+            //     ui.group(|ui|{
+            //         ui.horizontal(|ui|{
+            //             let mut index: usize = 0;
+            //             parsed_values.vals[..parsed_values.end_index].iter().for_each(|x|{
+            //                 let (_, msg) = get_parse_warning_color(&x.parsed_warning);
+            //                 let colored_widget = colored_strings.vals.get(index).unwrap();
+            //                 let label = ui.label(colored_widget.clone());
+            //                 if x.parsed_warning != ParsedWarning::Ok{
+            //                     label.on_hover_text(format!("{}{}[{}]", msg, ". Converted to: ", x.converted_value));
+            //                 }else{
+            //                     label.on_hover_text(msg);
+            //                 }
+            //                 index += 1;
+            //             });
+            //         })
+            //     });
+            // }
+            //
+            //
         };
 
         ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
