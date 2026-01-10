@@ -1,9 +1,9 @@
 use core::{f64, fmt};
 
-use bevy::{ecs::relationship::RelationshipSourceCollection, input::mouse::MouseWheel, platform::collections::HashMap, prelude::*, render::render_resource::encase::private::Truncate};
+use bevy::{ input::mouse::MouseWheel, platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
-    EguiContexts, EguiPlugin, EguiPrimaryContextPass, EguiStartupSet, EguiTextureHandle, egui::{self, Layout, Margin, Spacing, vec2}
+    EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui::{self, Margin, Spacing, vec2}
 };
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -28,15 +28,6 @@ impl Default for FontScale{
             min: 0.1,
         }
     }
-}
-
-
-#[derive(Resource)]
-pub struct ImageIds{
-    github: egui::TextureId,
-    zoom_in: egui::TextureId,
-    zoom_out: egui::TextureId,
-    clipboard: egui::TextureId,
 }
 
 #[derive(Resource)]
@@ -73,8 +64,6 @@ impl fmt::Display for ParsedWarning {
         }
     }
 }
-
-
 
 #[derive(Default)]
 pub struct StringInfo{
@@ -132,12 +121,10 @@ pub struct NumString{
     val: String,
 }
 
-#[derive(Default)]
-pub struct ColoredStrings{
-    requires_restring: bool,
-    vals: Vec<egui::RichText>
+#[derive(Resource)]
+pub struct CopyTimer{
+    copy_timer: Timer,
 }
-
 
 
 fn main() {
@@ -169,31 +156,22 @@ fn main() {
         .init_resource::<NumberRegex>()
         .init_resource::<ParsedValues>()
         .init_resource::<FontScale>()
+        .insert_resource(CopyTimer {copy_timer: Timer::from_seconds(1.0, TimerMode::Once)})
         // .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
         .insert_resource(ProblemValues::new())
         // .add_systems(Startup, tests)
+        .add_systems(Startup, finish_copy_timer)
         .add_systems(Startup, spawn_3d_camera)
         .add_systems(Startup, spawn_a_cube)
-        .add_systems(Startup, get_texture_ids)
         .add_systems(Update, font_scale_inputs)
         .add_systems(EguiPrimaryContextPass, ui_system)
         // .add_systems(Update, test_system)
         .run();
 }
 
-fn get_texture_ids(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut egui_textures: ResMut<bevy_egui::EguiUserTextures>,
-) {
-    commands.insert_resource(ImageIds{
-        github: egui_textures.add_image(EguiTextureHandle::Strong(asset_server.load("github-white.png"))),
-        zoom_in: egui_textures.add_image(EguiTextureHandle::Strong(asset_server.load("zoom-in.png"))),
-        zoom_out: egui_textures.add_image(EguiTextureHandle::Strong(asset_server.load("zoom-out.png"))),
-        clipboard: egui_textures.add_image(EguiTextureHandle::Strong(asset_server.load("clipboard.png"))),
-    });
+fn finish_copy_timer(mut copy_timer: ResMut<CopyTimer>){
+    copy_timer.copy_timer.finish();
 }
-
 
 fn tests(){
     // test_detect_precision_loss
@@ -252,14 +230,12 @@ fn string_trim_zeros(s: &str) -> String{
 
     // recombine int and frac. Add minus and zero as required.
     let requirements = (requires_minus, requires_zero);
-    let new_string = match requirements{
+    match requirements{
         (true, true) => format!("-0{}{}", int, frac),
         (false, true) => format!("0{}{}", int, frac),
         (true, false) => format!("-{}{}", int, frac),
         (false, false) => format!("{}{}", int, frac),
-    };
-
-    return new_string;
+    }
 }
 
 fn get_sort_indices(values: &[f64]) -> Vec<usize> {
@@ -326,7 +302,6 @@ fn scale_ui(style: &mut egui::Style, scale : f32){
 
     style.spacing = Spacing  {
             item_spacing: vec2(8.0, 3.0) * scale,
-            window_margin: Margin::same(6 * scale as i8),
             menu_margin: Margin::same(6 * scale as i8),
             button_padding: vec2(4.0, 1.0) * scale,
             indent: 18.0 * scale,
@@ -339,6 +314,8 @@ fn scale_ui(style: &mut egui::Style, scale : f32){
             icon_width_inner: 8.0 * scale,
             icon_spacing: 4.0 * scale,
             tooltip_width: 500.0 * scale,
+            //
+            // window_margin: Margin::same(6 * scale as i8),
             // default_area_size: vec2(600.0, 400.0) * scale,
             // menu_width: 400.0 * scale,
             // menu_spacing: 2.0 * scale,
@@ -431,18 +408,17 @@ fn ui_system(
     // mut parsed_numbers: Local<Vec<f64>>,
     mut text_is_dirty: Local<bool>,
 
-    mut colored_strings: Local<ColoredStrings>,
     mut num_strings: Local<NumString>,
 
     mut parsed_values: ResMut<ParsedValues>,
     mut problem_values: ResMut<ProblemValues>,
     mut worse_parse_problem: Local<ParsedWarning>,
 
+    time: Res<Time>,
+    mut copy_timer: ResMut<CopyTimer>,
+
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
-    let logo_size = 30.0 * font_scale.scale;
-    let logo_size_vec = vec2(logo_size, logo_size);
-
 
     if !*font_added{
         *font_added = true;
@@ -453,64 +429,89 @@ fn ui_system(
         });
     }
 
+    let max_width = ctx.content_rect().width() * 0.37;
     // log::info!("max_width: {max_width}");
 
 
-    egui::Window::new(PROGRAM_TITLE).max_width(ctx.content_rect().width() * 0.37).show(ctx, |ui| {
-        ui.horizontal(|ui|{
-            ui.allocate_ui(logo_size_vec, |ui|{
-                ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-                if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer").clicked(){
+    let mut first_button_size: egui::Vec2 = Default::default();
+
+    egui::Window::new(PROGRAM_TITLE).max_width(max_width).show(ctx, |ui| {
+        ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+        ui.columns(3, |cols|{
+            let response = cols[0].vertical_centered_justified(|ui|{
+                if ui.button("").on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer").clicked(){
                     ui.ctx().open_url(egui::OpenUrl {
                         new_tab: true,
                         url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
                     });
                 }
-                ui.style_mut().override_text_style = None;
             });
-            ui.with_layout(Layout::right_to_left(egui::Align::RIGHT), |ui|{
-                ui.allocate_ui(logo_size_vec, |ui|{
-                    ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-                     if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("Decrease Font").clicked(){
-                        decrease_font(&mut font_scale);
-                    }
-                    if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("")).on_hover_text("Increase Font").clicked(){
-                        increase_font(&mut font_scale);
-                    }
-                    ui.style_mut().override_text_style = None;
-                });
+            cols[1].vertical_centered_justified(|ui|{
+                if ui.button("").on_hover_cursor(egui::CursorIcon::ZoomOut).on_hover_text("Decrease Font").clicked(){
+                    decrease_font(&mut font_scale);
+                }
+
             });
+            cols[2].vertical_centered_justified(|ui|{
+                if ui.button("").on_hover_cursor(egui::CursorIcon::ZoomIn).on_hover_text("Increase Font").clicked(){
+                    increase_font(&mut font_scale);
+                }
+            });
+            first_button_size = response.response.rect.size();
         });
+        ui.style_mut().override_text_style = None;
 
         ui.horizontal(|ui|{
-            ui.allocate_ui(vec2(logo_size, logo_size), |ui|{
-                ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-                if ui.add_sized(vec2(logo_size, logo_size), egui::Button::new("󰨸")).on_hover_text("copy text to clipboard").clicked(){
+            ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+            ui.allocate_ui(first_button_size, |ui|{
+                let copy_response = ui.add_sized(first_button_size, egui::Button::new("󰨸")).on_hover_text("Copy text to clipboard");
+                if copy_response.clicked(){
                     clipboard.set_text(&my_text);
+                    copy_timer.copy_timer.reset();
                 }; 
-                ui.style_mut().override_text_style = None;
+                if !copy_timer.copy_timer.is_finished(){
+                    copy_timer.copy_timer.tick(time.delta());
+                    // copy_response.show_tooltip_text("Copied!");
+
+                    // Center the tool tip:
+                    // Measure it first using a galley
+                    let galley = ui.painter().layout_no_wrap("Copied!".to_owned(), 
+                        ui.style().text_styles[&egui::TextStyle::Body].clone(), 
+                        ui.style().visuals.text_color()
+                    );
+                    // Center with the measurement
+                    let mut position = copy_response.rect.center_bottom();
+                    position.x -= galley.rect.size().x / 2.0;
+                    // Create in an area:
+                    egui::Area::new("copied_tooltip".into())
+                        .order(egui::Order::Tooltip)
+                        .fixed_pos(position)
+                        .show(ui.ctx(), |ui|{
+                            egui::Frame::popup(ui.style()).show(ui, |ui|{
+                                ui.add(egui::Label::new("Copied!").wrap_mode(egui::TextWrapMode::Extend));
+                            });
+                        });
+
+                }
             });
-            ui.with_layout(Layout::right_to_left(egui::Align::RIGHT), |ui|{
-                ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
-                ui.centered_and_justified(|ui|{
-                    let clean_button= ui.add_enabled(*text_is_dirty, egui::Button::new("clean 󰃢")).on_disabled_hover_text("replace text to internal representation of your numbers").on_hover_text("replace text to internal representation of numbers");
-                    if clean_button.clicked(){
-                        *text_is_dirty = false;
-                        *my_text = parsed_values.vals.iter().map(|x|{
-                            x.converted_value.to_string()
-                        }).collect::<Vec<_>>().join(", ");
-                        log::info!("cleaned text");
-                    };
-                });
-                ui.style_mut().override_text_style = None;
+            ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
+            ui.centered_and_justified(|ui|{
+                let clean_button= ui.add_enabled(*text_is_dirty, egui::Button::new("clean 󰃢")).on_disabled_hover_text("Replace text with internal representation of your numbers").on_hover_text("Replace text with internal representation of numbers");
+                if clean_button.clicked(){
+                    *text_is_dirty = false;
+                    *my_text = parsed_values.vals.iter().map(|x|{
+                        x.converted_value.to_string()
+                    }).collect::<Vec<_>>().join(", ");
+                };
             });
+            ui.style_mut().override_text_style = None;
         });
 
 
         let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
 
         let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
-            .id_source("scroll_parsed_collapsible")
+            .id_salt("scroll_parsed_collapsible")
             .default_open(true)
             .show(ui, |_ui| {
         });
@@ -590,7 +591,6 @@ fn ui_system(
 
                     *text_is_dirty = true;
                     num_strings.requires_restring = true;
-                    colored_strings.requires_restring = true;
 
                     problem_values.map.values_mut().for_each(|vec|{
                         vec.clear();
