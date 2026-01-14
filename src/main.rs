@@ -1,6 +1,6 @@
 mod ui;
 
-use bevy::{input::mouse::MouseWheel, prelude::*};
+use bevy::{input::mouse::MouseWheel, platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
@@ -10,6 +10,8 @@ pub const PROGRAM_TITLE: &str = "3D Sorting";
 
 fn main() {
     App::new()
+        .add_message::<ui::ChangeMaterials>()
+        .add_message::<ui::ChangeHeights>()
         // sending logs to console in browser:
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -35,21 +37,66 @@ fn main() {
         .add_plugins(EguiPlugin::default())
         // .insert_resource(NumberRegex::default())
         .init_resource::<ui::NumberRegex>()
+        .init_resource::<ui::Random>()
         .init_resource::<ui::ParsedValues>()
         .init_resource::<ui::FontScale>()
+        .init_resource::<ui::UserText>()
         .insert_resource(ui::CopyTimer {
             copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
         })
         // .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
-        .insert_resource(ui::ProblemValues::new())
+        // .insert_resource(ui::ProblemValues::new())
         // .add_systems(Startup, tests)
         .add_systems(Startup, finish_copy_timer)
         .add_systems(Startup, spawn_3d_camera)
-        .add_systems(Startup, spawn_a_cube)
+        // .add_systems(Startup, spawn_a_cube)
+        .add_systems(
+            Startup,
+            (spawn_cube_assets, ui::spawn_random_parsed_values).chain(),
+        )
+        // .add_systems(Startup, ui::spawn_random_parsed_values)
+        .add_systems(
+            Update,
+            change_heights.run_if(on_message::<ui::ChangeHeights>),
+        )
+        .add_systems(
+            Update,
+            change_materials.run_if(on_message::<ui::ChangeMaterials>),
+        )
         .add_systems(Update, font_scale_inputs)
         .add_systems(EguiPrimaryContextPass, ui::ui_system)
         // .add_systems(Update, test_system)
         .run();
+}
+
+fn change_heights(
+    mut commands: Commands,
+    query: Query<(Entity, &mut Transform, &ui::ChangeHeight)>,
+) {
+    for (entity, mut transform, component) in query {
+        //
+        transform.scale.y = component.height as f32;
+        commands.entity(entity).remove::<ui::ChangeHeight>();
+    }
+}
+
+fn change_materials(
+    mut commands: Commands,
+    cube_assets: Res<ui::CubeAssets>,
+    query: Query<(
+        Entity,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &ui::ChangeMaterial,
+    )>,
+) {
+    for (entity, mut material, component) in query {
+        *material = cube_assets
+            .materials
+            .get(&component.parsed_warning)
+            .unwrap()
+            .clone();
+        commands.entity(entity).remove::<ui::ChangeMaterial>();
+    }
 }
 
 fn finish_copy_timer(mut copy_timer: ResMut<ui::CopyTimer>) {
@@ -92,15 +139,66 @@ fn font_scale_inputs(
     }
 }
 
+fn spawn_cube_assets(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands.insert_resource(ui::CubeAssets {
+        mesh: Mesh3d(meshes.add(Cuboid::from_length(1.0))),
+        materials: HashMap::from([
+            (
+                ui::ParsedWarning::Ok,
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::linear_rgb(202.0, 211.0, 245.0),
+                    // emissive: LinearRgba {
+                    //     red: 202.0,
+                    //     green: 211.0,
+                    //     blue: 245.0,
+                    //     alpha: 0.0,
+                    // },
+                    ..Default::default()
+                })),
+            ),
+            (
+                ui::ParsedWarning::Error,
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    // base_color: Color::linear_rgb(37.0, 135.0, 150.0),
+                    emissive: LinearRgba {
+                        red: 37.0,
+                        green: 135.0,
+                        blue: 150.0,
+                        alpha: 0.0,
+                    },
+                    ..Default::default()
+                })),
+            ),
+            (
+                ui::ParsedWarning::PrecisionLoss,
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    // base_color: Color::linear_rgb(238.0, 212.0, 159.0),
+                    emissive: LinearRgba {
+                        red: 238.0,
+                        green: 212.0,
+                        blue: 159.0,
+                        alpha: 0.0,
+                    },
+                    ..Default::default()
+                })),
+            ),
+        ]),
+    });
+}
+
 fn spawn_a_cube(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // cube mesh
-    let my_mesh = meshes.add(Cuboid::new(1.2, 3.4, 5.6));
-    let my_cube_mesh = Mesh3d(my_mesh);
+    let my_cube_mesh = Mesh3d(meshes.add(Cuboid::new(1.2, 3.4, 5.6)));
     // cube color
+
     let my_material = materials.add(StandardMaterial {
         base_color: Color::srgba_u8(0, u8::MAX, 0, u8::MAX),
         // unlit: true,
@@ -118,12 +216,8 @@ fn spawn_a_cube(
     let my_cube_position = Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::new(5.0, 5.0, 5.0));
 
     let my_cube = (my_cube_mesh, my_cube_color, my_cube_position);
-    commands.spawn(my_cube);
-
-    // commands.spawn(Mesh::from(
-    //     CuboidMeshBuilder::from(Cuboid::new(1.2, 3.4, 5.6)).build(),
-    // ));
-    log::info!("cube spawned")
+    let entity = commands.spawn(my_cube);
+    log::info!("cube id: {}", entity.id());
 }
 
 fn spawn_3d_camera(mut commands: Commands) {

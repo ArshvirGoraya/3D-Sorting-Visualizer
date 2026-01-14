@@ -2,15 +2,28 @@ use crate::PROGRAM_TITLE;
 
 use core::{f64, fmt};
 
-use bevy::{platform::collections::HashMap, prelude::*};
+use bevy::{ecs::{bundle, relationship::RelationshipSourceCollection}, platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Margin, Spacing, vec2},
+    egui::{self, Margin, Spacing, emath::{Numeric, easing::cubic_in}, vec2},
 };
 
 use regex_lite::Regex;
 
+use fastrand;
+
+#[derive(Resource)]
+pub struct Random {
+    pub rng: fastrand::Rng,
+}
+impl Default for Random {
+    fn default() -> Self {
+        Self {
+            rng: fastrand::Rng::new(),
+        }
+    }
+}
 
 #[derive(Resource)]
 pub struct FontScale {
@@ -66,40 +79,62 @@ impl fmt::Display for ParsedWarning {
     }
 }
 
+// Cube stuff. Maybe better if not in this file?
+#[derive(Resource)]
+pub struct CubeAssets {
+    pub mesh: Mesh3d,
+    pub materials: HashMap<ParsedWarning, MeshMaterial3d<StandardMaterial>>,
+}
+#[derive(Component)]
+pub struct ChangeHeight{
+    pub height: f64
+}
+#[derive(Component)]
+pub struct ChangeMaterial{
+    pub parsed_warning: ParsedWarning
+}
+// EVENTS:
+#[derive(Message)]
+pub struct ChangeMaterials;
+#[derive(Message)]
+pub struct ChangeHeights;
+
+
+// #[derive(Resource)]
+// pub struct ProblemValues {
+//     // Stores indices in ParsedValues that have parse problems.
+//     map: HashMap<ParsedWarning, Vec<usize>>,
+// }
+//
+// impl ProblemValues {
+//     pub fn new() -> Self {
+//         let mut map: HashMap<ParsedWarning, Vec<usize>> = HashMap::new();
+//         for key in [
+//             ParsedWarning::Ok,
+//             ParsedWarning::Error,
+//             ParsedWarning::PrecisionLoss,
+//         ] {
+//             map.insert(key, Vec::new());
+//         }
+//         Self { map }
+//     }
+// }
+
 #[derive(Default)]
 pub struct StringInfo {
     start_index: usize,
     end_index: usize,
 }
 
-#[derive(Default)]
+#[derive(Resource)]
 pub struct ParsedValue {
     raw_string: StringInfo,
     matched_string: StringInfo,
     converted_value: f64,
     parsed_warning: ParsedWarning,
+    cube_handle: Entity,
     // final_position: int,
     // box_handle: int
-}
-
-#[derive(Resource)]
-pub struct ProblemValues {
-    // Stores indices in ParsedValues that have parse problems.
-    map: HashMap<ParsedWarning, Vec<usize>>,
-}
-
-impl ProblemValues {
-    pub fn new() -> Self {
-        let mut map: HashMap<ParsedWarning, Vec<usize>> = HashMap::new();
-        for key in [
-            ParsedWarning::Ok,
-            ParsedWarning::Error,
-            ParsedWarning::PrecisionLoss,
-        ] {
-            map.insert(key, Vec::new());
-        }
-        Self { map }
-    }
 }
 
 #[derive(Resource, Default)]
@@ -150,11 +185,202 @@ fn tests() {
     });
 }
 
+fn generate_random_vec_f64(
+    mut random: ResMut<Random>,
+    min: usize,
+    max: usize,
+    amount: usize,
+) -> Vec<f64> {
+    let range = (max - min).to_f64();
+    std::iter::repeat_with(|| random.rng.f64() * range)
+        .take(amount)
+        .collect()
+}
+
+pub fn spawn_random_parsed_values(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut random: ResMut<Random>,
+    mut user_text: ResMut<UserText>,
+    mut worse_parse_problem: Local<ParsedWarning>,
+    number_regex: Res<NumberRegex>,
+    cube_assets: Res<CubeAssets>,
+    mut change_material_event: MessageWriter<ChangeMaterials>,
+    mut change_height_event: MessageWriter<ChangeHeights>,
+    mut parsed_values: ResMut<ParsedValues>,
+) {
+    // let mut parsed_values: ParsedValues = ParsedValues::default();
+    let amount = 25;
+    let range = (1 - 100).to_f64();
+    for index in 0..amount{
+        user_text.val.push_str(&((random.rng.f64() * range).to_string()));
+        if index != amount -1 {
+            user_text.val.push_str(", ");
+        }
+    };
+    update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, change_material_event, change_height_event);
+}
+
+fn update_parsed_values(
+    number_regex: Res<NumberRegex>,
+    user_text: ResMut<UserText>,
+    mut worse_parse_problem: Local<ParsedWarning>,
+    commands: &mut Commands,
+    cube_assets: & Res<CubeAssets>,
+    parsed_values: &mut ParsedValues,
+    mut change_material_event: MessageWriter<ChangeMaterials>,
+    mut change_height_event: MessageWriter<ChangeHeights>
+    ){
+    *worse_parse_problem = ParsedWarning::Ok;
+    let mut index: usize = 0;
+    let mut any_requires_change_material_height = (false, false);
+    log::info!("--");
+    number_regex
+        .re
+        .find_iter(&user_text.val)
+        .for_each(|m|{
+            let s = m.as_str();
+            match s.parse::<f64>(){
+                Ok(n) =>{
+                    let mut parsed_warning = ParsedWarning::Ok;
+                    let mut converted_val = n;
+
+                    if n.is_infinite(){
+                        // log::warn!("over-flowed number: {}", s);
+                        parsed_warning = ParsedWarning::PrecisionLoss;
+                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
+                        converted_val = f64::MAX;
+                    }
+                    else if detect_precision_loss(s, n){
+                        // log::warn!("precision loss on number: {}", s);
+                        parsed_warning = ParsedWarning::PrecisionLoss;
+                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
+                    }
+                    else if n.is_nan(){
+                        // log::error!("number is NaN: {}", s);
+                        parsed_warning = ParsedWarning::Error;
+                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
+                        converted_val = 0.0;
+                    }
+                    add_parsed_value(parsed_values, converted_val, parsed_warning, index, m.start(), m.end(), commands, cube_assets, &mut any_requires_change_material_height);
+                },
+                Err(_err) => {
+                    // log::error!("failed to parse: {} with err {}", s, err);
+                    *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
+                    add_parsed_value(parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end(), commands, cube_assets, &mut any_requires_change_material_height);
+                }
+            }
+            index += 1;
+        });
+    parsed_values.end_index = index;  // truncates to end_index when 'sort' is clicked.
+ 
+    if any_requires_change_material_height.0{
+        // trigger material change for all cubes that have the ChangeMaterial component
+        change_height_event.write(ChangeHeights);
+    }
+    if any_requires_change_material_height.1{
+        // trigger height change for all cubes that have the ChangeHeight component
+        change_material_event.write(ChangeMaterials);
+    }
+
+    // make cubes past end_index not render: only despawn them when I `sort` is clicked.
+    for parsed_value in &parsed_values.vals[parsed_values.end_index..]{
+        commands.entity(parsed_value.cube_handle).insert(Visibility::Hidden);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_parsed_value(
+    parsed_values: &mut ParsedValues,
+    converted_value: f64,
+    parsed_warning: ParsedWarning,
+    index: usize,
+    match_start: usize,
+    match_end: usize,
+    commands: &mut Commands,
+    cube_assets: & Res<CubeAssets>,
+    any_requires_change_material_height: &mut (bool, bool)
+) {
+    let previous_raw_string_end_index = {
+        if index == 0 {
+            0
+        } else {
+            parsed_values
+                .vals
+                .get(index - 1)
+                .unwrap()
+                .raw_string
+                .end_index
+        }
+    };
+
+    if let Some(parsed_value) = parsed_values.vals.get_mut(index) {
+        // If vector already contains a parsed_value object at this index, just change its values:
+        parsed_value.raw_string.start_index = previous_raw_string_end_index;
+        parsed_value.raw_string.end_index = match_end;
+        parsed_value.matched_string.start_index = match_start;
+        parsed_value.matched_string.end_index = match_end;
+
+        if parsed_value.parsed_warning != parsed_warning{
+            any_requires_change_material_height.0 = true;
+            commands.entity(parsed_value.cube_handle).insert(ChangeMaterial{
+                parsed_warning
+            });
+        }
+        if parsed_value.converted_value != converted_value{
+            any_requires_change_material_height.1 = true;
+            commands.entity(parsed_value.cube_handle).insert(ChangeHeight{
+                height: converted_value,
+            });
+        }
+        parsed_value.parsed_warning = parsed_warning;
+        parsed_value.converted_value = converted_value;
+
+        // make visible if not already:
+        commands.entity(parsed_value.cube_handle).insert(Visibility::Visible);
+    } else {
+        parsed_values.vals.push(ParsedValue {
+            converted_value,
+            parsed_warning,
+            matched_string: StringInfo {
+                start_index: match_start,
+                end_index: match_end,
+            },
+            raw_string: StringInfo {
+                start_index: previous_raw_string_end_index,
+                end_index: match_end,
+            },
+            cube_handle: spawn_a_cube(commands, cube_assets, index, parsed_warning, converted_value),
+            // ..Default::default()
+        });
+    }
+}
+
+fn spawn_a_cube(commands: &mut Commands, cube_assets: & Res<CubeAssets>, index: usize, parsed_warning: ParsedWarning, converted_value: f64) -> Entity{
+    let cube_width = 1.0;
+    let mut position = Vec3::ZERO;
+    position.z += cube_width * (index as f32); 
+    let mut size = Vec3::ONE;
+    size.y = converted_value as f32;
+
+    commands.spawn((
+            cube_assets.mesh.clone(), 
+            cube_assets.materials.get(&parsed_warning).unwrap().clone(), 
+            Transform::from_translation(position).with_scale(size)
+            )).id()
+}
+
+#[derive(Resource, Default)]
+pub struct UserText{
+    val: String,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn ui_system(
     mut contexts: EguiContexts,
     // image_ids: Res<ImageIds>,
-    mut my_text: Local<String>,
+    mut user_text: ResMut<UserText>,
     // mut my_parsed_text: Local<String>,
     number_regex: Res<NumberRegex>,
     mut clipboard: ResMut<bevy_egui::EguiClipboard>,
@@ -166,12 +392,19 @@ pub fn ui_system(
     mut num_strings: Local<NumString>,
 
     mut parsed_values: ResMut<ParsedValues>,
-    mut problem_values: ResMut<ProblemValues>,
     mut worse_parse_problem: Local<ParsedWarning>,
 
     time: Res<Time>,
     mut copy_timer: ResMut<CopyTimer>,
 
+    mut commands: Commands,
+    cube_assets: Res<CubeAssets>,
+
+    mut change_material_event: MessageWriter<ChangeMaterials>,
+    mut change_height_event: MessageWriter<ChangeHeights>
+
+    // for random materials, need to create with this:
+    // mut materials: ResMut<Assets<StandardMaterial>>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
 
@@ -219,7 +452,7 @@ pub fn ui_system(
             ui.allocate_ui(first_button_size, |ui|{
                 let copy_response = ui.add_sized(first_button_size, egui::Button::new("󰨸")).on_hover_text("Copy text to clipboard");
                 if copy_response.clicked(){
-                    clipboard.set_text(&my_text);
+                    clipboard.set_text(&user_text.val);
                     copy_timer.copy_timer.reset();
                 }; 
                 if !copy_timer.copy_timer.is_finished(){
@@ -252,7 +485,7 @@ pub fn ui_system(
                 let clean_button= ui.add_enabled(*text_is_dirty, egui::Button::new("clean 󰃢")).on_disabled_hover_text("Replace text with internal representation of your numbers").on_hover_text("Replace text with internal representation of numbers");
                 if clean_button.clicked(){
                     *text_is_dirty = false;
-                    *my_text = parsed_values.vals.iter().map(|x|{
+                    user_text.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x|{
                         x.converted_value.to_string()
                     }).collect::<Vec<_>>().join(", ");
                 };
@@ -265,7 +498,7 @@ pub fn ui_system(
 
         let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
             .id_salt("scroll_parsed_collapsible")
-            .default_open(true)
+            .default_open(false)
             .show(ui, |_ui| {
         });
 
@@ -287,7 +520,7 @@ pub fn ui_system(
 
         ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
             egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
-                let text_edit = egui::TextEdit::multiline(&mut *my_text).hint_text("numbers here").desired_width(ui.available_width());
+                let text_edit = egui::TextEdit::multiline(&mut user_text.val).hint_text("numbers here").desired_width(ui.available_width());
 
                 if ui
                     .add(text_edit).on_hover_text("supports positive and negative ints and floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"")
@@ -301,55 +534,16 @@ pub fn ui_system(
 
                     *text_is_dirty = true;
                     num_strings.requires_restring = true;
-
-                    problem_values.map.values_mut().for_each(|vec|{
-                        vec.clear();
-                    });
-                    *worse_parse_problem = ParsedWarning::Ok;
-
-                    let mut index: usize = 0;
-                    log::info!("--");
-                    number_regex
-                        .re
-                        .find_iter(&my_text)
-                        .for_each(|m|{
-                            let s = m.as_str();
-                            match s.parse::<f64>(){
-                                Ok(n) =>{
-                                    let mut parsed_warning = ParsedWarning::Ok;
-                                    let mut converted_val = n;
-                     
-                                    if n.is_infinite(){
-                                        // log::warn!("over-flowed number: {}", s);
-                                        parsed_warning = ParsedWarning::PrecisionLoss;
-                                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
-                                        converted_val = f64::MAX;
-                                    }
-                                    else if detect_precision_loss(s, n){
-                                        // log::warn!("precision loss on number: {}", s);
-                                        parsed_warning = ParsedWarning::PrecisionLoss;
-                                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
-                                    }
-                                    else if n.is_nan(){
-                                        // log::error!("number is NaN: {}", s);
-                                        parsed_warning = ParsedWarning::Error;
-                                        *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
-                                        converted_val = 0.0;
-                                    }
-                                    add_parsed_value(&mut parsed_values, converted_val, parsed_warning, index, m.start(), m.end());
-                                    // log::info!("added raw string: {}", &my_text[parsed_values.vals.get(index).unwrap().raw_string.start_index..parsed_values.vals.get(index).unwrap().raw_string.end_index])
-                                },
-                                Err(_err) => {
-                                    // log::error!("failed to parse: {} with err {}", s, err);
-                                    *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
-                                    add_parsed_value(&mut parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end());
-                                }
-                            }
-                            index += 1;
-                        });
-
-                    parsed_values.end_index = index;  // truncates to end_index when 'sort' is clicked.
-                    // parsed_values.vals.truncate(index);
+                    update_parsed_values(
+                        number_regex,
+                        user_text,
+                        worse_parse_problem,
+                        &mut commands,
+                        & cube_assets,
+                        &mut parsed_values,
+                        change_material_event,
+                        change_height_event
+                    );
                 }
 
 
@@ -427,10 +621,6 @@ fn scale_ui(style: &mut egui::Style, scale: f32) {
     use egui::FontId;
     use egui::TextStyle::*;
 
-    // for (text_style, _font_id) in &style.text_styles{
-    //     log::info!("textstyle: {}", text_style);
-    // }
-
     // go to definition of egui::Style for these defaults
     style.text_styles = [
         (Heading, FontId::new(30.0 * scale, Proportional)),
@@ -470,53 +660,6 @@ fn scale_ui(style: &mut egui::Style, scale: f32) {
         // combo_height: 200.0 * scale,
         ..Default::default()
     };
-}
-
-fn add_parsed_value(
-    parsed_values: &mut ParsedValues,
-    converted_value: f64,
-    parsed_warning: ParsedWarning,
-    index: usize,
-    match_start: usize,
-    match_end: usize,
-) {
-    let previous_raw_string_end_index = {
-        if index == 0 {
-            0
-        } else {
-            parsed_values
-                .vals
-                .get(index - 1)
-                .unwrap()
-                .raw_string
-                .end_index
-        }
-    };
-
-    if let Some(parsed_value) = parsed_values.vals.get_mut(index) {
-        // If vector already contains a parsed_value object at this index, just change its values:
-        parsed_value.raw_string.start_index = previous_raw_string_end_index;
-        parsed_value.raw_string.end_index = match_end;
-
-        parsed_value.converted_value = converted_value;
-        parsed_value.parsed_warning = parsed_warning;
-        parsed_value.matched_string.start_index = match_start;
-        parsed_value.matched_string.end_index = match_end;
-    } else {
-        log::info!("new Parsed value!");
-        parsed_values.vals.push(ParsedValue {
-            converted_value,
-            parsed_warning,
-            matched_string: StringInfo {
-                start_index: match_start,
-                end_index: match_end,
-            },
-            raw_string: StringInfo {
-                start_index: previous_raw_string_end_index,
-                end_index: match_end,
-            },
-        });
-    }
 }
 
 #[allow(clippy::collapsible_if)]
