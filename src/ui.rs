@@ -2,16 +2,14 @@ use crate::PROGRAM_TITLE;
 
 use core::{f64, fmt};
 
-use bevy::{ecs::{bundle, relationship::RelationshipSourceCollection}, platform::collections::HashMap, prelude::*};
+use bevy::{platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Margin, Spacing, emath::{Numeric, easing::cubic_in}, vec2},
+    egui::{self, Margin, Spacing, emath::Numeric, vec2},
 };
 
 use regex_lite::Regex;
-
-use fastrand;
 
 #[derive(Resource)]
 pub struct Random {
@@ -85,40 +83,23 @@ pub struct CubeAssets {
     pub mesh: Mesh3d,
     pub materials: HashMap<ParsedWarning, MeshMaterial3d<StandardMaterial>>,
 }
-#[derive(Component)]
-pub struct ChangeHeight{
-    pub height: f64
-}
-#[derive(Component)]
-pub struct ChangeMaterial{
-    pub parsed_warning: ParsedWarning
-}
-// EVENTS:
-#[derive(Message)]
-pub struct ChangeMaterials;
-#[derive(Message)]
-pub struct ChangeHeights;
-
+// Cube updates:
+// #[derive(Message)]
+// pub struct UpdateCubes;
 
 // #[derive(Resource)]
-// pub struct ProblemValues {
-//     // Stores indices in ParsedValues that have parse problems.
-//     map: HashMap<ParsedWarning, Vec<usize>>,
+// pub struct UpdateData{
+//     pub entity: Entity,
+//     pub height: bool,
+//     pub material: bool,
+//     pub visibility: bool,
 // }
+// #[derive(Resource, Default)]
+// pub struct UpdateList{
+//     pub vals: Vec<UpdateData>,
+// }
+
 //
-// impl ProblemValues {
-//     pub fn new() -> Self {
-//         let mut map: HashMap<ParsedWarning, Vec<usize>> = HashMap::new();
-//         for key in [
-//             ParsedWarning::Ok,
-//             ParsedWarning::Error,
-//             ParsedWarning::PrecisionLoss,
-//         ] {
-//             map.insert(key, Vec::new());
-//         }
-//         Self { map }
-//     }
-// }
 
 #[derive(Default)]
 pub struct StringInfo {
@@ -140,7 +121,7 @@ pub struct ParsedValue {
 #[derive(Resource, Default)]
 pub struct ParsedValues {
     vals: Vec<ParsedValue>,
-    end_index: usize,
+    end_index: usize, // marks the position of visible and invisible cubes
 }
 
 #[derive(Default)]
@@ -154,7 +135,7 @@ pub struct CopyTimer {
     pub copy_timer: Timer,
 }
 
-
+#[allow(dead_code)]
 fn tests() {
     // test_detect_precision_loss
     let regex_matches = [
@@ -185,52 +166,51 @@ fn tests() {
     });
 }
 
-fn generate_random_vec_f64(
-    mut random: ResMut<Random>,
-    min: usize,
-    max: usize,
-    amount: usize,
-) -> Vec<f64> {
-    let range = (max - min).to_f64();
-    std::iter::repeat_with(|| random.rng.f64() * range)
-        .take(amount)
-        .collect()
-}
-
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_random_parsed_values(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    // meshes: ResMut<Assets<Mesh>>,
+    // materials: ResMut<Assets<StandardMaterial>>,
     mut random: ResMut<Random>,
     mut user_text: ResMut<UserText>,
-    mut worse_parse_problem: Local<ParsedWarning>,
+    worse_parse_problem: Local<ParsedWarning>,
     number_regex: Res<NumberRegex>,
     cube_assets: Res<CubeAssets>,
-    mut change_material_event: MessageWriter<ChangeMaterials>,
-    mut change_height_event: MessageWriter<ChangeHeights>,
+    // mut update_list: ResMut<UpdateList>,
+    // update_cubes_event: MessageWriter<UpdateCubes>,
     mut parsed_values: ResMut<ParsedValues>,
+    mut cubes_query: Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+    )>,
 ) {
-    // let mut parsed_values: ParsedValues = ParsedValues::default();
-    let amount = 25;
-    let range = (1 - 100).to_f64();
+    let amount = 5;
+    let range_helper = ((100 - 1) + 1) as f64;
+
     for index in 0..amount{
-        user_text.val.push_str(&((random.rng.f64() * range).to_string()));
+        user_text.val.push_str(&(format!("{:.2}", random.rng.f64() * range_helper)));
         if index != amount -1 {
             user_text.val.push_str(", ");
         }
     };
-    update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, change_material_event, change_height_event);
+    update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, &mut cubes_query);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn update_parsed_values(
     number_regex: Res<NumberRegex>,
     user_text: ResMut<UserText>,
     mut worse_parse_problem: Local<ParsedWarning>,
     commands: &mut Commands,
-    cube_assets: & Res<CubeAssets>,
+    cube_assets: &Res<CubeAssets>,
     parsed_values: &mut ParsedValues,
-    mut change_material_event: MessageWriter<ChangeMaterials>,
-    mut change_height_event: MessageWriter<ChangeHeights>
+    mut cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+    )>,
+
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
@@ -263,30 +243,40 @@ fn update_parsed_values(
                         *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
                         converted_val = 0.0;
                     }
-                    add_parsed_value(parsed_values, converted_val, parsed_warning, index, m.start(), m.end(), commands, cube_assets, &mut any_requires_change_material_height);
+                    add_parsed_value(parsed_values, converted_val, parsed_warning, index, m.start(), m.end(), commands, cube_assets, cubes_query, &mut any_requires_change_material_height);
                 },
                 Err(_err) => {
                     // log::error!("failed to parse: {} with err {}", s, err);
                     *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
-                    add_parsed_value(parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end(), commands, cube_assets, &mut any_requires_change_material_height);
+                    add_parsed_value(parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end(), commands, cube_assets, cubes_query, &mut any_requires_change_material_height);
                 }
             }
             index += 1;
         });
-    parsed_values.end_index = index;  // truncates to end_index when 'sort' is clicked.
+    parsed_values.end_index = index;
  
-    if any_requires_change_material_height.0{
-        // trigger material change for all cubes that have the ChangeMaterial component
-        change_height_event.write(ChangeHeights);
-    }
-    if any_requires_change_material_height.1{
-        // trigger height change for all cubes that have the ChangeHeight component
-        change_material_event.write(ChangeMaterials);
-    }
-
-    // make cubes past end_index not render: only despawn them when I `sort` is clicked.
-    for parsed_value in &parsed_values.vals[parsed_values.end_index..]{
-        commands.entity(parsed_value.cube_handle).insert(Visibility::Hidden);
+    // parsed_values.vals.len() = total number of blocks.
+    // parsed_values.end_index = index of block which must be invisible (everything after this must
+    // also be invisible)
+    // check if the block is contained within the total number of blocks.
+    //
+    log::info!("{} < {}: {}", parsed_values.end_index, parsed_values.vals.len(), parsed_values.end_index < parsed_values.vals.len());
+    //
+    if parsed_values.end_index < parsed_values.vals.len() {
+        log::info!("making cubes >= index {} invisible", parsed_values.end_index);
+        for parsed_value in &parsed_values.vals[parsed_values.end_index..]{
+            if let Ok((_, _, mut visibility)) = cubes_query.get_mut(parsed_value.cube_handle){
+                if *visibility == Visibility::Hidden{
+                    // break out when first cube that is hidden is found: we know that the rest are
+                    // all hidden from the first encountered hidden.
+                    // Also need to be sure that not just changing it to the same value or Bevy
+                    // will do extra computations that is better avoided.
+                    break;
+                }
+                *visibility = Visibility::Hidden;
+                log::info!("make cube {} invisible", parsed_value.converted_value);
+            }
+        }
     }
 }
 
@@ -300,6 +290,11 @@ fn add_parsed_value(
     match_end: usize,
     commands: &mut Commands,
     cube_assets: & Res<CubeAssets>,
+    mut cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+    )>,
     any_requires_change_material_height: &mut (bool, bool)
 ) {
     let previous_raw_string_end_index = {
@@ -322,23 +317,49 @@ fn add_parsed_value(
         parsed_value.matched_string.start_index = match_start;
         parsed_value.matched_string.end_index = match_end;
 
+        //
+        // let mut update_height = false;
+        // let mut update_material = false;
+
         if parsed_value.parsed_warning != parsed_warning{
+            // update_height = true;
             any_requires_change_material_height.0 = true;
-            commands.entity(parsed_value.cube_handle).insert(ChangeMaterial{
-                parsed_warning
-            });
         }
         if parsed_value.converted_value != converted_value{
             any_requires_change_material_height.1 = true;
-            commands.entity(parsed_value.cube_handle).insert(ChangeHeight{
-                height: converted_value,
-            });
+            // update_material = true;
+        }
+
+        // if update_height || update_material{
+        //     // only add to this if something needs to update.
+        //     update_list.vals.push(UpdateData { 
+        //         entity: parsed_value.cube_handle, 
+        //         height: update_height, 
+        //         material: update_material,
+        //         visibility: false,
+        //     });
+        // }
+
+
+        if let Ok((mut transform, mut material, mut visibility)) = cubes_query.get_mut(parsed_value.cube_handle)
+        {
+            if parsed_value.converted_value != converted_value{
+                // change height to reflect new value - relative value is done later on after all
+                // values are acquired.
+                transform.scale.y = converted_value as f32;
+            }
+            if parsed_value.parsed_warning != parsed_warning{
+                *material = cube_assets.materials.get(&parsed_warning).unwrap().clone();
+            }
+            if *visibility != Visibility::Visible{
+                // Need to make sure to check if not already visible first. Changing it to the same
+                // value makes Bevy do extra things, which is computation cost easily avoided. 
+                *visibility = Visibility::Visible;
+            }
         }
         parsed_value.parsed_warning = parsed_warning;
         parsed_value.converted_value = converted_value;
-
-        // make visible if not already:
-        commands.entity(parsed_value.cube_handle).insert(Visibility::Visible);
+        log::info!("updating cube/value at index {}", index);
     } else {
         parsed_values.vals.push(ParsedValue {
             converted_value,
@@ -354,13 +375,14 @@ fn add_parsed_value(
             cube_handle: spawn_a_cube(commands, cube_assets, index, parsed_warning, converted_value),
             // ..Default::default()
         });
+        log::info!("creating new cube/value at index {}", index);
     }
 }
 
 fn spawn_a_cube(commands: &mut Commands, cube_assets: & Res<CubeAssets>, index: usize, parsed_warning: ParsedWarning, converted_value: f64) -> Entity{
     let cube_width = 1.0;
     let mut position = Vec3::ZERO;
-    position.z += cube_width * (index as f32); 
+    position.x += cube_width * (index as f32); 
     let mut size = Vec3::ONE;
     size.y = converted_value as f32;
 
@@ -392,7 +414,7 @@ pub fn ui_system(
     mut num_strings: Local<NumString>,
 
     mut parsed_values: ResMut<ParsedValues>,
-    mut worse_parse_problem: Local<ParsedWarning>,
+    worse_parse_problem: Local<ParsedWarning>,
 
     time: Res<Time>,
     mut copy_timer: ResMut<CopyTimer>,
@@ -400,8 +422,11 @@ pub fn ui_system(
     mut commands: Commands,
     cube_assets: Res<CubeAssets>,
 
-    mut change_material_event: MessageWriter<ChangeMaterials>,
-    mut change_height_event: MessageWriter<ChangeHeights>
+    mut cubes_query: Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+    )>,
 
     // for random materials, need to create with this:
     // mut materials: ResMut<Assets<StandardMaterial>>,
@@ -541,8 +566,7 @@ pub fn ui_system(
                         &mut commands,
                         & cube_assets,
                         &mut parsed_values,
-                        change_material_event,
-                        change_height_event
+                        &mut cubes_query,
                     );
                 }
 
@@ -566,7 +590,7 @@ pub fn ui_system(
 fn detect_precision_loss(original: &str, parsed: f64) -> bool {
     let num_string = parsed.to_string();
     let new_string = string_trim_zeros(original);
-    log::info!("{original} turned to {new_string} == {parsed}");
+    // log::info!("{original} turned to {new_string} == {parsed}");
     if new_string != num_string {
         log::info!("\tno match!")
     }

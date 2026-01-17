@@ -10,8 +10,7 @@ pub const PROGRAM_TITLE: &str = "3D Sorting";
 
 fn main() {
     App::new()
-        .add_message::<ui::ChangeMaterials>()
-        .add_message::<ui::ChangeHeights>()
+        // .add_message::<ui::UpdateCubes>()
         // sending logs to console in browser:
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -39,6 +38,7 @@ fn main() {
         .init_resource::<ui::NumberRegex>()
         .init_resource::<ui::Random>()
         .init_resource::<ui::ParsedValues>()
+        // .init_resource::<ui::UpdateList>()
         .init_resource::<ui::FontScale>()
         .init_resource::<ui::UserText>()
         .insert_resource(ui::CopyTimer {
@@ -54,50 +54,67 @@ fn main() {
             Startup,
             (spawn_cube_assets, ui::spawn_random_parsed_values).chain(),
         )
-        // .add_systems(Startup, ui::spawn_random_parsed_values)
-        .add_systems(
-            Update,
-            change_heights.run_if(on_message::<ui::ChangeHeights>),
-        )
-        .add_systems(
-            Update,
-            change_materials.run_if(on_message::<ui::ChangeMaterials>),
-        )
+        // .add_systems(Update, update_cubes.run_if(on_message::<ui::UpdateCubes>))
+        // .add_systems(
+        //     Update,
+        //     change_heights.run_if(on_message::<ui::ChangeHeights>),
+        // )
+        // .add_systems(
+        //     Update,
+        //     change_materials.run_if(on_message::<ui::ChangeMaterials>),
+        // )
         .add_systems(Update, font_scale_inputs)
         .add_systems(EguiPrimaryContextPass, ui::ui_system)
         // .add_systems(Update, test_system)
         .run();
 }
 
-fn change_heights(
-    mut commands: Commands,
-    query: Query<(Entity, &mut Transform, &ui::ChangeHeight)>,
-) {
-    for (entity, mut transform, component) in query {
-        //
-        transform.scale.y = component.height as f32;
-        commands.entity(entity).remove::<ui::ChangeHeight>();
-    }
-}
+// fn update_cubes(
+//     mut update_list: ResMut<ui::UpdateList>,
+//     mut query: Query<(
+//         &mut Transform,
+//         &mut MeshMaterial3d<StandardMaterial>,
+//         &mut Visibility,
+//     )>,
+// ) {
+//     for update_data in &update_list.vals {
+//         if let Ok((mut transform, mut material, mut visibility)) = query.get_mut(update_data.entity)
+//         {
+//             //
+//         }
+//     }
+//     update_list.vals.clear();
+// }
 
-fn change_materials(
-    mut commands: Commands,
-    cube_assets: Res<ui::CubeAssets>,
-    query: Query<(
-        Entity,
-        &mut MeshMaterial3d<StandardMaterial>,
-        &ui::ChangeMaterial,
-    )>,
-) {
-    for (entity, mut material, component) in query {
-        *material = cube_assets
-            .materials
-            .get(&component.parsed_warning)
-            .unwrap()
-            .clone();
-        commands.entity(entity).remove::<ui::ChangeMaterial>();
-    }
-}
+// fn change_heights(
+//     mut commands: Commands,
+//     query: Query<(Entity, &mut Transform, &ui::ChangeHeight)>,
+// ) {
+//     for (entity, mut transform, component) in query {
+//         //
+//         transform.scale.y = component.height as f32;
+//         commands.entity(entity).remove::<ui::ChangeHeight>();
+//     }
+// }
+//
+// fn change_materials(
+//     mut commands: Commands,
+//     cube_assets: Res<ui::CubeAssets>,
+//     query: Query<(
+//         Entity,
+//         &mut MeshMaterial3d<StandardMaterial>,
+//         &ui::ChangeMaterial,
+//     )>,
+// ) {
+//     for (entity, mut material, component) in query {
+//         *material = cube_assets
+//             .materials
+//             .get(&component.parsed_warning)
+//             .unwrap()
+//             .clone();
+//         commands.entity(entity).remove::<ui::ChangeMaterial>();
+//     }
+// }
 
 fn finish_copy_timer(mut copy_timer: ResMut<ui::CopyTimer>) {
     copy_timer.copy_timer.finish();
@@ -190,36 +207,6 @@ fn spawn_cube_assets(
     });
 }
 
-fn spawn_a_cube(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // cube mesh
-    let my_cube_mesh = Mesh3d(meshes.add(Cuboid::new(1.2, 3.4, 5.6)));
-    // cube color
-
-    let my_material = materials.add(StandardMaterial {
-        base_color: Color::srgba_u8(0, u8::MAX, 0, u8::MAX),
-        // unlit: true,
-        // alpha_mode: AlphaMode::Opaque,
-        emissive: LinearRgba {
-            red: 0.0,
-            green: 0.0,
-            blue: 20.0,
-            alpha: 0.0,
-        },
-        ..Default::default()
-    });
-    let my_cube_color = MeshMaterial3d(my_material);
-    // cube position
-    let my_cube_position = Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::new(5.0, 5.0, 5.0));
-
-    let my_cube = (my_cube_mesh, my_cube_color, my_cube_position);
-    let entity = commands.spawn(my_cube);
-    log::info!("cube id: {}", entity.id());
-}
-
 fn spawn_3d_camera(mut commands: Commands) {
     // let problem_values = ProblemValues::new();
     // for key in problem_values.map.keys(){
@@ -248,7 +235,7 @@ fn spawn_3d_camera(mut commands: Commands) {
             ..Default::default()
         },
         // Camera3d::default(),
-        Transform::from_xyz(100.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(0.0, 0.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
     log::info!("camera spawned")
 }
