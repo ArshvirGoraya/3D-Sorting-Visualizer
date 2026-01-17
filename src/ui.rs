@@ -6,10 +6,13 @@ use bevy::{platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Margin, Spacing, emath::Numeric, vec2},
+    egui::{self, Margin, Spacing, vec2},
 };
 
+use bevy_panorbit_camera::PanOrbitCamera;
 use regex_lite::Regex;
+
+const CUBE_WIDTH : f32 = 1.0;
 
 #[derive(Resource)]
 pub struct Random {
@@ -184,6 +187,7 @@ pub fn spawn_random_parsed_values(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
+    mut camera_query: Query<&mut PanOrbitCamera>
 ) {
     let amount = 5;
     let range_helper = ((100 - 1) + 1) as f64;
@@ -194,7 +198,7 @@ pub fn spawn_random_parsed_values(
             user_text.val.push_str(", ");
         }
     };
-    update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, &mut cubes_query);
+    update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, &mut cubes_query, &mut camera_query);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -205,12 +209,12 @@ fn update_parsed_values(
     commands: &mut Commands,
     cube_assets: &Res<CubeAssets>,
     parsed_values: &mut ParsedValues,
-    mut cubes_query: &mut Query<(
+    cubes_query: &mut Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
-
+    camera_query: &mut Query<&mut PanOrbitCamera>
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
@@ -253,6 +257,7 @@ fn update_parsed_values(
             }
             index += 1;
         });
+    let visible_cube_count_changed = parsed_values.end_index != index;
     parsed_values.end_index = index;
  
     // parsed_values.vals.len() = total number of blocks.
@@ -278,6 +283,13 @@ fn update_parsed_values(
             }
         }
     }
+    // Update the camera if number of visible cubes changed 
+    if visible_cube_count_changed{
+        let mut pan_orbit = camera_query.single_mut().unwrap();
+        let cubes_middle = ((parsed_values.end_index as f32) * CUBE_WIDTH) / 2.0;
+        pan_orbit.target_focus.x = cubes_middle;
+        log::info!("set camera to middle of cubes")
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -290,7 +302,7 @@ fn add_parsed_value(
     match_end: usize,
     commands: &mut Commands,
     cube_assets: & Res<CubeAssets>,
-    mut cubes_query: &mut Query<(
+    cubes_query: &mut Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
@@ -380,9 +392,8 @@ fn add_parsed_value(
 }
 
 fn spawn_a_cube(commands: &mut Commands, cube_assets: & Res<CubeAssets>, index: usize, parsed_warning: ParsedWarning, converted_value: f64) -> Entity{
-    let cube_width = 1.0;
     let mut position = Vec3::ZERO;
-    position.x += cube_width * (index as f32); 
+    position.x += CUBE_WIDTH * (index as f32); 
     let mut size = Vec3::ONE;
     size.y = converted_value as f32;
 
@@ -427,6 +438,7 @@ pub fn ui_system(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
+    mut camera_query: Query<&mut PanOrbitCamera>
 
     // for random materials, need to create with this:
     // mut materials: ResMut<Assets<StandardMaterial>>,
@@ -567,6 +579,7 @@ pub fn ui_system(
                         & cube_assets,
                         &mut parsed_values,
                         &mut cubes_query,
+                        &mut camera_query,
                     );
                 }
 

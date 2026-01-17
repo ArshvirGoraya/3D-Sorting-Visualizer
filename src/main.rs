@@ -34,35 +34,28 @@ fn main() {
         // https://github.com/Plonq/bevy_panorbit_camera
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(EguiPlugin::default())
-        // .insert_resource(NumberRegex::default())
         .init_resource::<ui::NumberRegex>()
         .init_resource::<ui::Random>()
         .init_resource::<ui::ParsedValues>()
-        // .init_resource::<ui::UpdateList>()
         .init_resource::<ui::FontScale>()
         .init_resource::<ui::UserText>()
         .insert_resource(ui::CopyTimer {
             copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
         })
         // .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
-        // .insert_resource(ui::ProblemValues::new())
         // .add_systems(Startup, tests)
         .add_systems(Startup, finish_copy_timer)
-        .add_systems(Startup, spawn_3d_camera)
-        // .add_systems(Startup, spawn_a_cube)
+        // .add_systems(Startup, spawn_3d_camera)
+        // .add_systems(Update, center_camera.run_if())
         .add_systems(
             Startup,
-            (spawn_cube_assets, ui::spawn_random_parsed_values).chain(),
+            (
+                spawn_3d_camera,
+                spawn_cube_assets,
+                ui::spawn_random_parsed_values,
+            )
+                .chain(),
         )
-        // .add_systems(Update, update_cubes.run_if(on_message::<ui::UpdateCubes>))
-        // .add_systems(
-        //     Update,
-        //     change_heights.run_if(on_message::<ui::ChangeHeights>),
-        // )
-        // .add_systems(
-        //     Update,
-        //     change_materials.run_if(on_message::<ui::ChangeMaterials>),
-        // )
         .add_systems(Update, font_scale_inputs)
         .add_systems(EguiPrimaryContextPass, ui::ui_system)
         // .add_systems(Update, test_system)
@@ -206,6 +199,11 @@ fn spawn_cube_assets(
         ]),
     });
 }
+
+// fn center_camera(mut query: Query<&mut Transform, With<PanOrbitCamera>>) {
+//     let mut pan_orbit = query.single_mut().unwrap();
+//     // pan_orbit.translation.x =
+// }
 
 fn spawn_3d_camera(mut commands: Commands) {
     // let problem_values = ProblemValues::new();
