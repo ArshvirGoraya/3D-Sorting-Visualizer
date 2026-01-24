@@ -1,16 +1,19 @@
-use crate::PROGRAM_TITLE;
+use crate::{AudioControls, CameraControls, PROGRAM_TITLE, sorter};
 
 use core::{f64, fmt};
+use std::{ffi::OsStr, path::Path};
 
-use bevy::{platform::collections::HashMap, prelude::*};
+use bevy::{audio::{PlaybackMode, Volume}, platform::collections::HashMap, prelude::*, reflect::Enum};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Margin, Spacing, vec2},
+    egui::{self, Margin, Rangef, Spacing, vec2},
 };
 
 use bevy_panorbit_camera::PanOrbitCamera;
 use regex_lite::Regex;
+
+use core::time::Duration;
 
 const CUBE_WIDTH : f32 = 1.0;
 
@@ -129,7 +132,8 @@ pub struct ParsedValues {
 
 #[derive(Default)]
 pub struct NumString {
-    requires_restring: bool,
+    // requires_restring: bool,
+    cleaned_string: bool,
     val: String,
 }
 
@@ -169,6 +173,18 @@ fn tests() {
     });
 }
 
+pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, text: &mut String, random: &mut ResMut<Random>){
+    text.clear();
+    let range_helper = (max - min) + min;
+
+    for index in 0..amount{
+        text.push_str(&(format!("{:.2}", random.rng.f64() * range_helper)));
+        if index != amount -1 {
+            text.push_str(", ");
+        }
+    };
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_random_parsed_values(
     mut commands: Commands,
@@ -176,7 +192,11 @@ pub fn spawn_random_parsed_values(
     // materials: ResMut<Assets<StandardMaterial>>,
     mut random: ResMut<Random>,
     mut user_text: ResMut<UserText>,
-    worse_parse_problem: Local<ParsedWarning>,
+    worse_parse_problem: Local<ParsedWarning>, // no parse warning when spawning cubes in first, so
+                                               // this doesn't need to turn into a ResMut!
+                                               // If you are making precision loss numbers on
+                                               // purpose when spawning here, its fine if the system detects it as no
+                                               // parse warning on the first spawn.
     number_regex: Res<NumberRegex>,
     cube_assets: Res<CubeAssets>,
     // mut update_list: ResMut<UpdateList>,
@@ -189,15 +209,11 @@ pub fn spawn_random_parsed_values(
     )>,
     mut camera_query: Query<&mut PanOrbitCamera>
 ) {
-    let amount = 5;
-    let range_helper = ((100 - 1) + 1) as f64;
+    // generate_random_string_nums(5, -100.0, 100.0, &mut user_text.val, &mut random);
 
-    for index in 0..amount{
-        user_text.val.push_str(&(format!("{:.2}", random.rng.f64() * range_helper)));
-        if index != amount -1 {
-            user_text.val.push_str(", ");
-        }
-    };
+    // Just doing this for now: uncomment the above in release!
+    user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
+
     update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, &mut cubes_query, &mut camera_query);
 }
 
@@ -287,8 +303,11 @@ fn update_parsed_values(
     if visible_cube_count_changed{
         let mut pan_orbit = camera_query.single_mut().unwrap();
         let cubes_middle = ((parsed_values.end_index as f32) * CUBE_WIDTH) / 2.0;
+        // pan_orbit.focus.x = cubes_middle; // this sets what the camera is at initially. first set of numbers will NOT be centered. 
+            // Cant set focus and target_focus each time... just makes it stay still until egui is
+            // unfocused... weird
         pan_orbit.target_focus.x = cubes_middle;
-        log::info!("set camera to middle of cubes")
+        log::info!("set camera to middle of cubes: {}", cubes_middle)
     }
 }
 
@@ -359,6 +378,7 @@ fn add_parsed_value(
                 // change height to reflect new value - relative value is done later on after all
                 // values are acquired.
                 transform.scale.y = converted_value as f32;
+                transform.translation.y = (converted_value / 2.0) as f32;
             }
             if parsed_value.parsed_warning != parsed_warning{
                 *material = cube_assets.materials.get(&parsed_warning).unwrap().clone();
@@ -394,6 +414,7 @@ fn add_parsed_value(
 fn spawn_a_cube(commands: &mut Commands, cube_assets: & Res<CubeAssets>, index: usize, parsed_warning: ParsedWarning, converted_value: f64) -> Entity{
     let mut position = Vec3::ZERO;
     position.x += CUBE_WIDTH * (index as f32); 
+    position.y = (converted_value / 2.0) as f32;
     let mut size = Vec3::ONE;
     size.y = converted_value as f32;
 
@@ -411,38 +432,65 @@ pub struct UserText{
 
 #[allow(clippy::too_many_arguments)]
 pub fn ui_system(
-    mut contexts: EguiContexts,
-    // image_ids: Res<ImageIds>,
-    mut user_text: ResMut<UserText>,
-    // mut my_parsed_text: Local<String>,
-    number_regex: Res<NumberRegex>,
-    mut clipboard: ResMut<bevy_egui::EguiClipboard>,
-    mut font_scale: ResMut<FontScale>,
-    mut font_added: Local<bool>,
-    // mut parsed_numbers: Local<Vec<f64>>,
-    mut text_is_dirty: Local<bool>,
+    (mut commands, mut contexts): (Commands, EguiContexts),
+    // mut commands: Commands,
+    // mut contexts: EguiContexts,
 
+    // text:
+    (mut user_text, number_regex, mut clipboard, mut font_scale, mut font_added, mut text_is_dirty): (ResMut<UserText>, Res<NumberRegex>, ResMut<bevy_egui::EguiClipboard>, ResMut<FontScale>, Local<bool>, Local<bool>),
+    mut empty_text: Local<String>,
+
+    // text parsing
     mut num_strings: Local<NumString>,
-
     mut parsed_values: ResMut<ParsedValues>,
     worse_parse_problem: Local<ParsedWarning>,
 
-    time: Res<Time>,
-    mut copy_timer: ResMut<CopyTimer>,
+    // timers
+    (time, mut copy_timer, mut increment_timer): (Res<Time>, ResMut<CopyTimer>, ResMut<sorter::IncrementTimer>),
 
-    mut commands: Commands,
+    // cubes:
     cube_assets: Res<CubeAssets>,
-
     mut cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
-    mut camera_query: Query<&mut PanOrbitCamera>
+
+    // camera:
+    (mut camera_query, mut camera_select): (Query<&mut PanOrbitCamera>, Local<crate::CameraControls>),
+
+
+    // music_controller: Query<&AudioSink, With<DefaultAudio>>,
+
+    // audio:
+    (mut audio_controls, 
+     mut audio_assets,
+     asset_server,
+     // audio_player,
+     // mut audio_picking_state_set,
+     // audio_picking_state_get
+     mut default_audio_control,
+     mut global_volume,
+     ): (
+     ResMut<AudioControls>,
+     ResMut<Assets<AudioSource>>,
+     Res<AssetServer>,
+     Query<&mut AudioSink, With<crate::DefaultAudio>>,
+     ResMut<GlobalVolume>
+     // Res<AudioPlayer>,
+     // ResMut<NextState<crate::AudioPicking>>,
+     // Res<State<crate::AudioPicking>>
+    ),
+
+    // sort state
+    (mut sort_state_set, sort_state_get, mut sort_select): (ResMut<NextState<sorter::SortState>>, Res<State<sorter::SortState>>, Local<sorter::Algorithms>),
+    mut is_sorting: Local<bool>,
 
     // for random materials, need to create with this:
     // mut materials: ResMut<Assets<StandardMaterial>>,
 ) -> Result {
+    // if *sort_state == sorter::SortState::NotSorting{}
+
     let ctx = contexts.ctx_mut()?;
 
     if !*font_added{
@@ -482,16 +530,330 @@ pub fn ui_system(
             });
             first_button_size = response.response.rect.size();
         });
+        // ui.style_mut().override_text_style = None;
+        //
+        ui.separator();
+
+
+        ui.columns(2, |cols|{
+            cols[0].vertical_centered_justified(|ui|{
+                // TODO: if already sorting, change this to stop!
+                if !*is_sorting{
+                    if ui.add(
+                        egui::Button::new("Sort!").fill(egui::Color32::from_rgb(48, 64, 43))
+                        )
+                        .on_hover_text("click to begin sorting")
+                        .clicked()
+                    {
+                            log::info!("Begin sort!");
+                            *is_sorting = !*is_sorting;
+                    }
+                }else{
+                    #[allow(clippy::collapsible_else_if)]
+                    if ui.add(
+                        egui::Button::new("Stop!").fill(egui::Color32::from_rgb(83, 47, 52))
+                        )
+                        .on_hover_text("click to stop sorting")
+                        .clicked()
+                    {
+                            log::info!("Stop sort!");
+                            *is_sorting = !*is_sorting;
+                    }
+                }
+            });
+            // cols[1].vertical_centered_justified(|ui|{
+            cols[1].add_enabled_ui(true, |ui|{
+                // INFO: Must wrap around a rect for tooltip...
+                // But if wrapped in a exact size, UI will not update vertically when combox is
+                // wrapped, but can use truncate wrapping to not worry about this.
+                let hover_size = egui::vec2(
+                    ui.available_width(), 
+                    ui.spacing().interact_size.y,
+                );
+                let (rect, _) = ui.allocate_exact_size(hover_size, egui::Sense::hover());
+                // let mut child = ui.child_ui(rect, egui::Layout::left_to_right(egui::Align::Center), None);
+                let mut child = ui.new_child(egui::UiBuilder{
+                    max_rect: Some(rect),
+                    // layout: Some(egui::Layout::left_to_right(egui::Align::Center)),
+                    ..Default::default()
+                });
+
+                child.add_enabled_ui(!*is_sorting, |ui|{
+                    egui::ComboBox::from_id_salt("sort_select")
+                        .width(ui.available_width())
+                        .selected_text(sort_select.to_string())
+                        .wrap_mode(egui::TextWrapMode::Truncate)
+                        // .wrap()
+                        .show_ui(ui, |ui|{
+                            for algorithm in sorter::Algorithms::ALL{
+                                ui.selectable_value(&mut *sort_select, algorithm, algorithm.to_string());
+                                // TODO: .clicked() here will tell you which value has been
+                                // selected!
+                            }
+                        });
+                });
+                child.interact(rect, "sort_select_hover".into(), egui::Sense::hover())
+                    .on_hover_text("select sorting algorithm");
+            });
+        });
         ui.style_mut().override_text_style = None;
 
         ui.horizontal(|ui|{
-            ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-            ui.allocate_ui(first_button_size, |ui|{
-                let copy_response = ui.add_sized(first_button_size, egui::Button::new("󰨸")).on_hover_text("Copy text to clipboard");
+            ui.label("Sort speed: ");
+            ui.spacing_mut().slider_width = ui.available_width() - ui.spacing().interact_size.x - ui.spacing().item_spacing.x - 1.0;
+            if ui.add(
+                    egui::Slider::new(&mut increment_timer.duration_f64, 0.0..=1.0)
+                    .step_by(0.01)
+                    .max_decimals(2)
+                    .clamping(egui::SliderClamping::Never)
+                )
+                .on_hover_text("seconds waited between each increment when sorting")
+                .changed(){
+                    increment_timer.duration_f64 = increment_timer.duration_f64.max(0.0);
+                    increment_timer.increment_timer.reset();
+                    log::info!("increment speed changed {}", increment_timer.duration_f64);
+            }
+        });
+
+        ui.vertical_centered_justified(|ui|{
+            if ui.button("Increment (debug)")
+                .on_hover_text("debug: increment the sort by 1 step")
+                .clicked() {
+                sorter::increment_sorting();
+            }
+        });
+        ui.separator();
+
+        //
+        // CAMERA
+        // 
+
+        ui.style_mut().override_text_style = Some(egui::TextStyle::Name("medium".into()));
+        ui.columns(2, |cols|{
+            cols[0].vertical_centered_justified(|ui|{
+                if ui.button("Reset Camera")
+                    .on_hover_text("reset the camera to its original position")
+                        .clicked()
+                {
+                    log::info!("Reset the camera!");
+                }
+            });
+
+            cols[1].scope(|ui|{
+                let hover_size = egui::vec2(
+                    ui.available_width(), 
+                    ui.spacing().interact_size.y,
+                );
+                let (rect, _) = ui.allocate_exact_size(hover_size, egui::Sense::hover());
+                // let mut child = ui.child_ui(rect, egui::Layout::left_to_right(egui::Align::Center), None);
+
+                let mut child = ui.new_child(egui::UiBuilder{
+                    max_rect: Some(rect),
+                    // layout: Some(egui::Layout::left_to_right(egui::Align::Center)),
+                    ..Default::default()
+                });
+
+                // wrapped in a add_enabled_ui because .add() required a response and ComboBox
+                // doesnt give one.
+                child.add_enabled_ui(true, |ui|{
+                    egui::ComboBox::from_id_salt("camera_select")
+                        .width(ui.available_width())
+                        .selected_text(camera_select.to_string())
+                        .wrap_mode(egui::TextWrapMode::Truncate)
+                        .show_ui(ui, |ui|{
+                            for control in crate::CameraControls::ALL{
+                                ui.selectable_value(&mut *camera_select, control, control.to_string());
+                            }
+                        });
+                });
+                child.interact(rect, "camera_select_hover".into(), egui::Sense::hover())
+                    .on_hover_text("select camera control");
+            });
+        });
+        ui.separator();
+
+        // 
+        // AUDIO
+        //
+        ui.horizontal(|ui|{
+            ui.checkbox(&mut audio_controls.enabled, "Audio");
+
+            // let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
+            //     .id_salt("scroll_parsed_collapsible")
+            //     .default_open(false)
+            //     .show(ui, |_ui| {
+            // });
+            //
+            // if !collapse_response.fully_closed(){
+
+            ui.vertical_centered_justified(|ui|{
+                ui.collapsing("Audio Settings", |ui|{
+                    // egui::Slider::new(&mut increment_timer.duration_f64, 0.0..=1.0)
+                    // .step_by(0.01)
+                    // .max_decimals(2)
+                    // .clamping(egui::SliderClamping::Never)
+                    ui.add(
+                        egui::Slider::new(&mut audio_controls.volume, 0.1..=10.0).text("Volume")
+                            .max_decimals(1)
+                            .step_by(0.1)
+                    );
+                    ui.add(
+                        egui::Slider::new(&mut audio_controls.pitch, 0.1..=2.0).text("Pitch")
+                            .max_decimals(1)
+                            .step_by(0.1)
+                    );
+                    ui.columns(2, |cols|{
+                        cols[0].add_enabled_ui(true, |ui|{
+                            ui.vertical_centered_justified(|ui|{
+                                if ui.button("Select Audio").clicked(){
+                                    let filter = Box::new({
+                                        let extensions = [
+                                            Some(OsStr::new("aac")),
+                                            Some(OsStr::new("flac")),
+                                            Some(OsStr::new("mp3")),
+                                            Some(OsStr::new("ogg")),
+                                            Some(OsStr::new("wav")),
+                                        ];
+                                        move |path: &Path| -> bool { 
+                                            for ext in extensions{
+                                                if path.extension() == ext{
+                                                    return true
+                                                }
+                                            }
+                                            return false
+                                        }
+                                    });
+                                    let mut file_picker = egui_file::FileDialog::open_file(audio_controls.selected_path_buf.clone()).show_files_filter(filter);
+                                    file_picker.open();
+                                    audio_controls.open_file_dialog = Some(file_picker);
+                                    // audio_picking_state_set.set(crate::AudioPicking::Picking);
+
+                                    // #[cfg(not(target_arch = "wasm32"))]
+                                    // #[cfg(target_arch = "wasm32")]
+                                    // if cfg!(target_arch = "wasm32"){}
+                                    //
+                                    //
+                                    // wasm_bindgen_futures::spawn_local(async{
+                                    //     let file = rfd::AsyncFileDialog::new()
+                                    //         //AAC, FLAC, MP3, OGG/VORBIS, and WAV supported by symphonia feature
+                                    //         .add_filter("audio", &["aac", "flac", "mp3", "ogg", "wav"])
+                                    //         .set_directory("/")
+                                    //         .pick_file()
+                                    //         .await;
+                                    //
+                                    //     if let Some(file) = file{
+                                    //         // crate::change_audio_source(file);
+                                    //         let file_name = file.file_name();
+                                    //         let file_data = file.read().await;
+                                    //         let audio_source = AudioSource{
+                                    //             bytes: file_data.into()
+                                    //         };
+                                    //         // let handle = audio_assets.add(audio_source);
+                                    //         // audio_controls.audio_source_handle = Some(handle);
+                                    //         // audio_controls.selected_file_name = Some(file_name);
+                                    //     }
+                                    // });
+                                    // let future = async move {
+                                    //     let file = rfd::AsyncFileDialog::new()
+                                    //         //AAC, FLAC, MP3, OGG/VORBIS, and WAV supported by symphonia feature
+                                    //         .add_filter("audio", &["aac", "flac", "mp3", "ogg", "wav"])
+                                    //         .set_directory("/")
+                                    //         .pick_file()
+                                    //         .await;
+                                    //     if let Some(file) = file{
+                                    //         // crate::change_audio_source(file);
+                                    //         let file_name = file.file_name();
+                                    //         let file_data = file.read().await;
+                                    //         let audio_source = AudioSource{
+                                    //             bytes: file_data.into()
+                                    //         };
+                                    //         let handle = audio_assets.add(audio_source);
+                                    //         audio_controls.audio_source_handle = Some(handle);
+                                    //         audio_controls.selected_file_name = Some(file_name);
+                                    //     }
+                                    // };
+                                    // wasm_bindgen_futures::spawn_local(future);
+
+                                }
+                            });
+                        });
+                        cols[1].vertical_centered_justified(|ui|{
+                            if ui.button("Default").clicked(){
+                                // set to default
+                                if let Some(audio_handle) = &audio_controls.audio_source_handle{
+                                    audio_assets.remove(audio_handle);
+                                }
+                                audio_controls.selected_file_name = None;
+                                audio_controls.audio_source_handle = None;
+                            }
+                        })
+                    });
+                    ui.vertical_centered_justified(|ui|{
+                        let mut file_name = &audio_controls.default_file_name;
+                        if let Some(selected_file_name) = &audio_controls.selected_file_name{
+                            file_name = selected_file_name;
+                        }
+                        ui.add_enabled(false,
+                            egui::Button::new(file_name)
+                            .wrap_mode(egui::TextWrapMode::Truncate)
+                        );
+                    });
+                    ui.vertical_centered_justified(|ui|{
+                        if ui.button("debug play selected").clicked(){
+                            let audio_source_handle = audio_controls.audio_source_handle.clone()
+                                .unwrap_or(audio_controls.audio_source_handle_default.clone());
+                            commands.spawn((
+                                AudioPlayer::new(audio_source_handle),
+                                PlaybackSettings{
+                                    volume: Volume::Linear(audio_controls.volume),
+                                    speed: audio_controls.pitch,
+                                    mode: PlaybackMode::Despawn,
+                                    ..Default::default()
+                                },
+                            ));
+                            log::info!("playing sound!");
+                        }
+                    })
+                });
+            });
+        });
+
+        #[allow(clippy::collapsible_if)]
+        if let Some(dialog) = &mut audio_controls.open_file_dialog{
+            if dialog.show(ctx).selected(){
+                if let Some(file) = dialog.path(){
+                    let path_buf = file.to_path_buf();
+                    let file_name = file.file_name().unwrap().to_str().unwrap().to_string();
+
+                    let bytes = std::fs::read(path_buf.clone()).unwrap();
+                    log::info!("bytes: {}", bytes.len());
+                    let handle = audio_assets.add(AudioSource{
+                        bytes: bytes.into()
+                    });
+                    audio_controls.audio_source_handle = Some(handle);
+                    audio_controls.selected_file_name = Some(file_name);
+                    audio_controls.selected_path_buf = Some(path_buf);
+                    audio_controls.open_file_dialog = None;
+                }
+            }
+        }
+
+
+        // randomize colors
+        // toggle cubes height mode
+
+        ui.separator();
+        //
+
+        ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+        ui.columns(3, |cols|{
+            // clipboard:
+            cols[0].vertical_centered_justified(|ui|{
+                let copy_response = ui.button("󰨸").on_hover_text("Copy text to clipboard");
                 if copy_response.clicked(){
                     clipboard.set_text(&user_text.val);
                     copy_timer.copy_timer.reset();
-                }; 
+                }
                 if !copy_timer.copy_timer.is_finished(){
                     copy_timer.copy_timer.tick(time.delta());
                     // copy_response.show_tooltip_text("Copied!");
@@ -514,22 +876,30 @@ pub fn ui_system(
                                 ui.add(egui::Label::new("Copied!").wrap_mode(egui::TextWrapMode::Extend));
                             });
                         });
-
                 }
             });
-            ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
-            ui.centered_and_justified(|ui|{
-                let clean_button= ui.add_enabled(*text_is_dirty, egui::Button::new("clean 󰃢")).on_disabled_hover_text("Replace text with internal representation of your numbers").on_hover_text("Replace text with internal representation of numbers");
+            // clean text
+            cols[1].vertical_centered_justified(|ui|{
+                let clean_button = ui.add_enabled(*text_is_dirty, egui::Button::new("Clean 󰃢"))
+                    .on_hover_text("Replace text with internal representation of your numbers")
+                    .on_disabled_hover_text("Replace text with internal representation of your numbers");
                 if clean_button.clicked(){
                     *text_is_dirty = false;
                     user_text.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x|{
                         x.converted_value.to_string()
                     }).collect::<Vec<_>>().join(", ");
-                };
+                }
             });
-            ui.style_mut().override_text_style = None;
+            cols[2].vertical_centered_justified(|ui|{
+                if ui.add_enabled(true, egui::Button::new("RNG #"))
+                    .on_hover_text("Replace text with random numbers")
+                    .on_disabled_hover_text("Replace text with random numbers")
+                    .clicked(){
+                        // generate_random_string_nums()
+                }
+            });
         });
-
+        ui.style_mut().override_text_style = None;
 
         let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
 
@@ -540,8 +910,8 @@ pub fn ui_system(
         });
 
         if !collapse_response.fully_closed(){
-            if num_strings.requires_restring {
-                num_strings.requires_restring = false;
+            if !num_strings.cleaned_string{
+                num_strings.cleaned_string = true;
                 num_strings.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
             }
             ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
@@ -570,7 +940,7 @@ pub fn ui_system(
 
 
                     *text_is_dirty = true;
-                    num_strings.requires_restring = true;
+                    num_strings.cleaned_string = false;
                     update_parsed_values(
                         number_regex,
                         user_text,
@@ -586,8 +956,6 @@ pub fn ui_system(
 
             });
         });
-
-
     });
 
     if font_scale.is_changed() {
@@ -671,6 +1039,10 @@ fn scale_ui(style: &mut egui::Style, scale: f32) {
         (
             (Name("symbol_font".into())),
             FontId::new(25.0 * scale, Proportional),
+        ),
+        (
+            (Name("medium".into())),
+            FontId::new(20.0 * scale, Proportional),
         ),
     ]
     .into();

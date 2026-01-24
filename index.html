@@ -1,11 +1,14 @@
 <html>
   <head>
-    <link data-trunk rel="scss" href="index.scss"/>
-    <link data-trunk rel="rust" data-wasm-opt="z"/>
+    <!-- https://trunkrs.dev/guide/assets/index.html -->
+    <link data-trunk rel="copy-dir" href="./assets/" />
+    <link data-trunk rel="scss" href="index.scss" />
+    <link data-trunk rel="rust" data-wasm-opt="z" />
   </head>
   <style>
-  canvas {outline: none;} /* maybe remove when embedding in canvas that is NOT fullscreen on browser? */
+    canvas {
+      outline: none;
+    } /* maybe remove when embedding in canvas that is NOT fullscreen on browser? */
   </style>
-  <body style="margin:10px; background-color: 2b2c2f;">
-  </body>
+  <body style="margin: 10px; background-color: 2b2c2f"></body>
 </html>

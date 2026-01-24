@@ -1,65 +1,218 @@
+pub mod sorter;
 mod ui;
 
-use bevy::{input::mouse::MouseWheel, platform::collections::HashMap, prelude::*};
+use bevy::{
+    asset::AssetMetaCheck,
+    audio::{AudioPlugin, PlaybackMode, Volume},
+    core_pipeline::tonemapping::Tonemapping,
+    input::mouse::MouseWheel,
+    platform::collections::HashMap,
+    prelude::*,
+};
 
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+use rfd::FileHandle;
+
+use core::{fmt, time::Duration};
+use std::{
+    fs,
+    path::{self, PathBuf},
+};
 
 pub const PROGRAM_TITLE: &str = "3D Sorting";
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
+pub enum CameraControls {
+    #[default]
+    DragControl,
+    AutoRotate,
+    FollowSelected,
+}
+
+impl fmt::Display for CameraControls {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CameraControls::DragControl => write!(f, "Drag Control"),
+            CameraControls::AutoRotate => write!(f, "Auto Rotate"),
+            CameraControls::FollowSelected => write!(f, "Follow Selected"),
+        }
+    }
+}
+impl CameraControls {
+    pub const ALL: [CameraControls; 3] = [
+        CameraControls::DragControl,
+        CameraControls::AutoRotate,
+        CameraControls::FollowSelected,
+    ];
+}
+#[derive(Resource, Default)]
+pub struct AudioControls {
+    enabled: bool,
+    volume: f32,
+    pitch: f32,
+    default_file_name: String,
+    audio_source_handle_default: Handle<AudioSource>,
+    selected_file_name: Option<String>,
+    audio_source_handle: Option<Handle<AudioSource>>,
+    // bevy egui:
+    selected_path_buf: Option<PathBuf>,
+    open_file_dialog: Option<egui_file::FileDialog>,
+    // audio_entity: Option<Entity>,
+    // filter_closure: Box,
+}
+
+// #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
+// pub enum AudioPicking {
+//     #[default]
+//     NotPicking,
+//     Picking,
+// }
+
+//
+// impl Default for AudioControls {
+//     fn default() -> Self {
+//         Self {
+//             enabled: true,
+//             volume: 10,
+//             pitch: 1,
+//             selected_file: "Default".to_string(),
+//             default_file_path: "Default".to_string(),
+//             ..Default::default()
+//         }
+//     }
+// }
+
+// Marker Components:
+#[derive(Component)]
+pub struct DefaultAudio;
+#[derive(Component)]
+pub struct SelectedAudio;
+
 fn main() {
     App::new()
-        // .add_message::<ui::UpdateCubes>()
-        // sending logs to console in browser:
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: PROGRAM_TITLE.to_string(),
-                // resolution: WindowResolution {
-                //     ..Default::default()
-                // },
-                window_theme: Some(bevy::window::WindowTheme::Dark),
-                recognize_doubletap_gesture: true,
-                recognize_pinch_gesture: true,
-                recognize_rotation_gesture: true,
-                recognize_pan_gesture: Some((1, 1)), // for iOS
-                // present_mode: bevy::window::PresentMode::Fifo..Default::default(),
-                mode: bevy::window::WindowMode::Windowed,
-                fit_canvas_to_parent: true, // wasm "fullscreen"
-                prevent_default_event_handling: true,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: PROGRAM_TITLE.to_string(),
+                        window_theme: Some(bevy::window::WindowTheme::Dark),
+                        recognize_doubletap_gesture: true,
+                        recognize_pinch_gesture: true,
+                        recognize_rotation_gesture: true,
+                        recognize_pan_gesture: Some((1, 1)), // for iOS
+                        // present_mode: bevy::window::PresentMode::Fifo..Default::default(),
+                        mode: bevy::window::WindowMode::Windowed,
+                        fit_canvas_to_parent: true, // wasm "fullscreen"
+                        prevent_default_event_handling: true,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+                .set(AssetPlugin {
+                    // for assets to work on browser (not sure when)
+                    meta_check: AssetMetaCheck::Never,
+                    ..Default::default()
+                }),
+        )
         // https://github.com/Plonq/bevy_panorbit_camera
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(EguiPlugin::default())
+        // .add_plugins(GlobalsPlugin)
+        // .init_asset::<AudioSource>()
         .init_resource::<ui::NumberRegex>()
         .init_resource::<ui::Random>()
         .init_resource::<ui::ParsedValues>()
         .init_resource::<ui::FontScale>()
         .init_resource::<ui::UserText>()
+        .init_resource::<GlobalVolume>()
+        // .init_resource::<AudioControls>()
+        // .insert_resource(AudioControls {
+        //     volume: 10,
+        //     pitch: 1,
+        //     enabled: true,
+        //     default_file_path: "".to_string(),
+        //     selected_file: "".to_string(),
+        //     ..Default::default()
+        // })
         .insert_resource(ui::CopyTimer {
             copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
         })
-        // .insert_resource(FontScale { scale: 1.0, max: 10.0, min: 0.1, scale_step: 0.1 })
+        .insert_resource(sorter::IncrementTimer {
+            duration: Duration::new(0, 0),
+            increment_timer: Timer::from_seconds(0.0, TimerMode::Once),
+            duration_f64: 0.0,
+        })
+        // set tonemapping to none for accurate color
+        //
+        .init_state::<sorter::SortState>()
+        // .init_state::<AudioPicking>()
         // .add_systems(Startup, tests)
-        .add_systems(Startup, finish_copy_timer)
-        // .add_systems(Startup, spawn_3d_camera)
         // .add_systems(Update, center_camera.run_if())
         .add_systems(
             Startup,
             (
+                finish_timers,
+                spawn_audio_sources,
                 spawn_3d_camera,
                 spawn_cube_assets,
                 ui::spawn_random_parsed_values,
             )
                 .chain(),
         )
+        // .add_systems(Update, audio_select.run_if(in_state(AudioPicking::Picking)))
         .add_systems(Update, font_scale_inputs)
         .add_systems(EguiPrimaryContextPass, ui::ui_system)
-        // .add_systems(Update, test_system)
         .run();
+}
+
+// fn audio_select(mut audio_controls: ResMut<AudioControls>) {
+//     if let Some(file_dialog) = &mut audio_controls.open_file_dialog {
+//         //
+//     }
+// }
+
+fn spawn_audio_sources(
+    mut commands: Commands,
+    // mut audio_assets: ResMut<Assets<AudioSource>>,
+    asset_server: Res<AssetServer>,
+    // music_controller: Query<&AudioSink, With<DefaultAudio>>,
+    mut global_volume: ResMut<GlobalVolume>,
+) {
+    let default_volume = 1.0;
+    global_volume.volume = Volume::Linear(default_volume);
+
+    // // load file and add to audio_assets
+    let default_handle: Handle<bevy::audio::AudioSource> =
+        asset_server.load("impactWood_medium_000.ogg");
+    //
+    let file_name = "impactWood_medium_000.ogg".to_string();
+    let default_pitch = 1.0;
+    //
+    commands.insert_resource(AudioControls {
+        volume: default_volume,
+        pitch: default_pitch,
+        enabled: true,
+        default_file_name: file_name,
+        audio_source_handle_default: default_handle.clone(),
+        // if these are none: the default audio plays
+        selected_file_name: None,
+        audio_source_handle: None,
+        ..Default::default()
+    });
+    // commands.spawn((
+    //     AudioPlayer::new(default_handle),
+    //     PlaybackSettings {
+    //         mode: PlaybackMode::Once,
+    //         paused: true,
+    //         ..Default::default()
+    //     },
+    //     DefaultAudio,
+    // ));
+    // commands.spawn(AudioPlayer::new(
+    //     asset_server.load("impactWood_medium_000.ogg"),
+    // ));
 }
 
 // fn update_cubes(
@@ -109,8 +262,12 @@ fn main() {
 //     }
 // }
 
-fn finish_copy_timer(mut copy_timer: ResMut<ui::CopyTimer>) {
+fn finish_timers(
+    mut copy_timer: ResMut<ui::CopyTimer>,
+    mut increment_timer: ResMut<sorter::IncrementTimer>,
+) {
     copy_timer.copy_timer.finish();
+    increment_timer.increment_timer.finish();
 }
 
 fn get_sorted_indices(values: &[f64]) -> Vec<usize> {
@@ -160,26 +317,28 @@ fn spawn_cube_assets(
             (
                 ui::ParsedWarning::Ok,
                 MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::linear_rgb(202.0, 211.0, 245.0),
+                    base_color: Color::srgba_u8(202, 211, 245, 0),
                     // emissive: LinearRgba {
                     //     red: 202.0,
                     //     green: 211.0,
                     //     blue: 245.0,
                     //     alpha: 0.0,
                     // },
+                    unlit: true,
                     ..Default::default()
                 })),
             ),
             (
                 ui::ParsedWarning::Error,
                 MeshMaterial3d(materials.add(StandardMaterial {
-                    // base_color: Color::linear_rgb(37.0, 135.0, 150.0),
+                    base_color: Color::srgba_u8(237, 135, 150, 0),
                     emissive: LinearRgba {
                         red: 37.0,
                         green: 135.0,
                         blue: 150.0,
                         alpha: 0.0,
                     },
+                    // unlit: true,
                     ..Default::default()
                 })),
             ),
@@ -187,12 +346,16 @@ fn spawn_cube_assets(
                 ui::ParsedWarning::PrecisionLoss,
                 MeshMaterial3d(materials.add(StandardMaterial {
                     // base_color: Color::linear_rgb(238.0, 212.0, 159.0),
-                    emissive: LinearRgba {
-                        red: 238.0,
-                        green: 212.0,
-                        blue: 159.0,
-                        alpha: 0.0,
-                    },
+                    base_color: Color::srgba_u8(238, 212, 159, 0),
+                    // base_color: Color::hsl,
+                    // emissive: LinearRgba {
+                    //     red: 238.0,
+                    //     green: 212.0,
+                    //     blue: 159.0,
+                    //     alpha: 0.0,
+                    // },
+                    unlit: true,
+                    fog_enabled: false,
                     ..Default::default()
                 })),
             ),
@@ -232,6 +395,7 @@ fn spawn_3d_camera(mut commands: Commands) {
             orbit_smoothness: 0.0, // orbit without any smoothing
             ..Default::default()
         },
+        Tonemapping::None, // more accurate colors
         // Camera3d::default(),
         Transform::from_xyz(0.0, 0.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
