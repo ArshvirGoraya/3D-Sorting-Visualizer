@@ -19,6 +19,7 @@ bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_state",
   "bevy_window",
   "bevy_winit",
+  "mp3",
   "png",
   "symphonia-aac",
   "symphonia-flac",
@@ -35,12 +36,19 @@ bevy_egui = "0.38.1"
 # https://github.com/Plonq/bevy_panorbit_camera/blob/master/Cargo.toml#L14
 bevy_panorbit_camera = { version = "0.33.0", features = ["bevy_egui"] }
 console_error_panic_hook = "0.1.7"
-egui_file = "0.24.2"
+# egui_file = "0.24.2"
 fastrand = { version = "2.3.0", features = ["js"] }
+futures = "0.3.31"
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 regex-lite = "0.1.8"
 rfd = "0.17.2"
 wasm-bindgen-futures = "0.4.58"
+web-sys = { version = "0.3.85", features = [
+  "Document",
+  "FileList",
+  "HtmlInputElement",
+  "Window"
+] }
 
 [dev-dependencies]  # only for debug builds
 bevy = { version = "0.17.3", default-features = false, features = ["debug"] }

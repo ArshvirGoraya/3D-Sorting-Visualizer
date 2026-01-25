@@ -1,6 +1,9 @@
 pub mod sorter;
 mod ui;
 
+#[cfg(any(target_arch = "wasm32", rust_analyzer))]
+mod wasm_audio_picker;
+
 use bevy::{
     asset::AssetMetaCheck,
     audio::{AudioPlugin, PlaybackMode, Volume},
@@ -13,13 +16,40 @@ use bevy::{
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+use futures::channel::mpsc::{Receiver, Sender};
 use rfd::FileHandle;
+use web_sys::{js_sys::Uint8Array, wasm_bindgen::JsValue};
 
 use core::{fmt, time::Duration};
 use std::{
     fs,
     path::{self, PathBuf},
 };
+
+// Not added into the system even on non-wasm builds, in which case this enum definition just
+// exists but an instance of it is never created.
+// {
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
+pub enum WasmAudioReceiverListening {
+    #[default]
+    NotListening,
+    Listening,
+}
+// // same as above. only in wasm
+// pub enum FileEvent {
+//     FileLoaded(Vec<u8>),
+//     FileNoSelected,
+//     Error(String),
+// }
+// // same as above. only in wasm.
+// #[derive(Resource)]
+// pub struct BrowserAudioElements {
+//     sender: Sender<FileEvent>,
+//     receiver: Receiver<FileEvent>,
+//     // file_reader: FileReader,
+//     // on_load_closure: Closure<dyn fnmut()>,
+// }
+// }
 
 pub const PROGRAM_TITLE: &str = "3D Sorting";
 
@@ -58,7 +88,7 @@ pub struct AudioControls {
     audio_source_handle: Option<Handle<AudioSource>>,
     // bevy egui:
     selected_path_buf: Option<PathBuf>,
-    open_file_dialog: Option<egui_file::FileDialog>,
+    // open_file_dialog: Option<egui_file::FileDialog>,
     // audio_entity: Option<Entity>,
     // filter_closure: Box,
 }
@@ -91,80 +121,95 @@ pub struct DefaultAudio;
 pub struct SelectedAudio;
 
 fn main() {
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: PROGRAM_TITLE.to_string(),
-                        window_theme: Some(bevy::window::WindowTheme::Dark),
-                        recognize_doubletap_gesture: true,
-                        recognize_pinch_gesture: true,
-                        recognize_rotation_gesture: true,
-                        recognize_pan_gesture: Some((1, 1)), // for iOS
-                        // present_mode: bevy::window::PresentMode::Fifo..Default::default(),
-                        mode: bevy::window::WindowMode::Windowed,
-                        fit_canvas_to_parent: true, // wasm "fullscreen"
-                        prevent_default_event_handling: true,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
-                .set(AssetPlugin {
-                    // for assets to work on browser (not sure when)
-                    meta_check: AssetMetaCheck::Never,
+    let mut app = App::new();
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: PROGRAM_TITLE.to_string(),
+                    window_theme: Some(bevy::window::WindowTheme::Dark),
+                    recognize_doubletap_gesture: true,
+                    recognize_pinch_gesture: true,
+                    recognize_rotation_gesture: true,
+                    recognize_pan_gesture: Some((1, 1)), // for iOS
+                    // present_mode: bevy::window::PresentMode::Fifo..Default::default(),
+                    mode: bevy::window::WindowMode::Windowed,
+                    fit_canvas_to_parent: true, // wasm "fullscreen"
+                    prevent_default_event_handling: true,
                     ..Default::default()
                 }),
+                ..Default::default()
+            })
+            .set(AssetPlugin {
+                // for assets to work on browser (not sure when)
+                meta_check: AssetMetaCheck::Never,
+                ..Default::default()
+            }),
+    )
+    // https://github.com/Plonq/bevy_panorbit_camera
+    .add_plugins(PanOrbitCameraPlugin)
+    .add_plugins(EguiPlugin::default())
+    // .add_plugins(GlobalsPlugin)
+    // .init_asset::<AudioSource>()
+    .init_resource::<ui::NumberRegex>()
+    .init_resource::<ui::Random>()
+    .init_resource::<ui::ParsedValues>()
+    .init_resource::<ui::FontScale>()
+    .init_resource::<ui::UserText>()
+    .init_resource::<GlobalVolume>()
+    // .init_resource::<AudioControls>()
+    // .insert_resource(AudioControls {
+    //     volume: 10,
+    //     pitch: 1,
+    //     enabled: true,
+    //     default_file_path: "".to_string(),
+    //     selected_file: "".to_string(),
+    //     ..Default::default()
+    // })
+    .insert_resource(ui::CopyTimer {
+        copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
+    })
+    .insert_resource(sorter::IncrementTimer {
+        duration: Duration::new(0, 0),
+        increment_timer: Timer::from_seconds(0.0, TimerMode::Once),
+        duration_f64: 0.0,
+    })
+    // set tonemapping to none for accurate color
+    //
+    .init_state::<sorter::SortState>();
+
+    #[cfg(any(target_arch = "wasm32", rust_analyzer))]
+    app.init_state::<WasmAudioReceiverListening>();
+
+    // .init_state::<AudioPicking>()
+    // .add_systems(Startup, tests)
+    // .add_systems(Update, center_camera.run_if())
+    app.add_systems(
+        Startup,
+        (
+            finish_timers,
+            spawn_audio_sources,
+            spawn_3d_camera,
+            spawn_cube_assets,
+            ui::spawn_random_parsed_values,
         )
-        // https://github.com/Plonq/bevy_panorbit_camera
-        .add_plugins(PanOrbitCameraPlugin)
-        .add_plugins(EguiPlugin::default())
-        // .add_plugins(GlobalsPlugin)
-        // .init_asset::<AudioSource>()
-        .init_resource::<ui::NumberRegex>()
-        .init_resource::<ui::Random>()
-        .init_resource::<ui::ParsedValues>()
-        .init_resource::<ui::FontScale>()
-        .init_resource::<ui::UserText>()
-        .init_resource::<GlobalVolume>()
-        // .init_resource::<AudioControls>()
-        // .insert_resource(AudioControls {
-        //     volume: 10,
-        //     pitch: 1,
-        //     enabled: true,
-        //     default_file_path: "".to_string(),
-        //     selected_file: "".to_string(),
-        //     ..Default::default()
-        // })
-        .insert_resource(ui::CopyTimer {
-            copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
-        })
-        .insert_resource(sorter::IncrementTimer {
-            duration: Duration::new(0, 0),
-            increment_timer: Timer::from_seconds(0.0, TimerMode::Once),
-            duration_f64: 0.0,
-        })
-        // set tonemapping to none for accurate color
-        //
-        .init_state::<sorter::SortState>()
-        // .init_state::<AudioPicking>()
-        // .add_systems(Startup, tests)
-        // .add_systems(Update, center_camera.run_if())
-        .add_systems(
-            Startup,
-            (
-                finish_timers,
-                spawn_audio_sources,
-                spawn_3d_camera,
-                spawn_cube_assets,
-                ui::spawn_random_parsed_values,
-            )
-                .chain(),
-        )
-        // .add_systems(Update, audio_select.run_if(in_state(AudioPicking::Picking)))
-        .add_systems(Update, font_scale_inputs)
-        .add_systems(EguiPrimaryContextPass, ui::ui_system)
-        .run();
+            .chain(),
+    );
+    #[cfg(any(target_arch = "wasm32", rust_analyzer))]
+    app.add_systems(Startup, wasm_audio_picker::spawn_browser_audio_handlers);
+
+    #[cfg(any(target_arch = "wasm32", rust_analyzer))]
+    app.add_systems(
+        Update,
+        wasm_audio_picker::audio_select_listener
+            .run_if(in_state(WasmAudioReceiverListening::Listening)),
+    );
+
+    // .add_systems(Update, audio_select.run_if(in_state(AudioPicking::Picking)))
+    app.add_systems(Update, font_scale_inputs)
+        .add_systems(EguiPrimaryContextPass, ui::ui_system);
+
+    app.run();
 }
 
 // fn audio_select(mut audio_controls: ResMut<AudioControls>) {
@@ -172,6 +217,25 @@ fn main() {
 //         //
 //     }
 // }
+
+fn change_audio_source(
+    audio_controls: &mut ResMut<AudioControls>,
+    audio_assets: &mut ResMut<Assets<AudioSource>>,
+    file_name: String,
+    bytes: Vec<u8>,
+) {
+    audio_controls.selected_file_name = Some(file_name);
+    if let Some(handle) = &mut audio_controls.audio_source_handle {
+        // remove previous handle if it exists (bevy
+        // does this automatically with reference
+        // counting? So, not necessary?)
+        audio_assets.remove(handle);
+    }
+    let handle = audio_assets.add(AudioSource {
+        bytes: bytes.into(),
+    });
+    audio_controls.audio_source_handle = Some(handle);
+}
 
 fn spawn_audio_sources(
     mut commands: Commands,
@@ -185,7 +249,7 @@ fn spawn_audio_sources(
 
     // // load file and add to audio_assets
     let default_handle: Handle<bevy::audio::AudioSource> =
-        asset_server.load("impactWood_medium_000.ogg");
+        asset_server.load("audio/impactWood_medium_000.ogg");
     //
     let file_name = "impactWood_medium_000.ogg".to_string();
     let default_pitch = 1.0;
@@ -195,7 +259,7 @@ fn spawn_audio_sources(
         pitch: default_pitch,
         enabled: true,
         default_file_name: file_name,
-        audio_source_handle_default: default_handle.clone(),
+        audio_source_handle_default: default_handle,
         // if these are none: the default audio plays
         selected_file_name: None,
         audio_source_handle: None,

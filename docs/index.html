@@ -5,8 +5,8 @@
     <link rel="stylesheet" href="/index-fe65950190f03c21.css" integrity="sha384-pgQCpTXf5Gd2g3bMQt/1fNJvznbtkReq/e3ooBAB1MPzHOTtbFDd5/tqXjQXrP4i"/>
     
 <script type="module">
-import init, * as bindings from '/rust_3d_sorting-e071ac44dbad3277.js';
-const wasm = await init({ module_or_path: '/rust_3d_sorting-e071ac44dbad3277_bg.wasm' });
+import init, * as bindings from '/rust_3d_sorting-72aeb51efc0a0c10.js';
+const wasm = await init({ module_or_path: '/rust_3d_sorting-72aeb51efc0a0c10_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -15,13 +15,15 @@ window.wasmBindings = bindings;
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 </script>
-  <link rel="modulepreload" href="/rust_3d_sorting-e071ac44dbad3277.js" crossorigin="anonymous" integrity="sha384-M6ZMfPm+H1TUVT/ClJ6kqJnI5jHb5VbNJxcjB9Ks97ONgzetE8RkYVp3PCQquzVF"><link rel="preload" href="/rust_3d_sorting-e071ac44dbad3277_bg.wasm" crossorigin="anonymous" integrity="sha384-7ZAbY8fNIbX8LFkGZJ8cbcx1W8lL/NwHdmzX+rf4wuGX07VdpDmqlU6doIwkOM/e" as="fetch" type="application/wasm"></head>
+  <link rel="modulepreload" href="/rust_3d_sorting-72aeb51efc0a0c10.js" crossorigin="anonymous" integrity="sha384-HiTMBYXAxOPmArHDyx/9SezqHGzGsrc84E7q79FIE2i3riWaVcAz7KiN0tyQX2tz"><link rel="preload" href="/rust_3d_sorting-72aeb51efc0a0c10_bg.wasm" crossorigin="anonymous" integrity="sha384-c4bVREE7Z8t0lHCCZ5f+UjCTFSAtWsXcVDFHcZnNVl0WtTLzFIcBasFuRyELAOc/" as="fetch" type="application/wasm"></head>
   <style>
     canvas {
       outline: none;
     } /* maybe remove when embedding in canvas that is NOT fullscreen on browser? */
   </style>
-  <body style="margin: 10px; background-color: 2b2c2f"><script>"use strict";
+  <body style="margin: 10px; background-color: 2b2c2f">
+    <input type="file" id="audio_picker" accept=".ogg,.flac,.wav,.mp3,.aac" style="display: none;"/>
+  <script>"use strict";
 
 (function () {
 
@@ -151,4 +153,22 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 })()
 </script></body>
+  <!-- <script> -->
+  <!--   const input = document.getElementById("audio_picker"); -->
+  <!--   input.addEventListener("change", async (event) =>{ -->
+  <!--     const file = input.files[0]; -->
+  <!--     if (!file) return; -->
+  <!--     // Could check for file size here and limit the size so big files can't be added? -->
+  <!---->
+  <!--     // Browser copies data (doing this in Rust doesn't make it faster!!) -->
+  <!--     const arrayBuffer = await file.arrayBuffer(); -->
+  <!---->
+  <!--     // Small wrapper needed to convert to Vec<u8> in Rust. Nothing is copied here!! -->
+  <!--     const uint8Array = new Uint8Array(array_buffer) -->
+  <!---->
+  <!--     // new copy of the bytes gets created in this rust function! So 2 copies (even if you write this all in rust) :( -->
+  <!--     // Ideally garbage collection removes the first copy fast. -->
+  <!--     window.browser_file_bytes_response(uint8Array) -->
+  <!--   }) -->
+  <!-- </script> -->
 </html>

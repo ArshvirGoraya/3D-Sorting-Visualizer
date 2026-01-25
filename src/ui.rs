@@ -471,12 +471,16 @@ pub fn ui_system(
      // audio_picking_state_get
      mut default_audio_control,
      mut global_volume,
+     audio_receiver_listening_get,
+     mut audio_receiver_listening_set
      ): (
      ResMut<AudioControls>,
      ResMut<Assets<AudioSource>>,
      Res<AssetServer>,
      Query<&mut AudioSink, With<crate::DefaultAudio>>,
-     ResMut<GlobalVolume>
+     ResMut<GlobalVolume>,
+     Option<ResMut<State<crate::WasmAudioReceiverListening>>>,
+     Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
      // Res<AudioPlayer>,
      // ResMut<NextState<crate::AudioPicking>>,
      // Res<State<crate::AudioPicking>>
@@ -705,34 +709,64 @@ pub fn ui_system(
                     ui.columns(2, |cols|{
                         cols[0].add_enabled_ui(true, |ui|{
                             ui.vertical_centered_justified(|ui|{
+                                //
+
+                                #[cfg(not(target_arch = "wasm32"))]
                                 if ui.button("Select Audio").clicked(){
-                                    let filter = Box::new({
-                                        let extensions = [
-                                            Some(OsStr::new("aac")),
-                                            Some(OsStr::new("flac")),
-                                            Some(OsStr::new("mp3")),
-                                            Some(OsStr::new("ogg")),
-                                            Some(OsStr::new("wav")),
-                                        ];
-                                        move |path: &Path| -> bool { 
-                                            for ext in extensions{
-                                                if path.extension() == ext{
-                                                    return true
-                                                }
-                                            }
-                                            return false
+                                    #[allow(clippy::collapsible_if)]
+                                    if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["aac", "flac", "wav", "ogg", "mp3"]).pick_file(){
+                                        if let Ok(bytes) = std::fs::read(&path){
+
+                                            let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+                                            crate::change_audio_source(&mut audio_controls, &mut audio_assets, file_name, bytes);
+
+                                            // audio_controls.selected_file_name = Some(path.file_name().unwrap().to_string_lossy().to_string());
+                                            // if let Some(handle) = &mut audio_controls.audio_source_handle{
+                                            //     // remove previous handle if it exists (bevy
+                                            //     // does this automatically with reference
+                                            //     // counting? So, not necessary?)
+                                            //     audio_assets.remove(handle);
+                                            // }
+                                            // let handle = audio_assets.add(AudioSource{
+                                            //     bytes: bytes.into()
+                                            // });
+                                            // audio_controls.audio_source_handle = Some(handle);
+                                        }
+                                    }
+                                }
+
+                                // just adding rust_analyzer to cfg so code doesn't appear
+                                // disabled in IDE.
+                                #[cfg(any(target_arch = "wasm32", rust_analyzer))]
+                                {
+                                    use web_sys::{HtmlInputElement, wasm_bindgen::JsCast};
+                                    let audio_reciever_state = audio_receiver_listening_get.expect("audio receiver state should exist");
+                                    ui.add_enabled_ui(*audio_reciever_state == crate::WasmAudioReceiverListening::NotListening, |ui|{
+                                        if ui.button("Select Audio").clicked(){
+
+                                            // audio_controls.
+                                            
+                                            let input_element = web_sys::window()
+                                                .expect("window should exist")
+                                                .document()
+                                                .expect("document should exist")
+                                                .get_element_by_id("audio_picker")
+                                                .expect("audio_picker input should exist in index.html")
+                                                .dyn_into::<HtmlInputElement>()
+                                                .expect("audio_picker id must be on a input element");
+
+                                            input_element.click();
+
+                                            // maker receiver listen for selected file
+                                            audio_receiver_listening_set.expect("audio receiver state should exist")
+                                                .set(crate::WasmAudioReceiverListening::Listening);
+
                                         }
                                     });
-                                    let mut file_picker = egui_file::FileDialog::open_file(audio_controls.selected_path_buf.clone()).show_files_filter(filter);
-                                    file_picker.open();
-                                    audio_controls.open_file_dialog = Some(file_picker);
-                                    // audio_picking_state_set.set(crate::AudioPicking::Picking);
+                                }
 
-                                    // #[cfg(not(target_arch = "wasm32"))]
-                                    // #[cfg(target_arch = "wasm32")]
-                                    // if cfg!(target_arch = "wasm32"){}
-                                    //
-                                    //
+                                // if ui.button("Select Audio").clicked(){
+
                                     // wasm_bindgen_futures::spawn_local(async{
                                     //     let file = rfd::AsyncFileDialog::new()
                                     //         //AAC, FLAC, MP3, OGG/VORBIS, and WAV supported by symphonia feature
@@ -773,8 +807,7 @@ pub fn ui_system(
                                     //     }
                                     // };
                                     // wasm_bindgen_futures::spawn_local(future);
-
-                                }
+                                // }
                             });
                         });
                         cols[1].vertical_centered_justified(|ui|{
@@ -817,27 +850,6 @@ pub fn ui_system(
                 });
             });
         });
-
-        #[allow(clippy::collapsible_if)]
-        if let Some(dialog) = &mut audio_controls.open_file_dialog{
-            if dialog.show(ctx).selected(){
-                if let Some(file) = dialog.path(){
-                    let path_buf = file.to_path_buf();
-                    let file_name = file.file_name().unwrap().to_str().unwrap().to_string();
-
-                    let bytes = std::fs::read(path_buf.clone()).unwrap();
-                    log::info!("bytes: {}", bytes.len());
-                    let handle = audio_assets.add(AudioSource{
-                        bytes: bytes.into()
-                    });
-                    audio_controls.audio_source_handle = Some(handle);
-                    audio_controls.selected_file_name = Some(file_name);
-                    audio_controls.selected_path_buf = Some(path_buf);
-                    audio_controls.open_file_dialog = None;
-                }
-            }
-        }
-
 
         // randomize colors
         // toggle cubes height mode
