@@ -89,23 +89,6 @@ pub struct CubeAssets {
     pub mesh: Mesh3d,
     pub materials: HashMap<ParsedWarning, MeshMaterial3d<StandardMaterial>>,
 }
-// Cube updates:
-// #[derive(Message)]
-// pub struct UpdateCubes;
-
-// #[derive(Resource)]
-// pub struct UpdateData{
-//     pub entity: Entity,
-//     pub height: bool,
-//     pub material: bool,
-//     pub visibility: bool,
-// }
-// #[derive(Resource, Default)]
-// pub struct UpdateList{
-//     pub vals: Vec<UpdateData>,
-// }
-
-//
 
 #[derive(Default)]
 pub struct StringInfo {
@@ -175,10 +158,13 @@ fn tests() {
 
 pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, text: &mut String, random: &mut ResMut<Random>){
     text.clear();
-    let range_helper = (max - min) + min;
+    // let range_helper = (max - min) + min;
+    let range_helper = max - min;
+    log::info!("range_helper: {range_helper}");
 
     for index in 0..amount{
-        text.push_str(&(format!("{:.2}", random.rng.f64() * range_helper)));
+        // text.push_str((format!("{:.2}", random.rng.f64() * range_helper)).trim_end_matches("0").trim_end_matches("."));
+        text.push_str((format!("{:.2}", min + random.rng.f64() * range_helper )).trim_end_matches("0").trim_end_matches("."));
         if index != amount -1 {
             text.push_str(", ");
         }
@@ -348,29 +334,12 @@ fn add_parsed_value(
         parsed_value.matched_string.start_index = match_start;
         parsed_value.matched_string.end_index = match_end;
 
-        //
-        // let mut update_height = false;
-        // let mut update_material = false;
-
         if parsed_value.parsed_warning != parsed_warning{
-            // update_height = true;
             any_requires_change_material_height.0 = true;
         }
         if parsed_value.converted_value != converted_value{
             any_requires_change_material_height.1 = true;
-            // update_material = true;
         }
-
-        // if update_height || update_material{
-        //     // only add to this if something needs to update.
-        //     update_list.vals.push(UpdateData { 
-        //         entity: parsed_value.cube_handle, 
-        //         height: update_height, 
-        //         material: update_material,
-        //         visibility: false,
-        //     });
-        // }
-
 
         if let Ok((mut transform, mut material, mut visibility)) = cubes_query.get_mut(parsed_value.cube_handle)
         {
@@ -437,7 +406,19 @@ pub fn ui_system(
     // mut contexts: EguiContexts,
 
     // text:
-    (mut user_text, number_regex, mut clipboard, mut font_scale, mut font_added, mut text_is_dirty): (ResMut<UserText>, Res<NumberRegex>, ResMut<bevy_egui::EguiClipboard>, ResMut<FontScale>, Local<bool>, Local<bool>),
+    (mut user_text, 
+     number_regex, 
+     mut clipboard, 
+     mut font_scale, 
+     mut font_added, 
+     mut text_is_dirty): 
+    (ResMut<UserText>, 
+     Res<NumberRegex>, 
+     ResMut<bevy_egui::EguiClipboard>, 
+     ResMut<FontScale>, 
+     Local<bool>, 
+     Local<bool>),
+
     mut empty_text: Local<String>,
 
     // text parsing
@@ -465,26 +446,18 @@ pub fn ui_system(
     // audio:
     (mut audio_controls, 
      mut audio_assets,
-     asset_server,
-     // audio_player,
-     // mut audio_picking_state_set,
-     // audio_picking_state_get
-     mut default_audio_control,
-     mut global_volume,
      audio_receiver_listening_get,
-     mut audio_receiver_listening_set
+     audio_receiver_listening_set
      ): (
      ResMut<AudioControls>,
      ResMut<Assets<AudioSource>>,
-     Res<AssetServer>,
-     Query<&mut AudioSink, With<crate::DefaultAudio>>,
-     ResMut<GlobalVolume>,
      Option<ResMut<State<crate::WasmAudioReceiverListening>>>,
      Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
-     // Res<AudioPlayer>,
-     // ResMut<NextState<crate::AudioPicking>>,
-     // Res<State<crate::AudioPicking>>
     ),
+    // random:
+    mut random: ResMut<Random>,
+    mut rng_values_controls: Local<crate::RNGValuesControls>,
+    mut generated_rng_values: Local<bool>,
 
     // sort state
     (mut sort_state_set, sort_state_get, mut sort_select): (ResMut<NextState<sorter::SortState>>, Res<State<sorter::SortState>>, Local<sorter::Algorithms>),
@@ -681,7 +654,6 @@ pub fn ui_system(
         //
         ui.horizontal(|ui|{
             ui.checkbox(&mut audio_controls.enabled, "Audio");
-
             // let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
             //     .id_salt("scroll_parsed_collapsible")
             //     .default_open(false)
@@ -689,13 +661,8 @@ pub fn ui_system(
             // });
             //
             // if !collapse_response.fully_closed(){
-
             ui.vertical_centered_justified(|ui|{
                 ui.collapsing("Audio Settings", |ui|{
-                    // egui::Slider::new(&mut increment_timer.duration_f64, 0.0..=1.0)
-                    // .step_by(0.01)
-                    // .max_decimals(2)
-                    // .clamping(egui::SliderClamping::Never)
                     ui.add(
                         egui::Slider::new(&mut audio_controls.volume, 0.1..=10.0).text("Volume")
                             .max_decimals(1)
@@ -709,28 +676,13 @@ pub fn ui_system(
                     ui.columns(2, |cols|{
                         cols[0].add_enabled_ui(true, |ui|{
                             ui.vertical_centered_justified(|ui|{
-                                //
-
                                 #[cfg(not(target_arch = "wasm32"))]
                                 if ui.button("Select Audio").clicked(){
                                     #[allow(clippy::collapsible_if)]
                                     if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["aac", "flac", "wav", "ogg", "mp3"]).pick_file(){
                                         if let Ok(bytes) = std::fs::read(&path){
-
                                             let file_name = path.file_name().unwrap().to_string_lossy().to_string();
                                             crate::change_audio_source(&mut audio_controls, &mut audio_assets, file_name, bytes);
-
-                                            // audio_controls.selected_file_name = Some(path.file_name().unwrap().to_string_lossy().to_string());
-                                            // if let Some(handle) = &mut audio_controls.audio_source_handle{
-                                            //     // remove previous handle if it exists (bevy
-                                            //     // does this automatically with reference
-                                            //     // counting? So, not necessary?)
-                                            //     audio_assets.remove(handle);
-                                            // }
-                                            // let handle = audio_assets.add(AudioSource{
-                                            //     bytes: bytes.into()
-                                            // });
-                                            // audio_controls.audio_source_handle = Some(handle);
                                         }
                                     }
                                 }
@@ -741,11 +693,22 @@ pub fn ui_system(
                                 {
                                     use web_sys::{HtmlInputElement, wasm_bindgen::JsCast};
                                     let audio_reciever_state = audio_receiver_listening_get.expect("audio receiver state should exist");
-                                    ui.add_enabled_ui(*audio_reciever_state == crate::WasmAudioReceiverListening::NotListening, |ui|{
+                                    // never disable this: previously, was disabled when audio
+                                    // receiver was listening for a file selection.
+                                    // There is no way to stop the receiver if cancel is selected
+                                    // in the file dialog (as there is not reliable way to detect 
+                                    // file dialog is cancelled). So, if cancelled, this would just stay
+                                    // disabled. Which we don't want. No bad consequences to leaving
+                                    // this enabled while receiving files (only bad thing is
+                                    // recevier is still running even tho file selection is
+                                    // cancelled, but that's not that expensive, and receiver will
+                                    // stop once a file is ever selected).
+                                    // TODO: could stop the receiver if any other kind of input is
+                                    // detected (camera input, button click, font scale, anything)
+                                    // ui.add_enabled_ui(*audio_reciever_state == crate::WasmAudioReceiverListening::NotListening, |ui|{
+                                    ui.add_enabled_ui(true, |ui|{
                                         if ui.button("Select Audio").clicked(){
-
-                                            // audio_controls.
-                                            
+                                            // audio_controls
                                             let input_element = web_sys::window()
                                                 .expect("window should exist")
                                                 .document()
@@ -756,58 +719,12 @@ pub fn ui_system(
                                                 .expect("audio_picker id must be on a input element");
 
                                             input_element.click();
-
-                                            // maker receiver listen for selected file
+                                            // make receiver listen for selected file
                                             audio_receiver_listening_set.expect("audio receiver state should exist")
                                                 .set(crate::WasmAudioReceiverListening::Listening);
-
                                         }
                                     });
                                 }
-
-                                // if ui.button("Select Audio").clicked(){
-
-                                    // wasm_bindgen_futures::spawn_local(async{
-                                    //     let file = rfd::AsyncFileDialog::new()
-                                    //         //AAC, FLAC, MP3, OGG/VORBIS, and WAV supported by symphonia feature
-                                    //         .add_filter("audio", &["aac", "flac", "mp3", "ogg", "wav"])
-                                    //         .set_directory("/")
-                                    //         .pick_file()
-                                    //         .await;
-                                    //
-                                    //     if let Some(file) = file{
-                                    //         // crate::change_audio_source(file);
-                                    //         let file_name = file.file_name();
-                                    //         let file_data = file.read().await;
-                                    //         let audio_source = AudioSource{
-                                    //             bytes: file_data.into()
-                                    //         };
-                                    //         // let handle = audio_assets.add(audio_source);
-                                    //         // audio_controls.audio_source_handle = Some(handle);
-                                    //         // audio_controls.selected_file_name = Some(file_name);
-                                    //     }
-                                    // });
-                                    // let future = async move {
-                                    //     let file = rfd::AsyncFileDialog::new()
-                                    //         //AAC, FLAC, MP3, OGG/VORBIS, and WAV supported by symphonia feature
-                                    //         .add_filter("audio", &["aac", "flac", "mp3", "ogg", "wav"])
-                                    //         .set_directory("/")
-                                    //         .pick_file()
-                                    //         .await;
-                                    //     if let Some(file) = file{
-                                    //         // crate::change_audio_source(file);
-                                    //         let file_name = file.file_name();
-                                    //         let file_data = file.read().await;
-                                    //         let audio_source = AudioSource{
-                                    //             bytes: file_data.into()
-                                    //         };
-                                    //         let handle = audio_assets.add(audio_source);
-                                    //         audio_controls.audio_source_handle = Some(handle);
-                                    //         audio_controls.selected_file_name = Some(file_name);
-                                    //     }
-                                    // };
-                                    // wasm_bindgen_futures::spawn_local(future);
-                                // }
                             });
                         });
                         cols[1].vertical_centered_justified(|ui|{
@@ -833,23 +750,58 @@ pub fn ui_system(
                     });
                     ui.vertical_centered_justified(|ui|{
                         if ui.button("debug play selected").clicked(){
-                            let audio_source_handle = audio_controls.audio_source_handle.clone()
-                                .unwrap_or(audio_controls.audio_source_handle_default.clone());
-                            commands.spawn((
-                                AudioPlayer::new(audio_source_handle),
-                                PlaybackSettings{
-                                    volume: Volume::Linear(audio_controls.volume),
-                                    speed: audio_controls.pitch,
-                                    mode: PlaybackMode::Despawn,
-                                    ..Default::default()
-                                },
-                            ));
-                            log::info!("playing sound!");
+                            crate::play_audio(&mut commands, &mut audio_controls);
                         }
                     })
                 });
             });
         });
+
+        ui.separator();
+
+
+        //
+        // RNG values
+        // 
+
+
+        ui.horizontal(|ui|{
+            if ui.button("RNG #").clicked(){
+                generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, &mut user_text.val, &mut random);
+                *generated_rng_values = true;
+            }
+            ui.vertical_centered_justified(|ui|{
+                ui.collapsing("RNG Settings", |ui|{
+                    if ui.add(
+                        egui::Slider::new(&mut rng_values_controls.amount, 2..=100)
+                        .clamping(egui::SliderClamping::Never)
+                        .text("amount")
+                    ).changed(){
+                        // must at least be 2
+                        rng_values_controls.amount = rng_values_controls.amount.max(2);
+                    }
+                    if ui.add(
+                        egui::Slider::new(&mut rng_values_controls.min, -100.0..=100.0)
+                        .clamping(egui::SliderClamping::Never)
+                        .min_decimals(1)
+                        .text("min")
+                    ).changed(){
+                        // set max to be the same as this, if this is bigger than max.
+                        rng_values_controls.max = rng_values_controls.max.max(rng_values_controls.min);
+                    }
+                    if ui.add(
+                        egui::Slider::new(&mut rng_values_controls.max, -100.0..=100.0)
+                        .clamping(egui::SliderClamping::Never)
+                        .min_decimals(1)
+                        .text("max")
+                    ).changed(){
+                        // set min to be the same as this, if this is smaller than min.
+                        rng_values_controls.min = rng_values_controls.min.min(rng_values_controls.max);
+                    }
+                })
+            })
+        });
+
 
         // randomize colors
         // toggle cubes height mode
@@ -902,14 +854,14 @@ pub fn ui_system(
                     }).collect::<Vec<_>>().join(", ");
                 }
             });
-            cols[2].vertical_centered_justified(|ui|{
-                if ui.add_enabled(true, egui::Button::new("RNG #"))
-                    .on_hover_text("Replace text with random numbers")
-                    .on_disabled_hover_text("Replace text with random numbers")
-                    .clicked(){
-                        // generate_random_string_nums()
-                }
-            });
+            // cols[2].vertical_centered_justified(|ui|{
+            //     if ui.add_enabled(true, egui::Button::new("RNG #"))
+            //         .on_hover_text("Replace text with random numbers")
+            //         .on_disabled_hover_text("Replace text with random numbers")
+            //         .clicked(){
+            //             // generate_random_string_nums();
+            //     }
+            // });
         });
         ui.style_mut().override_text_style = None;
 
@@ -939,19 +891,24 @@ pub fn ui_system(
 
         ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
             egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
-                let text_edit = egui::TextEdit::multiline(&mut user_text.val).hint_text("numbers here").desired_width(ui.available_width());
+                let mut text_edit_widget = ui.add(egui::TextEdit::multiline(&mut user_text.val)
+                    .hint_text("numbers here")
+                    .desired_width(ui.available_width()))
+                    .on_hover_text("supports positive and negative ints and floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"");
+                if *generated_rng_values{
+                    text_edit_widget.mark_changed();
+                }
+                if text_edit_widget.changed(){
+                    log::info!("text widget changed");
+                    if !*generated_rng_values{
+                        // if rng values were generated, already clean.
+                        *text_is_dirty = true;
+                    }
 
-                if ui
-                    .add(text_edit).on_hover_text("supports positive and negative ints and floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"")
-                    .changed()
-                {
                     // TODO: maybe add fancy stuff like remembering which parts of the string are already
                     // parsed, and parsing only new stuff and deleting any removed stuff.
                     // Could carry over to spawning cubes where not all cubes are respawned: instead only
                     // new cubes are added?
-
-
-                    *text_is_dirty = true;
                     num_strings.cleaned_string = false;
                     update_parsed_values(
                         number_regex,
@@ -964,8 +921,7 @@ pub fn ui_system(
                         &mut camera_query,
                     );
                 }
-
-
+                *generated_rng_values = false;
             });
         });
     });

@@ -93,26 +93,21 @@ pub struct AudioControls {
     // filter_closure: Box,
 }
 
-// #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
-// pub enum AudioPicking {
-//     #[default]
-//     NotPicking,
-//     Picking,
-// }
-
-//
-// impl Default for AudioControls {
-//     fn default() -> Self {
-//         Self {
-//             enabled: true,
-//             volume: 10,
-//             pitch: 1,
-//             selected_file: "Default".to_string(),
-//             default_file_path: "Default".to_string(),
-//             ..Default::default()
-//         }
-//     }
-// }
+#[derive(Resource)]
+pub struct RNGValuesControls {
+    amount: usize,
+    min: f64,
+    max: f64,
+}
+impl Default for RNGValuesControls {
+    fn default() -> Self {
+        Self {
+            amount: 25,
+            min: -50.0,
+            max: 50.0,
+        }
+    }
+}
 
 // Marker Components:
 #[derive(Component)]
@@ -156,16 +151,6 @@ fn main() {
     .init_resource::<ui::ParsedValues>()
     .init_resource::<ui::FontScale>()
     .init_resource::<ui::UserText>()
-    .init_resource::<GlobalVolume>()
-    // .init_resource::<AudioControls>()
-    // .insert_resource(AudioControls {
-    //     volume: 10,
-    //     pitch: 1,
-    //     enabled: true,
-    //     default_file_path: "".to_string(),
-    //     selected_file: "".to_string(),
-    //     ..Default::default()
-    // })
     .insert_resource(ui::CopyTimer {
         copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
     })
@@ -218,6 +203,25 @@ fn main() {
 //     }
 // }
 
+fn play_audio(commands: &mut Commands, audio_controls: &mut ResMut<AudioControls>) {
+    if !audio_controls.enabled {
+        return;
+    }
+    let audio_source_handle = audio_controls
+        .audio_source_handle
+        .clone()
+        .unwrap_or(audio_controls.audio_source_handle_default.clone());
+    commands.spawn((
+        AudioPlayer::new(audio_source_handle),
+        PlaybackSettings {
+            volume: Volume::Linear(audio_controls.volume),
+            speed: audio_controls.pitch,
+            mode: PlaybackMode::Despawn,
+            ..Default::default()
+        },
+    ));
+}
+
 fn change_audio_source(
     audio_controls: &mut ResMut<AudioControls>,
     audio_assets: &mut ResMut<Assets<AudioSource>>,
@@ -265,18 +269,6 @@ fn spawn_audio_sources(
         audio_source_handle: None,
         ..Default::default()
     });
-    // commands.spawn((
-    //     AudioPlayer::new(default_handle),
-    //     PlaybackSettings {
-    //         mode: PlaybackMode::Once,
-    //         paused: true,
-    //         ..Default::default()
-    //     },
-    //     DefaultAudio,
-    // ));
-    // commands.spawn(AudioPlayer::new(
-    //     asset_server.load("impactWood_medium_000.ogg"),
-    // ));
 }
 
 // fn update_cubes(

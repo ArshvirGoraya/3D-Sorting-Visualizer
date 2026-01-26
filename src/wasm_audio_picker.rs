@@ -31,43 +31,11 @@ pub enum FileEvent {
     FileNotSelected,
     Error(String),
 }
-// same as above. only in wasm.
+
 #[derive(Resource)]
 pub struct BrowserAudioFileChannel {
     receiver: Receiver<FileEvent>,
-    // file_reader: FileReader,
-    // on_load_closure: Closure<dyn fnmut()>,
 }
-
-// pub async fn browser_audio_picker(browser_audio_elements: BrowserAudioElements) {
-//     browser_audio_elements.input_element.click();
-//     // let input_element: HtmlInputElement = web_sys::window()
-//     //     .expect("window should exist")
-//     //     .document()
-//     //     .expect("document should exist")
-//     //     .get_element_by_id("audio_picker")
-//     //     .expect("audio_picker input should exist in index.html")
-//     //     .dyn_into::<HtmlInputElement>() // must convert with dyn_into instead of just .into()
-//     //     .expect("audio_picker id must be on a input element");
-//     //
-//     // // starts the picker
-//     // input_element.click();
-//
-//     // Now I just need to get the audio from it...
-//
-//     //
-//
-//     // let onchange_closure = Closure::
-//
-//     // input_element.set_onload();
-//
-//     log::info!("browser audio picker!")
-// }
-
-// #[wasm_bindgen]
-// pub fn browser_file_bytes_response(bytes: Uint8Array) {
-//     //
-// }
 
 pub fn spawn_browser_audio_handlers(mut commands: Commands) {
     let input_element: HtmlInputElement = web_sys::window()
@@ -82,10 +50,8 @@ pub fn spawn_browser_audio_handlers(mut commands: Commands) {
     let (sender, receiver) = channel(1);
 
     let input_element_clone = input_element.clone();
-    // let sender_clone = sender.clone(); // if sender is removed from being added to
-    // BrowserAudioFileChannel, then this clone is not needed!
 
-    // this outer function cannot be async. Cannot be attached to set_onchange() if it were.
+    // this outer function cannot be async. Could not be attached to set_onchange() if it were.
     let input_onchange_closure = Closure::<dyn FnMut(_)>::new(move |_event: web_sys::Event| {
         let mut sender_clone = sender.clone(); // have to clone it here as well or will
         // become a FnOnce
@@ -140,6 +106,12 @@ pub fn spawn_browser_audio_handlers(mut commands: Commands) {
 
     input_element.set_onchange(Some(input_onchange_closure.as_ref().unchecked_ref()));
 
+    let test_closure = Closure::<dyn FnMut(_)>::new(move |_event: web_sys::Event| {
+        log::info!("on close event!");
+    });
+
+    input_element.set_onclose(Some(test_closure.as_ref().unchecked_ref()));
+
     input_onchange_closure.forget(); // do not delete the closure after this function scope ends!
     // (keep alive for app's lifetime.)
 
@@ -155,7 +127,11 @@ pub fn audio_select_listener(
 ) {
     // only runs if in_state(WasmAudioReceiverListening::Listening)
     log::info!("Listener Ran!");
+
+    // this receiver is bounded to channel that can only hold 1 data at a time.
+    // Will only ever receive a single piece of that data, never more.
     if let Ok(file_event_option) = audio_file_channel.receiver.try_next() {
+        log::info!("Listener Received something!");
         if let Some(file_event) = file_event_option {
             match file_event {
                 FileEvent::FileLoaded(loaded_file) => {
@@ -169,10 +145,10 @@ pub fn audio_select_listener(
                     );
                 }
                 FileEvent::FileNotSelected => {
-                    //
+                    log::info!("no file selected");
                 }
                 FileEvent::Error(err_string) => {
-                    //
+                    log::warn!("file selection error: {err_string}");
                 }
             }
             // stop listening once file_event is received.
