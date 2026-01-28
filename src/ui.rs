@@ -102,15 +102,16 @@ pub struct ParsedValue {
     matched_string: StringInfo,
     converted_value: f64,
     parsed_warning: ParsedWarning,
-    cube_handle: Entity,
+    pub cube_handle: Entity,
+    rng_color: MeshMaterial3d<StandardMaterial>,
     // final_position: int,
     // box_handle: int
 }
 
 #[derive(Resource, Default)]
 pub struct ParsedValues {
-    vals: Vec<ParsedValue>,
-    end_index: usize, // marks the position of visible and invisible cubes
+    pub vals: Vec<ParsedValue>,
+    pub end_index: usize, // marks the position of visible and invisible cubes
 }
 
 #[derive(Default)]
@@ -175,7 +176,7 @@ pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, text: &mut
 pub fn spawn_random_parsed_values(
     mut commands: Commands,
     // meshes: ResMut<Assets<Mesh>>,
-    // materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut random: ResMut<Random>,
     mut user_text: ResMut<UserText>,
     worse_parse_problem: Local<ParsedWarning>, // no parse warning when spawning cubes in first, so
@@ -185,6 +186,7 @@ pub fn spawn_random_parsed_values(
                                                // parse warning on the first spawn.
     number_regex: Res<NumberRegex>,
     cube_assets: Res<CubeAssets>,
+    rng_color_controls: Res<crate::RNGColorControls>,
     // mut update_list: ResMut<UpdateList>,
     // update_cubes_event: MessageWriter<UpdateCubes>,
     mut parsed_values: ResMut<ParsedValues>,
@@ -200,7 +202,7 @@ pub fn spawn_random_parsed_values(
     // Just doing this for now: uncomment the above in release!
     user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
 
-    update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, &mut cubes_query, &mut camera_query);
+    update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, &mut cubes_query, &mut camera_query, &mut random, &mut materials, rng_color_controls.rng_cubes_enabled);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -216,7 +218,10 @@ fn update_parsed_values(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
-    camera_query: &mut Query<&mut PanOrbitCamera>
+    camera_query: &mut Query<&mut PanOrbitCamera>,
+    random: &mut ResMut<Random>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    rng_color_controls_enabled: bool,
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
@@ -249,12 +254,12 @@ fn update_parsed_values(
                         *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
                         converted_val = 0.0;
                     }
-                    add_parsed_value(parsed_values, converted_val, parsed_warning, index, m.start(), m.end(), commands, cube_assets, cubes_query, &mut any_requires_change_material_height);
+                    add_parsed_value(parsed_values, converted_val, parsed_warning, index, m.start(), m.end(), commands, cube_assets, cubes_query, &mut any_requires_change_material_height, random, materials, rng_color_controls_enabled);
                 },
                 Err(_err) => {
                     // log::error!("failed to parse: {} with err {}", s, err);
                     *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
-                    add_parsed_value(parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end(), commands, cube_assets, cubes_query, &mut any_requires_change_material_height);
+                    add_parsed_value(parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end(), commands, cube_assets, cubes_query, &mut any_requires_change_material_height, random, materials, rng_color_controls_enabled);
                 }
             }
             index += 1;
@@ -312,7 +317,10 @@ fn add_parsed_value(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
-    any_requires_change_material_height: &mut (bool, bool)
+    any_requires_change_material_height: &mut (bool, bool),
+    mut random: &mut ResMut<Random>,
+    mut materials: &mut ResMut<Assets<StandardMaterial>>,
+    rng_color_controls_enabled: bool,
 ) {
     let previous_raw_string_end_index = {
         if index == 0 {
@@ -350,7 +358,7 @@ fn add_parsed_value(
                 transform.translation.y = (converted_value / 2.0) as f32;
             }
             if parsed_value.parsed_warning != parsed_warning{
-                *material = cube_assets.materials.get(&parsed_warning).unwrap().clone();
+                *material = get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, parsed_value.rng_color.clone());
             }
             if *visibility != Visibility::Visible{
                 // Need to make sure to check if not already visible first. Changing it to the same
@@ -362,6 +370,7 @@ fn add_parsed_value(
         parsed_value.converted_value = converted_value;
         log::info!("updating cube/value at index {}", index);
     } else {
+        let rng_color = crate::spawn_and_get_random_color_handle(&mut materials, random);
         parsed_values.vals.push(ParsedValue {
             converted_value,
             parsed_warning,
@@ -373,14 +382,15 @@ fn add_parsed_value(
                 start_index: previous_raw_string_end_index,
                 end_index: match_end,
             },
-            cube_handle: spawn_a_cube(commands, cube_assets, index, parsed_warning, converted_value),
+            rng_color: rng_color.clone(),
+            cube_handle: spawn_a_cube(commands, cube_assets, index, parsed_warning, converted_value, materials, rng_color_controls_enabled, rng_color),
             // ..Default::default()
         });
         log::info!("creating new cube/value at index {}", index);
     }
 }
 
-fn spawn_a_cube(commands: &mut Commands, cube_assets: & Res<CubeAssets>, index: usize, parsed_warning: ParsedWarning, converted_value: f64) -> Entity{
+fn spawn_a_cube(commands: &mut Commands, cube_assets: & Res<CubeAssets>, index: usize, parsed_warning: ParsedWarning, converted_value: f64, materials: &mut ResMut<Assets<StandardMaterial>>, rng_color_controls_enabled: bool, rng_color: MeshMaterial3d<StandardMaterial>) -> Entity{
     let mut position = Vec3::ZERO;
     position.x += CUBE_WIDTH * (index as f32); 
     position.y = (converted_value / 2.0) as f32;
@@ -389,9 +399,50 @@ fn spawn_a_cube(commands: &mut Commands, cube_assets: & Res<CubeAssets>, index: 
 
     commands.spawn((
             cube_assets.mesh.clone(), 
-            cube_assets.materials.get(&parsed_warning).unwrap().clone(), 
+            get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, rng_color), 
             Transform::from_translation(position).with_scale(size)
-            )).id()
+    )).id()
+}
+fn get_cube_material(rng_color_controls_enabled: bool, parsed_warning: ParsedWarning, cube_assets: & Res<CubeAssets>, rng_color: MeshMaterial3d<StandardMaterial>) -> MeshMaterial3d<StandardMaterial> {
+    // if using rng AND no parse warning, use RNG material. Else get the parse warning material.
+    if rng_color_controls_enabled && parsed_warning == ParsedWarning::Ok{
+        rng_color
+    }else{
+        cube_assets.materials.get(&parsed_warning).unwrap().clone()
+    }
+}
+fn set_cube_colors(
+    rng_color_controls_enabled: bool,
+    generate_new_random: bool,
+    parsed_values: &mut ResMut<ParsedValues>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+    )>,
+    cube_assets: &Res<CubeAssets>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    random: &mut ResMut<Random>,
+) {
+
+    // set to random or default depending on rng_color_controls_enabled
+    let end_index = parsed_values.end_index;
+    for parsed_value in &mut parsed_values.vals[..end_index] {
+        // generate new RNG values?
+        if generate_new_random {
+            materials.remove(parsed_value.rng_color.clone()); // not needed. bevy will remove it
+                                                              // once all handles of it are
+                                                              // removed (when rng_color is set to
+                                                              // something else). but no harm in
+                                                              // being explicit?
+            parsed_value.rng_color = crate::spawn_and_get_random_color_handle(materials, random);
+        }
+
+        let parsed_warning = parsed_value.parsed_warning;
+        if let Ok((_, mut material, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+            *material = get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, parsed_value.rng_color.clone());
+        }
+    }
 }
 
 #[derive(Resource, Default)]
@@ -402,6 +453,7 @@ pub struct UserText{
 #[allow(clippy::too_many_arguments)]
 pub fn ui_system(
     (mut commands, mut contexts): (Commands, EguiContexts),
+    mut materials: ResMut<Assets<StandardMaterial>>,
     // mut commands: Commands,
     // mut contexts: EguiContexts,
 
@@ -455,9 +507,18 @@ pub fn ui_system(
      Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
     ),
     // random:
-    mut random: ResMut<Random>,
-    mut rng_values_controls: Local<crate::RNGValuesControls>,
-    mut generated_rng_values: Local<bool>,
+    (mut random,
+     mut rng_values_controls, 
+     mut generated_rng_values, 
+     mut rng_color_controls, 
+     mut bg_color,
+     ): 
+        (ResMut<Random>,
+         Local<crate::RNGValuesControls>, 
+         Local<bool>,
+         ResMut<crate::RNGColorControls>,
+         ResMut<ClearColor>,
+        ),
 
     // sort state
     (mut sort_state_set, sort_state_get, mut sort_select): (ResMut<NextState<sorter::SortState>>, Res<State<sorter::SortState>>, Local<sorter::Algorithms>),
@@ -802,11 +863,59 @@ pub fn ui_system(
             })
         });
 
+        ui.separator();
 
-        // randomize colors
-        // toggle cubes height mode
+        //
+        // RNG colors 
+        //
+
+        ui.horizontal(|ui|{
+            if ui.button("RNG Colors").clicked(){
+                // TODO:
+                rng_color_controls.rng_cubes_enabled = true;
+                set_cube_colors(
+                    rng_color_controls.rng_cubes_enabled, 
+                    true,
+                    &mut parsed_values, 
+                    &mut cubes_query, 
+                    &cube_assets, 
+                    &mut materials, 
+                    &mut random
+                );
+            };
+            ui.vertical_centered_justified(|ui|{
+                ui.collapsing("Colors Settings", |ui|{
+                    ui.horizontal(|ui|{
+                        if ui.color_edit_button_srgb(&mut rng_color_controls.background_color)
+                            .changed(){
+                                bg_color.0 = Color::srgb_u8(
+                                    rng_color_controls.background_color[0], 
+                                    rng_color_controls.background_color[1],
+                                    rng_color_controls.background_color[2]
+                                )
+                        }
+                        ui.label("background color");
+                    });
+                    if ui.checkbox(&mut rng_color_controls.rng_cubes_enabled, "Use RNG colors").changed(){
+                        set_cube_colors(
+                            rng_color_controls.rng_cubes_enabled, 
+                            false,
+                            &mut parsed_values, 
+                            &mut cubes_query, 
+                            &cube_assets, 
+                            &mut materials, 
+                            &mut random
+                        );
+                    }
+                });
+            });
+        });
+
 
         ui.separator();
+        // toggle cubes height mode
+
+
         //
 
         ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
@@ -919,6 +1028,9 @@ pub fn ui_system(
                         &mut parsed_values,
                         &mut cubes_query,
                         &mut camera_query,
+                        &mut random,
+                        &mut materials,
+                        rng_color_controls.rng_cubes_enabled
                     );
                 }
                 *generated_rng_values = false;

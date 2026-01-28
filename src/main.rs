@@ -10,6 +10,7 @@ use bevy::{
     core_pipeline::tonemapping::Tonemapping,
     input::mouse::MouseWheel,
     platform::collections::HashMap,
+    post_process::bloom::{Bloom, BloomCompositeMode, BloomPrefilter},
     prelude::*,
 };
 
@@ -108,6 +109,11 @@ impl Default for RNGValuesControls {
         }
     }
 }
+#[derive(Resource)]
+pub struct RNGColorControls {
+    rng_cubes_enabled: bool,
+    background_color: [u8; 3],
+}
 
 // Marker Components:
 #[derive(Component)]
@@ -151,6 +157,10 @@ fn main() {
     .init_resource::<ui::ParsedValues>()
     .init_resource::<ui::FontScale>()
     .init_resource::<ui::UserText>()
+    // .insert_resource(ClearColorConfig)
+    .insert_resource(ClearColor {
+        ..Default::default()
+    })
     .insert_resource(ui::CopyTimer {
         copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
     })
@@ -158,6 +168,10 @@ fn main() {
         duration: Duration::new(0, 0),
         increment_timer: Timer::from_seconds(0.0, TimerMode::Once),
         duration_f64: 0.0,
+    })
+    .insert_resource(RNGColorControls {
+        rng_cubes_enabled: true,
+        background_color: [43, 44, 47],
     })
     // set tonemapping to none for accurate color
     //
@@ -362,6 +376,17 @@ fn font_scale_inputs(
     }
 }
 
+fn spawn_and_get_random_color_handle(
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    random: &mut ResMut<ui::Random>,
+) -> MeshMaterial3d<StandardMaterial> {
+    MeshMaterial3d(materials.add(StandardMaterial {
+        base_color: Color::srgb_u8(random.rng.u8(..), random.rng.u8(..), random.rng.u8(..)),
+        unlit: true,
+        ..Default::default()
+    }))
+}
+
 fn spawn_cube_assets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -373,13 +398,7 @@ fn spawn_cube_assets(
             (
                 ui::ParsedWarning::Ok,
                 MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgba_u8(202, 211, 245, 0),
-                    // emissive: LinearRgba {
-                    //     red: 202.0,
-                    //     green: 211.0,
-                    //     blue: 245.0,
-                    //     alpha: 0.0,
-                    // },
+                    base_color: Color::srgb_u8(202, 211, 245),
                     unlit: true,
                     ..Default::default()
                 })),
@@ -387,31 +406,28 @@ fn spawn_cube_assets(
             (
                 ui::ParsedWarning::Error,
                 MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgba_u8(237, 135, 150, 0),
+                    // base_color: Color::srgb_u8(237, 135, 150),
+                    // unlit: true,
                     emissive: LinearRgba {
-                        red: 37.0,
-                        green: 135.0,
-                        blue: 150.0,
+                        red: 50.0,
+                        green: 00.0,
+                        blue: 0.0,
                         alpha: 0.0,
                     },
-                    // unlit: true,
                     ..Default::default()
                 })),
             ),
             (
                 ui::ParsedWarning::PrecisionLoss,
                 MeshMaterial3d(materials.add(StandardMaterial {
-                    // base_color: Color::linear_rgb(238.0, 212.0, 159.0),
-                    base_color: Color::srgba_u8(238, 212, 159, 0),
-                    // base_color: Color::hsl,
-                    // emissive: LinearRgba {
-                    //     red: 238.0,
-                    //     green: 212.0,
-                    //     blue: 159.0,
-                    //     alpha: 0.0,
-                    // },
-                    unlit: true,
-                    fog_enabled: false,
+                    // base_color: Color::srgb_u8(238, 212, 159),
+                    // unlit: true,
+                    emissive: LinearRgba {
+                        red: 50.0,
+                        green: 50.0,
+                        blue: 0.0,
+                        alpha: 0.0,
+                    },
                     ..Default::default()
                 })),
             ),
@@ -452,8 +468,22 @@ fn spawn_3d_camera(mut commands: Commands) {
             ..Default::default()
         },
         Tonemapping::None, // more accurate colors
-        // Camera3d::default(),
         Transform::from_xyz(0.0, 0.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
+        // Bloom::NATURAL,
+        // Bloom::ANAMORPHIC,
+        // Bloom::OLD_SCHOOL,
+        // Bloom::SCREEN_BLUR,
+        Bloom {
+            intensity: 0.1,
+            prefilter: BloomPrefilter {
+                threshold: 1.0,
+                ..Default::default()
+            },
+            low_frequency_boost_curvature: 0.0,
+            composite_mode: BloomCompositeMode::EnergyConserving,
+            scale: Vec2::new(0.0, 0.5),
+            ..Default::default()
+        },
     ));
     log::info!("camera spawned")
 }
