@@ -117,7 +117,7 @@ pub struct RNGColorControls {
 
 #[derive(Resource)]
 pub struct CubeScaleControls {
-    relative_heights: bool,
+    positional_heights: bool,
     height_scale_enable: bool,
     height_scale: f64,
     width_scale_enable: bool,
@@ -183,7 +183,7 @@ fn main() {
         background_color: [43, 44, 47],
     })
     .insert_resource(CubeScaleControls {
-        relative_heights: true,
+        positional_heights: true,
         height_scale_enable: false,
         height_scale: 1.0,
         width_scale_enable: false,

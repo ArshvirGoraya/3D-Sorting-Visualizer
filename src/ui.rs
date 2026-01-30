@@ -1,7 +1,7 @@
 use crate::{AudioControls, CameraControls, PROGRAM_TITLE, sorter};
 
 use core::{f64, fmt};
-use std::{ffi::OsStr, path::Path};
+use std::{cmp::Ordering, ffi::OsStr, path::Path};
 
 use bevy::{audio::{PlaybackMode, Volume}, platform::collections::HashMap, prelude::*, reflect::Enum};
 
@@ -104,14 +104,14 @@ pub struct ParsedValue {
     parsed_warning: ParsedWarning,
     pub cube_handle: Entity,
     rng_color: MeshMaterial3d<StandardMaterial>,
-    // final_position: int,
-    // box_handle: int
+    sorted_position: usize, // final_position
 }
 
 #[derive(Resource, Default)]
 pub struct ParsedValues {
     pub vals: Vec<ParsedValue>,
     pub end_index: usize, // marks the position of visible and invisible cubes
+    updated_sorted_positions: bool,
 }
 
 #[derive(Default)]
@@ -346,25 +346,39 @@ fn update_parsed_values(
     // variable tracks if width scale has changed and not really expensive to do anyway).
     center_camera(cube_width, parsed_values.end_index, camera_query, camera_select);
 
+
+    // positional heights
+
+
+    parsed_values.updated_sorted_positions = false;
+
+    if cube_scale_controls.positional_heights{
+        update_sorted_positions(parsed_values);
+    }
+
     // Update 
     update_parsed_values_second_loop(parsed_values, cube_scale_controls, cubes_query, commands, cube_width);
-
-    //
-    // // Update the camera if number of visible cubes changed 
-    // if visible_cube_count_changed{
-    //     let cubes_middle = ((parsed_values.end_index as f32) * CUBE_WIDTH) / 2.0;
-    //     let mut pan_orbit = camera_query.single_mut().unwrap();
-    //     if !pan_orbit.initialized{
-    //         pan_orbit.focus.x = cubes_middle;
-    //     }else{
-    //         // pan_orbit.focus.x = cubes_middle; // this sets what the camera is at initially (NOT forever, use target_focus for that).
-    //         // target_focus.x doesn't set the camera in initialy frame... only focus.x does that.
-    //         // can't set focus and target_focus at the same time... just makes it stay still until egui is unfocused.
-    //         pan_orbit.target_focus.x = cubes_middle;
-    //     }
-    //     log::info!("set camera to middle of cubes: {}", cubes_middle)
-    // }
 }
+
+fn update_sorted_positions(parsed_values: &mut ParsedValues){
+    // create vec of indices of size up to end_index.
+    let mut sorted_indices: Vec<usize> = (0..parsed_values.end_index).collect();
+
+    // sort by the values inside of these indices.
+    sorted_indices.sort_by(
+        |&i, &j| {
+            parsed_values.vals[i].converted_value.partial_cmp(&parsed_values.vals[j].converted_value)
+    }.unwrap());
+
+
+    for (final_position, current_position) in sorted_indices.iter().enumerate(){
+        parsed_values.vals[*current_position].sorted_position = final_position;
+    }
+
+    parsed_values.updated_sorted_positions = true;
+}
+
+
 
 fn update_parsed_values_second_loop(
     parsed_values: &mut ParsedValues,
@@ -381,34 +395,66 @@ fn update_parsed_values_second_loop(
     //
     // If cube_scale_controls.width_scale_enable, set widths and horizontal positions of the cubes up to end_index
     //
-    // If cube_scale_controls.relative_heights, set the heights and vertical position of cubes up
+    // If cube_scale_controls.positional_heights, set the heights and vertical position of cubes up
     // to end_index.
 
     // If all are false, return. If any are true, continue.
-    if !cube_scale_controls.width_scale_enable && !cube_scale_controls.relative_heights{
+    if !cube_scale_controls.width_scale_enable && !cube_scale_controls.positional_heights{
         return;
     }
 
     let end_index = parsed_values.end_index;
 
     for (index, parsed_value) in parsed_values.vals[..end_index].iter_mut().enumerate() {
-        log::info!("enumerated: {index}");
-        if cube_scale_controls.width_scale_enable{
-            if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
-                log::info!("acquired transform:");
+        if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+
+            if cube_scale_controls.width_scale_enable{
                 set_width_and_horizontal_position(index, &mut transform, cube_width);
-            }else{
-                // If query does not contains the transform, it is because the cube has JUST been added,
-                // and is not available to the query. In this case, commands can be used to overwrite
-                // the cube's Transform component (but this also requires recreating its height which
-                // was done during spawn - this part is overwritten anyway if relative_height is true).
-                let mut cube = commands.get_entity(parsed_value.cube_handle).unwrap();
-                let mut transform = Transform::from_translation(Vec3::ZERO);
-                set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
-                set_width_and_horizontal_position(index, &mut transform, cube_width);
-                cube.insert(transform);
             }
+            if cube_scale_controls.positional_heights{
+                set_position_height_and_vertical_position(parsed_value.sorted_position, &mut transform, cube_scale_controls);
+            }
+        }else{
+            // Cube has just spawned. Not available to query. Must overwrite transform instead.
+            // Requires re-creating the entire transform (even parts untouched by
+            // width_scale and positional_heights)
+            let mut cube = commands.get_entity(parsed_value.cube_handle).unwrap();
+            let mut transform = Transform::from_translation(Vec3::ZERO);
+
+            if cube_scale_controls.positional_heights{
+                set_position_height_and_vertical_position(parsed_value.sorted_position, &mut transform, cube_scale_controls);
+                if !cube_scale_controls.width_scale_enable{
+                    set_width_and_horizontal_position(index, &mut transform, cube_width);
+                }
+            }
+            if cube_scale_controls.width_scale_enable{
+                set_width_and_horizontal_position(index, &mut transform, cube_width);
+                if !cube_scale_controls.positional_heights{
+                    set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
+                }
+            }
+
+            cube.insert(transform);
         }
+
+
+        // log::info!("enumerated: {index}");
+        // if cube_scale_controls.width_scale_enable{
+        //     if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+        //         log::info!("acquired transform:");
+        //         set_width_and_horizontal_position(index, &mut transform, cube_width);
+        //     }else{
+        //         // If query does not contains the transform, it is because the cube has JUST been added,
+        //         // and is not available to the query. In this case, commands can be used to overwrite
+        //         // the cube's Transform component (but this also requires recreating its height which
+        //         // was done during spawn - this part is overwritten anyway if positional_heights is true).
+        //         let mut cube = commands.get_entity(parsed_value.cube_handle).unwrap();
+        //         let mut transform = Transform::from_translation(Vec3::ZERO);
+        //         set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
+        //         set_width_and_horizontal_position(index, &mut transform, cube_width);
+        //         cube.insert(transform);
+        //     }
+        // }
     }
 }
 
@@ -463,11 +509,14 @@ fn add_parsed_value(
         if let Ok((mut transform, mut material, mut visibility)) = cubes_query.get_mut(parsed_value.cube_handle)
         {
             if parsed_value.converted_value != converted_value{
-                // change height to reflect new value - relative value is done later on after all
+                // change height to reflect new value - positional value is done later on after all
                 // values are acquired.
                 // transform.scale.y = converted_value as f32;
                 // transform.translation.y = (converted_value / 2.0) as f32;
-                set_height_and_vertical_position(converted_value, &mut transform, &cube_scale_controls)
+                if !cube_scale_controls.positional_heights{
+                    // dont call this if using positional_heights. Can still add it but Will be overwitten later anyway.
+                    set_height_and_vertical_position(converted_value, &mut transform, &cube_scale_controls)
+                }
             }
             if parsed_value.parsed_warning != parsed_warning{
                 *material = get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, parsed_value.rng_color.clone());
@@ -496,6 +545,7 @@ fn add_parsed_value(
             },
             rng_color: rng_color.clone(),
             cube_handle: spawn_a_cube(commands, cube_assets, index, parsed_warning, converted_value, materials, rng_color_controls_enabled, rng_color, &cube_scale_controls),
+            sorted_position: 0, // this gets changed later
             // ..Default::default()
         });
         log::info!("creating new cube/value at index {}", index);
@@ -525,10 +575,11 @@ fn spawn_a_cube(
     let mut transform = Transform::from_translation(Vec3::ZERO).with_scale(Vec3::ONE);
     transform.translation.x = transform.scale.x * (index as f32); 
 
-    if !cube_scale_controls.width_scale_enable{
+    if !(cube_scale_controls.width_scale_enable || cube_scale_controls.positional_heights){
         // if height_scale_enable, the set_height_and_vertical_position function gets called anyway
         // later on in the second loop for cubes that have JUST SPAWNED (due to their transforms needing to be overwritten), 
         // so no need to call it here. But still can if you want, it will get over-written.
+        // same with positional_heights being true
         set_height_and_vertical_position(converted_value, &mut transform, cube_scale_controls);
     }
 
@@ -584,7 +635,7 @@ fn center_camera(
     let mut pan_orbit = camera_query.single_mut().unwrap();
 
     if camera_select != crate::CameraControls::FollowSelected{
-        let center = cube_width * ((end_index - 1) as f32) / 2.0;
+        let center = cube_width * ((end_index) as f32) / 2.0;
 
         if !pan_orbit.initialized{
             // setting target_focus before initialization = doesnt do anything.
@@ -599,6 +650,15 @@ fn center_camera(
         //  TODO:
         log::warn!("no functionality for centering camera on fol;ow selected yet,")
     }
+}
+
+fn set_position_height_and_vertical_position(positional_value: usize, transform: &mut Transform, cube_scale_controls: & ResMut<crate::CubeScaleControls>){
+    let mut height_value = (positional_value + 1) as f64;
+    if cube_scale_controls.height_scale_enable{
+        height_value *= cube_scale_controls.height_scale;
+    }
+    transform.scale.y = height_value as f32;
+    transform.translation.y = 0 as f32;
 }
 
 fn set_height_and_vertical_position(converted_value: f64, transform: &mut Transform, cube_scale_controls: & ResMut<crate::CubeScaleControls>){
@@ -620,9 +680,22 @@ fn control_cube_heights(
     )>
 ){
     let end_index = parsed_values.end_index;
-    for parsed_value in &mut parsed_values.vals[..end_index] {
-        if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
-            set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
+
+    if cube_scale_controls.positional_heights{
+        if !parsed_values.updated_sorted_positions{
+            update_sorted_positions(parsed_values);
+        }
+        for parsed_value in &mut parsed_values.vals[..end_index] {
+            if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+                set_position_height_and_vertical_position(parsed_value.sorted_position, &mut transform, cube_scale_controls);
+            }
+        }
+    }
+    else{
+        for parsed_value in &mut parsed_values.vals[..end_index] {
+            if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+                set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
+            }
         }
     }
 }
@@ -1143,8 +1216,8 @@ pub fn ui_system(
         // 
         // Cube Scale: Width, Height
         //
-        if ui.checkbox(&mut cube_scale_controls.relative_heights, "Relative Heights").changed(){
-            // TODO
+        if ui.checkbox(&mut cube_scale_controls.positional_heights, "Positional Heights").changed(){
+            control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
         }
         ui.horizontal(|ui|{
             if ui.checkbox(&mut cube_scale_controls.height_scale_enable, "Height Scale").changed(){
