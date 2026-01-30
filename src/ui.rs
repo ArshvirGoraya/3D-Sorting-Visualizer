@@ -195,14 +195,28 @@ pub fn spawn_random_parsed_values(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
-    mut camera_query: Query<&mut PanOrbitCamera>
+    mut camera_query: Query<&mut PanOrbitCamera>,
+    mut cube_scale_controls: ResMut<crate::CubeScaleControls>
 ) {
     // generate_random_string_nums(5, -100.0, 100.0, &mut user_text.val, &mut random);
 
     // Just doing this for now: uncomment the above in release!
     user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
 
-    update_parsed_values(number_regex, user_text, worse_parse_problem, &mut commands, & cube_assets, &mut parsed_values, &mut cubes_query, &mut camera_query, &mut random, &mut materials, rng_color_controls.rng_cubes_enabled);
+    update_parsed_values(
+        number_regex, 
+        user_text, 
+        worse_parse_problem, 
+        &mut commands, 
+        & cube_assets, 
+        &mut parsed_values, 
+        &mut cubes_query, 
+        &mut camera_query, 
+        &mut random, 
+        &mut materials, 
+        rng_color_controls.rng_cubes_enabled,
+        &mut cube_scale_controls,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -222,6 +236,7 @@ fn update_parsed_values(
     random: &mut ResMut<Random>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     rng_color_controls_enabled: bool,
+    mut cube_scale_controls: &mut ResMut<crate::CubeScaleControls>
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
@@ -254,12 +269,42 @@ fn update_parsed_values(
                         *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
                         converted_val = 0.0;
                     }
-                    add_parsed_value(parsed_values, converted_val, parsed_warning, index, m.start(), m.end(), commands, cube_assets, cubes_query, &mut any_requires_change_material_height, random, materials, rng_color_controls_enabled);
+                    add_parsed_value(
+                        parsed_values, 
+                        converted_val, 
+                        parsed_warning, 
+                        index, 
+                        m.start(), 
+                        m.end(), 
+                        commands, 
+                        cube_assets, 
+                        cubes_query, 
+                        &mut any_requires_change_material_height, 
+                        random, 
+                        materials, 
+                        rng_color_controls_enabled,
+                        &mut cube_scale_controls,
+                    );
                 },
                 Err(_err) => {
                     // log::error!("failed to parse: {} with err {}", s, err);
                     *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
-                    add_parsed_value(parsed_values, 0.0, ParsedWarning::Error, index, m.start(), m.end(), commands, cube_assets, cubes_query, &mut any_requires_change_material_height, random, materials, rng_color_controls_enabled);
+                    add_parsed_value(
+                        parsed_values, 
+                        0.0, 
+                        ParsedWarning::Error, 
+                        index, 
+                        m.start(), 
+                        m.end(), 
+                        commands, 
+                        cube_assets, 
+                        cubes_query, 
+                        &mut any_requires_change_material_height, 
+                        random, 
+                        materials, 
+                        rng_color_controls_enabled,
+                        &mut cube_scale_controls,
+                    );
                 }
             }
             index += 1;
@@ -267,9 +312,11 @@ fn update_parsed_values(
     let visible_cube_count_changed = parsed_values.end_index != index;
     parsed_values.end_index = index;
  
+    // DO NOT PUT THIS IN SECOND LOOP: this loops from end_index to end, not beginning to
+    // end_index.
     // parsed_values.vals.len() = total number of blocks.
     // parsed_values.end_index = index of block which must be invisible (everything after this must
-    // also be invisible)
+    // also be invisible). cube before this is the last visible one.
     // check if the block is contained within the total number of blocks.
     //
     log::info!("{} < {}: {}", parsed_values.end_index, parsed_values.vals.len(), parsed_values.end_index < parsed_values.vals.len());
@@ -290,6 +337,10 @@ fn update_parsed_values(
             }
         }
     }
+
+    // Update 
+    update_parsed_values_second_loop(parsed_values, cube_scale_controls, cubes_query, commands);
+
     // Update the camera if number of visible cubes changed 
     if visible_cube_count_changed{
         let mut pan_orbit = camera_query.single_mut().unwrap();
@@ -299,6 +350,52 @@ fn update_parsed_values(
             // unfocused... weird
         pan_orbit.target_focus.x = cubes_middle;
         log::info!("set camera to middle of cubes: {}", cubes_middle)
+    }
+}
+
+fn update_parsed_values_second_loop(
+    parsed_values: &mut ParsedValues,
+    cube_scale_controls: & ResMut<crate::CubeScaleControls>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+    )>,
+    commands: &mut Commands,
+){
+    // Logic that can only occur AFTER regex loop.
+    //
+    // If cube_scale_controls.width_scale_enable, set widths and horizontal positions of the cubes up to end_index
+    //
+    // If cube_scale_controls.relative_heights, set the heights and vertical position of cubes up
+    // to end_index.
+
+    // If all are false, return. If any are true, continue.
+    if !cube_scale_controls.width_scale_enable && !cube_scale_controls.relative_heights{
+        return;
+    }
+
+    let end_index = parsed_values.end_index;
+    let cube_width = get_cube_size_from_width_scale(parsed_values.end_index, cube_scale_controls);
+
+    for (index, parsed_value) in parsed_values.vals[..end_index].iter_mut().enumerate() {
+        log::info!("enumerated: {index}");
+        if cube_scale_controls.width_scale_enable{
+            if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+                log::info!("acquired transform:");
+                set_width_and_horizontal_position(index, &mut transform, cube_width);
+            }else{
+                // If query does not contains the transform, it is because the cube has JUST been added,
+                // and is not available to the query. In this case, commands can be used to overwrite
+                // the cube's Transform component (but this also requires recreating its height which
+                // was done during spawn - this part is overwritten anyway if relative_height is true).
+                let mut cube = commands.get_entity(parsed_value.cube_handle).unwrap();
+                let mut transform = Transform::from_translation(Vec3::ZERO);
+                set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
+                set_width_and_horizontal_position(index, &mut transform, cube_width);
+                cube.insert(transform);
+            }
+        }
     }
 }
 
@@ -321,6 +418,7 @@ fn add_parsed_value(
     mut random: &mut ResMut<Random>,
     mut materials: &mut ResMut<Assets<StandardMaterial>>,
     rng_color_controls_enabled: bool,
+    mut cube_scale_controls: &mut ResMut<crate::CubeScaleControls>
 ) {
     let previous_raw_string_end_index = {
         if index == 0 {
@@ -342,20 +440,21 @@ fn add_parsed_value(
         parsed_value.matched_string.start_index = match_start;
         parsed_value.matched_string.end_index = match_end;
 
-        if parsed_value.parsed_warning != parsed_warning{
-            any_requires_change_material_height.0 = true;
-        }
-        if parsed_value.converted_value != converted_value{
-            any_requires_change_material_height.1 = true;
-        }
+        // if parsed_value.parsed_warning != parsed_warning{
+        //     any_requires_change_material_height.0 = true;
+        // }
+        // if parsed_value.converted_value != converted_value{
+        //     any_requires_change_material_height.1 = true;
+        // }
 
         if let Ok((mut transform, mut material, mut visibility)) = cubes_query.get_mut(parsed_value.cube_handle)
         {
             if parsed_value.converted_value != converted_value{
                 // change height to reflect new value - relative value is done later on after all
                 // values are acquired.
-                transform.scale.y = converted_value as f32;
-                transform.translation.y = (converted_value / 2.0) as f32;
+                // transform.scale.y = converted_value as f32;
+                // transform.translation.y = (converted_value / 2.0) as f32;
+                set_height_and_vertical_position(converted_value, &mut transform, &cube_scale_controls)
             }
             if parsed_value.parsed_warning != parsed_warning{
                 *material = get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, parsed_value.rng_color.clone());
@@ -383,26 +482,108 @@ fn add_parsed_value(
                 end_index: match_end,
             },
             rng_color: rng_color.clone(),
-            cube_handle: spawn_a_cube(commands, cube_assets, index, parsed_warning, converted_value, materials, rng_color_controls_enabled, rng_color),
+            cube_handle: spawn_a_cube(commands, cube_assets, index, parsed_warning, converted_value, materials, rng_color_controls_enabled, rng_color, &cube_scale_controls),
             // ..Default::default()
         });
         log::info!("creating new cube/value at index {}", index);
     }
 }
 
-fn spawn_a_cube(commands: &mut Commands, cube_assets: & Res<CubeAssets>, index: usize, parsed_warning: ParsedWarning, converted_value: f64, materials: &mut ResMut<Assets<StandardMaterial>>, rng_color_controls_enabled: bool, rng_color: MeshMaterial3d<StandardMaterial>) -> Entity{
-    let mut position = Vec3::ZERO;
-    position.x += CUBE_WIDTH * (index as f32); 
-    position.y = (converted_value / 2.0) as f32;
-    let mut size = Vec3::ONE;
-    size.y = converted_value as f32;
+fn spawn_a_cube(
+    commands: &mut Commands, 
+    cube_assets: & Res<CubeAssets>, 
+    index: usize, 
+    parsed_warning: ParsedWarning, 
+    converted_value: f64, 
+    materials: &mut ResMut<Assets<StandardMaterial>>, 
+    rng_color_controls_enabled: bool, 
+    rng_color: MeshMaterial3d<StandardMaterial>,
+    cube_scale_controls: & ResMut<crate::CubeScaleControls>
+) -> Entity{
+    // INFO about cube horizontal size and positioning:
+    // Must just use the default horizontal size and position here, If
+    // cube_scale_controls.width_scale must be used, it used after the regex loop after total cube
+    // count is known.
+    // let size = Vec3{ // disabling this cus cube_width is just one anyway...
+    //     x: CUBE_WIDTH,
+    //     y: 1.0,
+    //     z: 1.0,
+    // };
+    let mut transform = Transform::from_translation(Vec3::ZERO).with_scale(Vec3::ONE);
+    transform.translation.x = transform.scale.x * (index as f32); 
+
+    if !cube_scale_controls.width_scale_enable{
+        // if height_scale_enable, the set_height_and_vertical_position function gets called anyway
+        // later on in the second loop for cubes that have JUST SPAWNED (due to their transforms needing to be overwritten), 
+        // so no need to call it here. But still can if you want, it will get over-written.
+        set_height_and_vertical_position(converted_value, &mut transform, cube_scale_controls);
+    }
 
     commands.spawn((
             cube_assets.mesh.clone(), 
             get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, rng_color), 
-            Transform::from_translation(position).with_scale(size)
+            transform
     )).id()
 }
+
+fn set_width_and_horizontal_position(index: usize, transform: &mut Transform, cube_width: f32){
+    transform.scale.x = cube_width; 
+    transform.translation.x = transform.scale.x * (index as f32);
+}
+
+fn get_cube_size_from_width_scale(end_index : usize, cube_scale_controls: & ResMut<crate::CubeScaleControls>) -> f32{
+    if cube_scale_controls.width_scale_enable{
+        return (cube_scale_controls.width_scale / ((end_index-1) as f64)) as f32
+    }
+    CUBE_WIDTH
+}
+
+fn control_cube_widths(
+    parsed_values: &mut ResMut<ParsedValues>,
+    cube_scale_controls: & ResMut<crate::CubeScaleControls>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+    )>
+){
+    let end_index = parsed_values.end_index;
+    
+    let cube_width = get_cube_size_from_width_scale(parsed_values.end_index, cube_scale_controls);
+
+    for (index, parsed_value) in parsed_values.vals[..end_index].iter_mut().enumerate() {
+        if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+            set_width_and_horizontal_position(index, &mut transform, cube_width);
+        }
+    }
+}
+
+fn set_height_and_vertical_position(converted_value: f64, transform: &mut Transform, cube_scale_controls: & ResMut<crate::CubeScaleControls>){
+    let mut height_value = converted_value;
+    if cube_scale_controls.height_scale_enable{
+        height_value *= cube_scale_controls.height_scale;
+    }
+    transform.scale.y = height_value as f32;
+    transform.translation.y = (height_value / 2.0) as f32
+}
+
+fn control_cube_heights(
+    parsed_values: &mut ResMut<ParsedValues>,
+    cube_scale_controls: & ResMut<crate::CubeScaleControls>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+    )>
+){
+    let end_index = parsed_values.end_index;
+    for parsed_value in &mut parsed_values.vals[..end_index] {
+        if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+            set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
+        }
+    }
+}
+
 fn get_cube_material(rng_color_controls_enabled: bool, parsed_warning: ParsedWarning, cube_assets: & Res<CubeAssets>, rng_color: MeshMaterial3d<StandardMaterial>) -> MeshMaterial3d<StandardMaterial> {
     // if using rng AND no parse warning, use RNG material. Else get the parse warning material.
     if rng_color_controls_enabled && parsed_warning == ParsedWarning::Ok{
@@ -411,6 +592,7 @@ fn get_cube_material(rng_color_controls_enabled: bool, parsed_warning: ParsedWar
         cube_assets.materials.get(&parsed_warning).unwrap().clone()
     }
 }
+
 fn set_cube_colors(
     rng_color_controls_enabled: bool,
     generate_new_random: bool,
@@ -500,25 +682,29 @@ pub fn ui_system(
      mut audio_assets,
      audio_receiver_listening_get,
      audio_receiver_listening_set
-     ): (
-     ResMut<AudioControls>,
-     ResMut<Assets<AudioSource>>,
-     Option<ResMut<State<crate::WasmAudioReceiverListening>>>,
-     Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
-    ),
+    ): 
+        (
+            ResMut<AudioControls>,
+            ResMut<Assets<AudioSource>>,
+            Option<ResMut<State<crate::WasmAudioReceiverListening>>>,
+            Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
+        ),
     // random:
     (mut random,
      mut rng_values_controls, 
      mut generated_rng_values, 
      mut rng_color_controls, 
      mut bg_color,
-     ): 
+    ): 
         (ResMut<Random>,
          Local<crate::RNGValuesControls>, 
          Local<bool>,
          ResMut<crate::RNGColorControls>,
          ResMut<ClearColor>,
         ),
+
+    // cube scale
+    mut cube_scale_controls: ResMut<crate::CubeScaleControls>,
 
     // sort state
     (mut sort_state_set, sort_state_get, mut sort_select): (ResMut<NextState<sorter::SortState>>, Res<State<sorter::SortState>>, Local<sorter::Algorithms>),
@@ -871,7 +1057,6 @@ pub fn ui_system(
 
         ui.horizontal(|ui|{
             if ui.button("RNG Colors").clicked(){
-                // TODO:
                 rng_color_controls.rng_cubes_enabled = true;
                 set_cube_colors(
                     rng_color_controls.rng_cubes_enabled, 
@@ -911,10 +1096,39 @@ pub fn ui_system(
             });
         });
 
+        ui.separator();
+        // 
+        // Cube Scale: Width, Height
+        //
+        if ui.checkbox(&mut cube_scale_controls.relative_heights, "Relative Heights").changed(){
+            // TODO
+        }
+        ui.horizontal(|ui|{
+            if ui.checkbox(&mut cube_scale_controls.height_scale_enable, "Height Scale").changed(){
+                control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+            }
+            if ui.add_enabled(
+                cube_scale_controls.height_scale_enable, 
+                egui::Slider::new(&mut cube_scale_controls.height_scale, 0.0..=10.0)
+                .clamping(egui::SliderClamping::Never)
+            ).changed(){
+                control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+            }
+        });
+        ui.horizontal(|ui|{
+            if ui.checkbox(&mut cube_scale_controls.width_scale_enable, "Width Scale").changed(){
+                control_cube_widths(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+            }
+            if ui.add_enabled(
+                cube_scale_controls.width_scale_enable, 
+                egui::Slider::new(&mut cube_scale_controls.width_scale, 0.0..=100.0)
+                .clamping(egui::SliderClamping::Never)
+            ).changed(){
+                control_cube_widths(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+            }
+        });
 
         ui.separator();
-        // toggle cubes height mode
-
 
         //
 
@@ -1030,7 +1244,8 @@ pub fn ui_system(
                         &mut camera_query,
                         &mut random,
                         &mut materials,
-                        rng_color_controls.rng_cubes_enabled
+                        rng_color_controls.rng_cubes_enabled,
+                        &mut cube_scale_controls
                     );
                 }
                 *generated_rng_values = false;

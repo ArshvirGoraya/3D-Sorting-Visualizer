@@ -115,6 +115,15 @@ pub struct RNGColorControls {
     background_color: [u8; 3],
 }
 
+#[derive(Resource)]
+pub struct CubeScaleControls {
+    relative_heights: bool,
+    height_scale_enable: bool,
+    height_scale: f64,
+    width_scale_enable: bool,
+    width_scale: f64,
+}
+
 // Marker Components:
 #[derive(Component)]
 pub struct DefaultAudio;
@@ -172,6 +181,13 @@ fn main() {
     .insert_resource(RNGColorControls {
         rng_cubes_enabled: true,
         background_color: [43, 44, 47],
+    })
+    .insert_resource(CubeScaleControls {
+        relative_heights: true,
+        height_scale_enable: false,
+        height_scale: 1.0,
+        width_scale_enable: false,
+        width_scale: 5.0,
     })
     // set tonemapping to none for accurate color
     //
