@@ -211,7 +211,8 @@ pub fn spawn_random_parsed_values(
         & cube_assets, 
         &mut parsed_values, 
         &mut cubes_query, 
-        &mut camera_query, 
+        &mut camera_query,
+        crate::CameraControls::default(),
         &mut random, 
         &mut materials, 
         rng_color_controls.rng_cubes_enabled,
@@ -233,6 +234,7 @@ fn update_parsed_values(
         &mut Visibility,
     )>,
     camera_query: &mut Query<&mut PanOrbitCamera>,
+    camera_select: crate::CameraControls,
     random: &mut ResMut<Random>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     rng_color_controls_enabled: bool,
@@ -309,7 +311,7 @@ fn update_parsed_values(
             }
             index += 1;
         });
-    let visible_cube_count_changed = parsed_values.end_index != index;
+    // let visible_cube_count_changed = parsed_values.end_index != index;
     parsed_values.end_index = index;
  
     // DO NOT PUT THIS IN SECOND LOOP: this loops from end_index to end, not beginning to
@@ -338,19 +340,30 @@ fn update_parsed_values(
         }
     }
 
-    // Update 
-    update_parsed_values_second_loop(parsed_values, cube_scale_controls, cubes_query, commands);
+    let cube_width = get_cube_size_from_width_scale(parsed_values.end_index, cube_scale_controls);
 
-    // Update the camera if number of visible cubes changed 
-    if visible_cube_count_changed{
-        let mut pan_orbit = camera_query.single_mut().unwrap();
-        let cubes_middle = ((parsed_values.end_index as f32) * CUBE_WIDTH) / 2.0;
-        // pan_orbit.focus.x = cubes_middle; // this sets what the camera is at initially. first set of numbers will NOT be centered. 
-            // Cant set focus and target_focus each time... just makes it stay still until egui is
-            // unfocused... weird
-        pan_orbit.target_focus.x = cubes_middle;
-        log::info!("set camera to middle of cubes: {}", cubes_middle)
-    }
+    // center the camera (if amount or width scale has changed. Just centering it each time here as no
+    // variable tracks if width scale has changed and not really expensive to do anyway).
+    center_camera(cube_width, parsed_values.end_index, camera_query, camera_select);
+
+    // Update 
+    update_parsed_values_second_loop(parsed_values, cube_scale_controls, cubes_query, commands, cube_width);
+
+    //
+    // // Update the camera if number of visible cubes changed 
+    // if visible_cube_count_changed{
+    //     let cubes_middle = ((parsed_values.end_index as f32) * CUBE_WIDTH) / 2.0;
+    //     let mut pan_orbit = camera_query.single_mut().unwrap();
+    //     if !pan_orbit.initialized{
+    //         pan_orbit.focus.x = cubes_middle;
+    //     }else{
+    //         // pan_orbit.focus.x = cubes_middle; // this sets what the camera is at initially (NOT forever, use target_focus for that).
+    //         // target_focus.x doesn't set the camera in initialy frame... only focus.x does that.
+    //         // can't set focus and target_focus at the same time... just makes it stay still until egui is unfocused.
+    //         pan_orbit.target_focus.x = cubes_middle;
+    //     }
+    //     log::info!("set camera to middle of cubes: {}", cubes_middle)
+    // }
 }
 
 fn update_parsed_values_second_loop(
@@ -362,6 +375,7 @@ fn update_parsed_values_second_loop(
         &mut Visibility,
     )>,
     commands: &mut Commands,
+    cube_width: f32,
 ){
     // Logic that can only occur AFTER regex loop.
     //
@@ -376,7 +390,6 @@ fn update_parsed_values_second_loop(
     }
 
     let end_index = parsed_values.end_index;
-    let cube_width = get_cube_size_from_width_scale(parsed_values.end_index, cube_scale_controls);
 
     for (index, parsed_value) in parsed_values.vals[..end_index].iter_mut().enumerate() {
         log::info!("enumerated: {index}");
@@ -545,7 +558,9 @@ fn control_cube_widths(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
-    )>
+    )>,
+    camera_query: &mut Query<&mut PanOrbitCamera>,
+    camera_select: crate::CameraControls
 ){
     let end_index = parsed_values.end_index;
     
@@ -555,6 +570,34 @@ fn control_cube_widths(
         if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
             set_width_and_horizontal_position(index, &mut transform, cube_width);
         }
+    }
+    // Center camera:
+    center_camera(cube_width, end_index, camera_query, camera_select);
+}
+
+fn center_camera(
+    cube_width: f32,
+    end_index: usize,
+    camera_query: &mut Query<&mut PanOrbitCamera>,
+    camera_select: crate::CameraControls
+){
+    let mut pan_orbit = camera_query.single_mut().unwrap();
+
+    if camera_select != crate::CameraControls::FollowSelected{
+        let center = cube_width * ((end_index - 1) as f32) / 2.0;
+
+        if !pan_orbit.initialized{
+            // setting target_focus before initialization = doesnt do anything.
+            // setting both target_focus and focus each time = doesnt update if egui is in focus
+            // has to be set focus before initialization, and set target_focus afterwards.
+            pan_orbit.focus.x = center;
+        }else{
+            pan_orbit.target_focus.x = center;
+        }
+
+    }else{
+        //  TODO:
+        log::warn!("no functionality for centering camera on fol;ow selected yet,")
     }
 }
 
@@ -1117,14 +1160,14 @@ pub fn ui_system(
         });
         ui.horizontal(|ui|{
             if ui.checkbox(&mut cube_scale_controls.width_scale_enable, "Width Scale").changed(){
-                control_cube_widths(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+                control_cube_widths(&mut parsed_values, &cube_scale_controls, &mut cubes_query, &mut camera_query, *camera_select);
             }
             if ui.add_enabled(
                 cube_scale_controls.width_scale_enable, 
                 egui::Slider::new(&mut cube_scale_controls.width_scale, 0.0..=100.0)
                 .clamping(egui::SliderClamping::Never)
             ).changed(){
-                control_cube_widths(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+                control_cube_widths(&mut parsed_values, &cube_scale_controls, &mut cubes_query, &mut camera_query, *camera_select);
             }
         });
 
@@ -1242,6 +1285,7 @@ pub fn ui_system(
                         &mut parsed_values,
                         &mut cubes_query,
                         &mut camera_query,
+                        *camera_select,
                         &mut random,
                         &mut materials,
                         rng_color_controls.rng_cubes_enabled,
