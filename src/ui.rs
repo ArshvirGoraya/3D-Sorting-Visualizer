@@ -1,4 +1,4 @@
-use crate::{AudioControls, CameraControls, PROGRAM_TITLE, sorter};
+use crate::{AudioControls, CameraControlsFollow, PROGRAM_TITLE, sorter};
 
 use core::{f64, fmt};
 use std::{cmp::Ordering, ffi::OsStr, path::Path};
@@ -195,7 +195,15 @@ pub fn spawn_random_parsed_values(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
-    mut camera_query: Query<&mut PanOrbitCamera>,
+    (mut camera_query, 
+     camera_controls_auto_rotate_get,
+     camera_controls_follow_get,
+     ): (
+     Query<&mut PanOrbitCamera>, 
+     Res<State<crate::CameraControlsAutoRotate>>,
+     Res<State<crate::CameraControlsFollow>>,
+     ),
+
     mut cube_scale_controls: ResMut<crate::CubeScaleControls>
 ) {
     // generate_random_string_nums(5, -100.0, 100.0, &mut user_text.val, &mut random);
@@ -212,7 +220,8 @@ pub fn spawn_random_parsed_values(
         &mut parsed_values, 
         &mut cubes_query, 
         &mut camera_query,
-        crate::CameraControls::default(),
+        camera_controls_auto_rotate_get,
+        camera_controls_follow_get,
         &mut random, 
         &mut materials, 
         rng_color_controls.rng_cubes_enabled,
@@ -234,7 +243,8 @@ fn update_parsed_values(
         &mut Visibility,
     )>,
     camera_query: &mut Query<&mut PanOrbitCamera>,
-    camera_select: crate::CameraControls,
+    camera_controls_auto_rotate_get: Res<State<crate::CameraControlsAutoRotate>>,
+    camera_controls_follow_get: Res<State<crate::CameraControlsFollow>>,
     random: &mut ResMut<Random>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     rng_color_controls_enabled: bool,
@@ -344,7 +354,7 @@ fn update_parsed_values(
 
     // center the camera (if amount or width scale has changed. Just centering it each time here as no
     // variable tracks if width scale has changed and not really expensive to do anyway).
-    center_camera(cube_width, parsed_values.end_index, camera_query, camera_select);
+    center_camera(cube_width, parsed_values.end_index, camera_query, *camera_controls_auto_rotate_get.get(), *camera_controls_follow_get.get());
 
 
     // positional heights
@@ -611,7 +621,8 @@ fn control_cube_widths(
         &mut Visibility,
     )>,
     camera_query: &mut Query<&mut PanOrbitCamera>,
-    camera_select: crate::CameraControls
+    camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
+    camera_controls_follow_get: crate::CameraControlsFollow,
 ){
     let end_index = parsed_values.end_index;
     
@@ -623,18 +634,19 @@ fn control_cube_widths(
         }
     }
     // Center camera:
-    center_camera(cube_width, end_index, camera_query, camera_select);
+    center_camera(cube_width, end_index, camera_query, camera_controls_auto_rotate_get, camera_controls_follow_get);
 }
 
 fn center_camera(
     cube_width: f32,
     end_index: usize,
     camera_query: &mut Query<&mut PanOrbitCamera>,
-    camera_select: crate::CameraControls
+    camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
+    camera_controls_follow_get: crate::CameraControlsFollow,
 ){
     let mut pan_orbit = camera_query.single_mut().unwrap();
 
-    if camera_select != crate::CameraControls::FollowSelected{
+    if camera_controls_follow_get == CameraControlsFollow::NotFollowing{
         let center = cube_width * ((end_index) as f32) / 2.0;
 
         if !pan_orbit.initialized{
@@ -791,8 +803,22 @@ pub fn ui_system(
     )>,
 
     // camera:
-    (mut camera_query, mut camera_select): (Query<&mut PanOrbitCamera>, Local<crate::CameraControls>),
-
+    (mut camera_query, 
+     mut camera_controls_auto_rotate,
+     mut camera_controls_follow_selected,
+     mut camera_controls_auto_rotate_set,
+     camera_controls_auto_rotate_get,
+     mut camera_controls_follow_set,
+     camera_controls_follow_get,
+     ): (
+     Query<&mut PanOrbitCamera>, 
+     Local<bool>,
+     Local<bool>,
+     ResMut<NextState<crate::CameraControlsAutoRotate>>,
+     Res<State<crate::CameraControlsAutoRotate>>,
+     ResMut<NextState<crate::CameraControlsFollow>>,
+     Res<State<crate::CameraControlsFollow>>,
+     ),
 
     // music_controller: Query<&AudioSink, With<DefaultAudio>>,
 
@@ -805,7 +831,7 @@ pub fn ui_system(
         (
             ResMut<AudioControls>,
             ResMut<Assets<AudioSource>>,
-            Option<ResMut<State<crate::WasmAudioReceiverListening>>>,
+            Option<Res<State<crate::WasmAudioReceiverListening>>>,
             Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
         ),
     // random:
@@ -854,7 +880,7 @@ pub fn ui_system(
     let mut first_button_size: egui::Vec2 = Default::default();
 
     // egui::Window::new(PROGRAM_TITLE).max_width(max_width).show(ctx, |ui| {
-    egui::Window::new(PROGRAM_TITLE).max_width(width).min_width(width).resizable(false).show(ctx, |ui| {
+    egui::Window::new(PROGRAM_TITLE).max_width(width).min_width(width).resizable(false).default_pos([0.0,0.0]).show(ctx, |ui| {
         ui.allocate_ui(vec2(ui.available_width(), scroll_height), |ui|{
             egui::ScrollArea::vertical().auto_shrink([true, true]).show(ui, |ui|{
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
@@ -979,46 +1005,71 @@ pub fn ui_system(
                 // 
 
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("medium".into()));
-                ui.columns(2, |cols|{
+                ui.columns(3, |cols|{
                     cols[0].vertical_centered_justified(|ui|{
-                        if ui.button("Reset Camera")
+                        if ui.button("Reset")
                             .on_hover_text("reset the camera to its original position")
                                 .clicked()
                         {
-                            log::info!("Reset the camera!");
+                            let mut pan_orbit = camera_query.single_mut().unwrap();
+                            // log::info!("{}, {}, {}", pan_orbit.target_yaw, pan_orbit.target_pitch, pan_orbit.target_radius);
+                            //
+                            // INFO: set to the same xyz values in the transform used when spawning
+                            pan_orbit.target_yaw = 0.0;
+                            pan_orbit.target_pitch = 0.0;
+                            // pan_orbit.target_radius = 100.0;
+                        }
+                    });
+                    cols[1].vertical_centered_justified(|ui|{
+                        // CameraControlsAutoRotate::AutoRotate
+                        if ui.checkbox(&mut camera_controls_auto_rotate, "Rotate").changed(){
+                            if *camera_controls_auto_rotate{
+                                camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::AutoRotate);
+                            }else{
+                                camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::NotAutoRotate);
+                            }
+                        }
+                    });
+                    cols[2].vertical_centered_justified(|ui|{
+                        if ui.checkbox(&mut camera_controls_follow_selected, "Follow").changed(){
+                            if *camera_controls_follow_selected{
+                            camera_controls_follow_set.set(crate::CameraControlsFollow::Following);
+                            }else{
+                                camera_controls_follow_set.set(crate::CameraControlsFollow::NotFollowing);
+                            }
                         }
                     });
 
-                    cols[1].scope(|ui|{
-                        let hover_size = egui::vec2(
-                            ui.available_width(), 
-                            ui.spacing().interact_size.y,
-                        );
-                        let (rect, _) = ui.allocate_exact_size(hover_size, egui::Sense::hover());
-                        // let mut child = ui.child_ui(rect, egui::Layout::left_to_right(egui::Align::Center), None);
-
-                        let mut child = ui.new_child(egui::UiBuilder{
-                            max_rect: Some(rect),
-                            // layout: Some(egui::Layout::left_to_right(egui::Align::Center)),
-                            ..Default::default()
-                        });
-
-                        // wrapped in a add_enabled_ui because .add() required a response and ComboBox
-                        // doesnt give one.
-                        child.add_enabled_ui(true, |ui|{
-                            egui::ComboBox::from_id_salt("camera_select")
-                                .width(ui.available_width())
-                                .selected_text(camera_select.to_string())
-                                .wrap_mode(egui::TextWrapMode::Truncate)
-                                .show_ui(ui, |ui|{
-                                    for control in crate::CameraControls::ALL{
-                                        ui.selectable_value(&mut *camera_select, control, control.to_string());
-                                    }
-                                });
-                        });
-                        child.interact(rect, "camera_select_hover".into(), egui::Sense::hover())
-                            .on_hover_text("select camera control");
-                        });
+                    // cols[1].scope(|ui|{
+                    //     let hover_size = egui::vec2(
+                    //         ui.available_width(), 
+                    //         ui.spacing().interact_size.y,
+                    //     );
+                    //     let (rect, _) = ui.allocate_exact_size(hover_size, egui::Sense::hover());
+                    //     // let mut child = ui.child_ui(rect, egui::Layout::left_to_right(egui::Align::Center), None);
+                    //
+                    //     let mut child = ui.new_child(egui::UiBuilder{
+                    //         max_rect: Some(rect),
+                    //         // layout: Some(egui::Layout::left_to_right(egui::Align::Center)),
+                    //         ..Default::default()
+                    //     });
+                    //
+                    //     // wrapped in a add_enabled_ui because .add() required a response and ComboBox
+                    //     // doesnt give one.
+                    //     child.add_enabled_ui(true, |ui|{
+                    //         egui::ComboBox::from_id_salt("camera_controls")
+                    //             .width(ui.available_width())
+                    //             .selected_text(camera_controls.to_string())
+                    //             .wrap_mode(egui::TextWrapMode::Truncate)
+                    //             .show_ui(ui, |ui|{
+                    //                 for control in crate::CameraControls::ALL{
+                    //                     ui.selectable_value(&mut *camera_controls, control, control.to_string());
+                    //                 }
+                    //             });
+                    //     });
+                    //     child.interact(rect, "camera_controls_hover".into(), egui::Sense::hover())
+                    //         .on_hover_text("select camera control");
+                    //     });
                 });
                 ui.separator();
 
@@ -1122,7 +1173,7 @@ pub fn ui_system(
                                     );
                                 });
                                 ui.vertical_centered_justified(|ui|{
-                                    if ui.button("debug play selected").clicked(){
+                                    if ui.button("play selected (debug)").clicked(){
                                         crate::play_audio(&mut commands, &mut audio_controls);
                                     }
                                 })
@@ -1243,14 +1294,28 @@ pub fn ui_system(
                     });
                     ui.horizontal(|ui|{
                         if ui.checkbox(&mut cube_scale_controls.width_scale_enable, "Width Scale").changed(){
-                            control_cube_widths(&mut parsed_values, &cube_scale_controls, &mut cubes_query, &mut camera_query, *camera_select);
+                            control_cube_widths(
+                                &mut parsed_values, 
+                                &cube_scale_controls, 
+                                &mut cubes_query, 
+                                &mut camera_query, 
+                                *camera_controls_auto_rotate_get.get(),
+                                *camera_controls_follow_get.get(),
+                            );
                         }
                         if ui.add_enabled(
                             cube_scale_controls.width_scale_enable, 
                             egui::Slider::new(&mut cube_scale_controls.width_scale, 0.0..=100.0)
                             .clamping(egui::SliderClamping::Never)
                         ).changed(){
-                            control_cube_widths(&mut parsed_values, &cube_scale_controls, &mut cubes_query, &mut camera_query, *camera_select);
+                            control_cube_widths(
+                                &mut parsed_values, 
+                                &cube_scale_controls, 
+                                &mut cubes_query, 
+                                &mut camera_query, 
+                                *camera_controls_auto_rotate_get.get(),
+                                *camera_controls_follow_get.get(),
+                            );
                         }
                     });
 
@@ -1366,7 +1431,8 @@ pub fn ui_system(
                                     &mut parsed_values,
                                     &mut cubes_query,
                                     &mut camera_query,
-                                    *camera_select,
+                                    camera_controls_auto_rotate_get,
+                                    camera_controls_follow_get,
                                     &mut random,
                                     &mut materials,
                                     rng_color_controls.rng_cubes_enabled,

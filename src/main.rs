@@ -54,30 +54,50 @@ pub enum WasmAudioReceiverListening {
 
 pub const PROGRAM_TITLE: &str = "3D Sorting";
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
-pub enum CameraControls {
+// #[derive(Resource, Default)]
+// pub struct CameraControls {
+//     auto_rotate: bool,
+//     follow_selected: bool,
+// }
+//
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
+pub enum CameraControlsFollow {
     #[default]
-    DragControl,
-    AutoRotate,
-    FollowSelected,
+    NotFollowing,
+    Following,
 }
 
-impl fmt::Display for CameraControls {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CameraControls::DragControl => write!(f, "Drag Control"),
-            CameraControls::AutoRotate => write!(f, "Auto Rotate"),
-            CameraControls::FollowSelected => write!(f, "Follow Selected"),
-        }
-    }
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
+pub enum CameraControlsAutoRotate {
+    #[default]
+    NotAutoRotate,
+    AutoRotate,
 }
-impl CameraControls {
-    pub const ALL: [CameraControls; 3] = [
-        CameraControls::DragControl,
-        CameraControls::AutoRotate,
-        CameraControls::FollowSelected,
-    ];
-}
+
+// #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
+// pub enum CameraControls {
+//     #[default]
+//     DragControl,
+//     AutoRotate,
+//     FollowSelected,
+// }
+//
+// impl fmt::Display for CameraControls {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         match self {
+//             CameraControls::DragControl => write!(f, "Drag Control"),
+//             CameraControls::AutoRotate => write!(f, "Auto Rotate"),
+//             CameraControls::FollowSelected => write!(f, "Follow Selected"),
+//         }
+//     }
+// }
+// impl CameraControls {
+//     pub const ALL: [CameraControls; 3] = [
+//         CameraControls::DragControl,
+//         CameraControls::AutoRotate,
+//         CameraControls::FollowSelected,
+//     ];
+// }
 #[derive(Resource, Default)]
 pub struct AudioControls {
     enabled: bool,
@@ -166,6 +186,7 @@ fn main() {
     .init_resource::<ui::ParsedValues>()
     .init_resource::<ui::FontScale>()
     .init_resource::<ui::UserText>()
+    // .init_resource::<CameraControls>()
     // .insert_resource(ClearColorConfig)
     .insert_resource(ClearColor {
         ..Default::default()
@@ -191,7 +212,9 @@ fn main() {
     })
     // set tonemapping to none for accurate color
     //
-    .init_state::<sorter::SortState>();
+    .init_state::<sorter::SortState>()
+    .init_state::<CameraControlsFollow>()
+    .init_state::<CameraControlsAutoRotate>();
 
     #[cfg(any(target_arch = "wasm32", rust_analyzer))]
     app.init_state::<WasmAudioReceiverListening>();
@@ -218,6 +241,11 @@ fn main() {
         Update,
         wasm_audio_picker::audio_select_listener
             .run_if(in_state(WasmAudioReceiverListening::Listening)),
+    );
+
+    app.add_systems(
+        Update,
+        auto_rotate_camera.run_if(in_state(CameraControlsAutoRotate::AutoRotate)),
     );
 
     // .add_systems(Update, audio_select.run_if(in_state(AudioPicking::Picking)))
@@ -455,6 +483,12 @@ fn spawn_cube_assets(
 //     let mut pan_orbit = query.single_mut().unwrap();
 //     // pan_orbit.translation.x =
 // }
+
+fn auto_rotate_camera(mut camera_query: Query<&mut PanOrbitCamera>) {
+    let mut pan_orbit = camera_query.single_mut().unwrap();
+    pan_orbit.target_yaw += 0.04;
+    // only runs when auto rotate state is true.
+}
 
 fn spawn_3d_camera(mut commands: Commands) {
     // let problem_values = ProblemValues::new();
