@@ -761,13 +761,16 @@ pub fn ui_system(
      mut clipboard, 
      mut font_scale, 
      mut font_added, 
-     mut text_is_dirty): 
+     mut text_is_dirty,
+     mut text_just_cleaned): 
     (ResMut<UserText>, 
      Res<NumberRegex>, 
      ResMut<bevy_egui::EguiClipboard>, 
      ResMut<FontScale>, 
      Local<bool>, 
-     Local<bool>),
+     Local<bool>,
+     Local<bool>
+     ),
 
     mut empty_text: Local<String>,
 
@@ -1248,51 +1251,51 @@ pub fn ui_system(
 
         //
 
-        ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-        ui.columns(3, |cols|{
+        // ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+        // ui.columns(3, |cols|{
             // clipboard:
-            cols[0].vertical_centered_justified(|ui|{
-                let copy_response = ui.button("󰨸").on_hover_text("Copy text to clipboard");
-                if copy_response.clicked(){
-                    clipboard.set_text(&user_text.val);
-                    copy_timer.copy_timer.reset();
-                }
-                if !copy_timer.copy_timer.is_finished(){
-                    copy_timer.copy_timer.tick(time.delta());
-                    // copy_response.show_tooltip_text("Copied!");
-
-                    // Center the tool tip:
-                    // Measure it first using a galley
-                    let galley = ui.painter().layout_no_wrap("Copied!".to_owned(), 
-                        ui.style().text_styles[&egui::TextStyle::Body].clone(), 
-                        ui.style().visuals.text_color()
-                    );
-                    // Center with the measurement
-                    let mut position = copy_response.rect.center_bottom();
-                    position.x -= galley.rect.size().x / 2.0;
-                    // Create in an area:
-                    egui::Area::new("copied_tooltip".into())
-                        .order(egui::Order::Tooltip)
-                        .fixed_pos(position)
-                        .show(ui.ctx(), |ui|{
-                            egui::Frame::popup(ui.style()).show(ui, |ui|{
-                                ui.add(egui::Label::new("Copied!").wrap_mode(egui::TextWrapMode::Extend));
-                            });
-                        });
-                }
-            });
+            // cols[0].vertical_centered_justified(|ui|{
+            //     let copy_response = ui.button("󰨸").on_hover_text("Copy text to clipboard");
+            //     if copy_response.clicked(){
+            //         clipboard.set_text(&user_text.val);
+            //         copy_timer.copy_timer.reset();
+            //     }
+            //     if !copy_timer.copy_timer.is_finished(){
+            //         copy_timer.copy_timer.tick(time.delta());
+            //         // copy_response.show_tooltip_text("Copied!");
+            //
+            //         // Center the tool tip:
+            //         // Measure it first using a galley
+            //         let galley = ui.painter().layout_no_wrap("Copied!".to_owned(), 
+            //             ui.style().text_styles[&egui::TextStyle::Body].clone(), 
+            //             ui.style().visuals.text_color()
+            //         );
+            //         // Center with the measurement
+            //         let mut position = copy_response.rect.center_bottom();
+            //         position.x -= galley.rect.size().x / 2.0;
+            //         // Create in an area:
+            //         egui::Area::new("copied_tooltip".into())
+            //             .order(egui::Order::Tooltip)
+            //             .fixed_pos(position)
+            //             .show(ui.ctx(), |ui|{
+            //                 egui::Frame::popup(ui.style()).show(ui, |ui|{
+            //                     ui.add(egui::Label::new("Copied!").wrap_mode(egui::TextWrapMode::Extend));
+            //                 });
+            //             });
+            //     }
+            // });
             // clean text
-            cols[1].vertical_centered_justified(|ui|{
-                let clean_button = ui.add_enabled(*text_is_dirty, egui::Button::new("Clean 󰃢"))
-                    .on_hover_text("Replace text with internal representation of your numbers")
-                    .on_disabled_hover_text("Replace text with internal representation of your numbers");
-                if clean_button.clicked(){
-                    *text_is_dirty = false;
-                    user_text.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x|{
-                        x.converted_value.to_string()
-                    }).collect::<Vec<_>>().join(", ");
-                }
-            });
+            // cols[1].vertical_centered_justified(|ui|{
+            //     let clean_button = ui.add_enabled(*text_is_dirty, egui::Button::new("Clean 󰃢"))
+            //         .on_hover_text("Replace text with internal representation of your numbers")
+            //         .on_disabled_hover_text("Replace text with internal representation of your numbers");
+            //     if clean_button.clicked(){
+            //         *text_is_dirty = false;
+            //         user_text.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x|{
+            //             x.converted_value.to_string()
+            //         }).collect::<Vec<_>>().join(", ");
+            //     }
+            // });
             // cols[2].vertical_centered_justified(|ui|{
             //     if ui.add_enabled(true, egui::Button::new("RNG #"))
             //         .on_hover_text("Replace text with random numbers")
@@ -1301,7 +1304,7 @@ pub fn ui_system(
             //             // generate_random_string_nums();
             //     }
             // });
-        });
+        // });
         ui.style_mut().override_text_style = None;
 
         let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
@@ -1313,6 +1316,21 @@ pub fn ui_system(
         });
 
         if !collapse_response.fully_closed(){
+            ui.vertical_centered_justified(|ui|{
+                ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+                let clean_button = ui.add_enabled(*text_is_dirty, egui::Button::new("Clean 󰃢"))
+                    .on_hover_text("Replace text with internal representation of your numbers")
+                    .on_disabled_hover_text("Replace text with internal representation of your numbers");
+                if clean_button.clicked(){
+                    *text_just_cleaned = true;
+                    *text_is_dirty = false;
+                    user_text.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x|{
+                        x.converted_value.to_string()
+                    }).collect::<Vec<_>>().join(", ");
+                }
+                ui.style_mut().override_text_style = None;
+            });
+
             if !num_strings.cleaned_string{
                 num_strings.cleaned_string = true;
                 num_strings.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
@@ -1328,6 +1346,39 @@ pub fn ui_system(
             });
         };
 
+        ui.vertical_centered_justified(|ui|{
+            ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+            let copy_response = ui.button("Copy 󰨸").on_hover_text("Copy text to clipboard");
+            if copy_response.clicked(){
+                clipboard.set_text(&user_text.val);
+                copy_timer.copy_timer.reset();
+            }
+            if !copy_timer.copy_timer.is_finished(){
+                copy_timer.copy_timer.tick(time.delta());
+                // copy_response.show_tooltip_text("Copied!");
+
+                // Center the tool tip:
+                // Measure it first using a galley
+                let galley = ui.painter().layout_no_wrap("Copied!".to_owned(), 
+                    ui.style().text_styles[&egui::TextStyle::Body].clone(), 
+                    ui.style().visuals.text_color()
+                );
+                // Center with the measurement
+                let mut position = copy_response.rect.center_bottom();
+                position.x -= galley.rect.size().x / 2.0;
+                // Create in an area:
+                egui::Area::new("copied_tooltip".into())
+                    .order(egui::Order::Tooltip)
+                    .fixed_pos(position)
+                    .show(ui.ctx(), |ui|{
+                        egui::Frame::popup(ui.style()).show(ui, |ui|{
+                            ui.add(egui::Label::new("Copied!").wrap_mode(egui::TextWrapMode::Extend));
+                        });
+                    });
+            }
+            ui.style_mut().override_text_style = None;
+        });
+
         ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
             egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
                 let mut text_edit_widget = ui.add(egui::TextEdit::multiline(&mut user_text.val)
@@ -1337,10 +1388,16 @@ pub fn ui_system(
                 if *generated_rng_values{
                     text_edit_widget.mark_changed();
                 }
+                if *text_just_cleaned{
+                    text_edit_widget.mark_changed();
+                    *text_just_cleaned = false;
+                }
+
                 if text_edit_widget.changed(){
                     log::info!("text widget changed");
                     if !*generated_rng_values{
                         // if rng values were generated, already clean.
+                        // if text change without rng values generated, mark as dirty.
                         *text_is_dirty = true;
                     }
 
