@@ -764,8 +764,6 @@ pub struct UserText{
 pub fn ui_system(
     (mut commands, mut contexts): (Commands, EguiContexts),
     mut materials: ResMut<Assets<StandardMaterial>>,
-    // mut commands: Commands,
-    // mut contexts: EguiContexts,
 
     // text:
     (mut user_text, 
@@ -783,8 +781,6 @@ pub fn ui_system(
      Local<bool>,
      Local<bool>
      ),
-
-    mut empty_text: Local<String>,
 
     // text parsing
     mut num_strings: Local<NumString>,
@@ -852,11 +848,15 @@ pub fn ui_system(
     mut cube_scale_controls: ResMut<crate::CubeScaleControls>,
 
     // sort state
-    (mut sort_state_set, sort_state_get, mut sort_select): (ResMut<NextState<sorter::SortState>>, Res<State<sorter::SortState>>, Local<sorter::Algorithms>),
+    (mut sort_state_set, 
+     sort_state_get, 
+     mut sort_select
+    ): (
+        ResMut<NextState<sorter::SortState>>, 
+        Res<State<sorter::SortState>>, 
+        Local<sorter::Algorithms>
+    ),
     mut is_sorting: Local<bool>,
-
-    // for random materials, need to create with this:
-    // mut materials: ResMut<Assets<StandardMaterial>>,
 ) -> Result {
     // if *sort_state == sorter::SortState::NotSorting{}
 
@@ -879,87 +879,79 @@ pub fn ui_system(
 
     let mut first_button_size: egui::Vec2 = Default::default();
 
-    // egui::Window::new(PROGRAM_TITLE).max_width(max_width).show(ctx, |ui| {
     egui::Window::new(PROGRAM_TITLE).max_width(width).min_width(width).resizable(false).default_pos([0.0,0.0]).show(ctx, |ui| {
         ui.allocate_ui(vec2(ui.available_width(), scroll_height), |ui|{
             egui::ScrollArea::vertical().auto_shrink([true, true]).show(ui, |ui|{
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
                 ui.columns(3, |cols|{
                     let response = cols[0].vertical_centered_justified(|ui|{
-                        if ui.button("").on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer").clicked(){
-                            ui.ctx().open_url(egui::OpenUrl {
-                                new_tab: true,
-                                url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
-                            });
-                        }
-                    });
-                    cols[1].vertical_centered_justified(|ui|{
-                        if ui.button("").on_hover_cursor(egui::CursorIcon::ZoomOut).on_hover_text("Decrease Font").clicked(){
-                            decrease_font(&mut font_scale);
-                        }
-
-                    });
-                    cols[2].vertical_centered_justified(|ui|{
-                        if ui.button("").on_hover_cursor(egui::CursorIcon::ZoomIn).on_hover_text("Increase Font").clicked(){
-                            increase_font(&mut font_scale);
+                        if ui.button("")
+                            .on_hover_cursor(egui::CursorIcon::PointingHand)
+                            .on_hover_text("https://github.com/ArshvirGoraya/3D-Sorting-Visualizer")
+                            .clicked(){
+                                ui.ctx().open_url(egui::OpenUrl {
+                                    new_tab: true,
+                                    url: "https://github.com/ArshvirGoraya/3D-Sorting-Visualizer".to_string(),
+                                });
                         }
                     });
                     first_button_size = response.response.rect.size();
+                    cols[1].vertical_centered_justified(|ui|{
+                        if ui.button("")
+                            .on_hover_cursor(egui::CursorIcon::ZoomOut)
+                            .on_hover_text("Decrease Font")
+                            .clicked(){
+                                decrease_font(&mut font_scale);
+                        }
+                    });
+                    cols[2].vertical_centered_justified(|ui|{
+                        if ui.button("")
+                            .on_hover_cursor(egui::CursorIcon::ZoomIn)
+                            .on_hover_text("Increase Font")
+                            .clicked(){
+                                increase_font(&mut font_scale);
+                        }
+                    });
                 });
-                // ui.style_mut().override_text_style = None;
-                //
-                ui.separator();
 
+                ui.separator();
 
                 ui.columns(2, |cols|{
                     cols[0].vertical_centered_justified(|ui|{
                         // TODO: if already sorting, change this to stop!
                         if !*is_sorting{
-                            if ui.add(
-                                egui::Button::new("Sort!").fill(egui::Color32::from_rgb(48, 64, 43))
-                            )
+                            if ui.add(egui::Button::new("Sort!").fill(egui::Color32::from_rgb(48, 64, 43)))
                                 .on_hover_text("click to begin sorting")
-                                    .clicked()
-                            {
-                                log::info!("Begin sort!");
-                                *is_sorting = !*is_sorting;
+                                .clicked(){
+                                    log::info!("Begin sort!");
+                                    *is_sorting = !*is_sorting;
                             }
                         }else{
                             #[allow(clippy::collapsible_else_if)]
-                            if ui.add(
-                                egui::Button::new("Stop!").fill(egui::Color32::from_rgb(83, 47, 52))
-                            )
-                                .on_hover_text("click to stop sorting")
-                                    .clicked()
-                            {
+                            if ui.add(egui::Button::new("Stop!").fill(egui::Color32::from_rgb(83, 47, 52)))
+                            .on_hover_text("click to stop sorting")
+                            .clicked(){
                                 log::info!("Stop sort!");
                                 *is_sorting = !*is_sorting;
                             }
                         }
                     });
-                    // cols[1].vertical_centered_justified(|ui|{
                     cols[1].add_enabled_ui(true, |ui|{
                         // INFO: Must wrap around a rect for tooltip...
-                        // But if wrapped in a exact size, UI will not update vertically when combox is
+                        // UI will not auto-update vertically when comobox is
                         // wrapped, but can use truncate wrapping to not worry about this.
-                        let hover_size = egui::vec2(
-                            ui.available_width(), 
-                            ui.spacing().interact_size.y,
-                        );
+                        let hover_size = egui::vec2(ui.available_width(), ui.spacing().interact_size.y);
                         let (rect, _) = ui.allocate_exact_size(hover_size, egui::Sense::hover());
-                        // let mut child = ui.child_ui(rect, egui::Layout::left_to_right(egui::Align::Center), None);
                         let mut child = ui.new_child(egui::UiBuilder{
                             max_rect: Some(rect),
-                            // layout: Some(egui::Layout::left_to_right(egui::Align::Center)),
                             ..Default::default()
                         });
-
+                        //
                         child.add_enabled_ui(!*is_sorting, |ui|{
                             egui::ComboBox::from_id_salt("sort_select")
                                 .width(ui.available_width())
                                 .selected_text(sort_select.to_string())
                                 .wrap_mode(egui::TextWrapMode::Truncate)
-                                // .wrap()
                                 .show_ui(ui, |ui|{
                                     for algorithm in sorter::Algorithms::ALL{
                                         ui.selectable_value(&mut *sort_select, algorithm, algorithm.to_string());
@@ -972,10 +964,11 @@ pub fn ui_system(
                             .on_hover_text("select sorting algorithm");
                         });
                 });
+
                 ui.style_mut().override_text_style = None;
 
                 ui.horizontal(|ui|{
-                    ui.label("Sort speed: ");
+                    ui.label("Sort speed 󰔛 ");
                     ui.spacing_mut().slider_width = ui.available_width() - ui.spacing().interact_size.x - ui.spacing().item_spacing.x - 1.0;
                     if ui.add(
                         egui::Slider::new(&mut increment_timer.duration_f64, 0.0..=1.0)
@@ -984,20 +977,21 @@ pub fn ui_system(
                         .clamping(egui::SliderClamping::Never)
                     )
                         .on_hover_text("seconds waited between each increment when sorting")
-                            .changed(){
-                                increment_timer.duration_f64 = increment_timer.duration_f64.max(0.0);
-                                increment_timer.increment_timer.reset();
-                                log::info!("increment speed changed {}", increment_timer.duration_f64);
+                        .changed(){
+                            increment_timer.duration_f64 = increment_timer.duration_f64.max(0.0);
+                            increment_timer.increment_timer.reset();
+                            log::info!("increment speed changed {}", increment_timer.duration_f64);
                     }
                 });
 
                 ui.vertical_centered_justified(|ui|{
                     if ui.button("Increment (debug)")
                         .on_hover_text("debug: increment the sort by 1 step")
-                            .clicked() {
-                                sorter::increment_sorting();
+                        .clicked() {
+                            sorter::increment_sorting();
                     }
                 });
+
                 ui.separator();
 
                 //
@@ -1007,108 +1001,90 @@ pub fn ui_system(
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("medium".into()));
                 ui.columns(3, |cols|{
                     cols[0].vertical_centered_justified(|ui|{
-                        if ui.button("Reset")
-                            .on_hover_text("reset the camera to its original position")
-                                .clicked()
-                        {
-                            let mut pan_orbit = camera_query.single_mut().unwrap();
-                            // log::info!("{}, {}, {}", pan_orbit.target_yaw, pan_orbit.target_pitch, pan_orbit.target_radius);
-                            //
-                            // INFO: set to the same xyz values in the transform used when spawning
-                            pan_orbit.target_yaw = 0.0;
-                            pan_orbit.target_pitch = 0.0;
-                            // pan_orbit.target_radius = 100.0;
+                        if ui.button("Reset ")
+                            .on_hover_text("reset the camera to original position")
+                            .clicked(){
+                                let mut pan_orbit = camera_query.single_mut().unwrap();
+                                // log::info!("{}, {}, {}", pan_orbit.target_yaw, pan_orbit.target_pitch, pan_orbit.target_radius);
+                                //
+                                // INFO: set to the same xyz values in the transform used when spawning
+                                pan_orbit.target_yaw = 0.0;
+                                pan_orbit.target_pitch = 0.0;
+                                // pan_orbit.target_radius = 100.0;
                         }
                     });
                     cols[1].vertical_centered_justified(|ui|{
                         // CameraControlsAutoRotate::AutoRotate
-                        if ui.checkbox(&mut camera_controls_auto_rotate, "Rotate").changed(){
-                            if *camera_controls_auto_rotate{
-                                camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::AutoRotate);
-                            }else{
-                                camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::NotAutoRotate);
-                            }
+                        if ui.checkbox(&mut camera_controls_auto_rotate, "Rotate 󱦙")
+                            .on_hover_text("continuously rotate camera")
+                            .changed(){
+                                if *camera_controls_auto_rotate{
+                                    camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::AutoRotate);
+                                }else{
+                                    camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::NotAutoRotate);
+                                }
                         }
                     });
                     cols[2].vertical_centered_justified(|ui|{
-                        if ui.checkbox(&mut camera_controls_follow_selected, "Follow").changed(){
-                            if *camera_controls_follow_selected{
-                            camera_controls_follow_set.set(crate::CameraControlsFollow::Following);
-                            }else{
-                                camera_controls_follow_set.set(crate::CameraControlsFollow::NotFollowing);
-                            }
+                        if ui.checkbox(&mut camera_controls_follow_selected, "Follow 󰮄")
+                            .on_hover_text("center camera on selected cube")
+                            .changed(){
+                                if *camera_controls_follow_selected{
+                                    camera_controls_follow_set.set(crate::CameraControlsFollow::Following);
+                                } else {
+                                    camera_controls_follow_set.set(crate::CameraControlsFollow::NotFollowing);
+                                }
                         }
                     });
-
-                    // cols[1].scope(|ui|{
-                    //     let hover_size = egui::vec2(
-                    //         ui.available_width(), 
-                    //         ui.spacing().interact_size.y,
-                    //     );
-                    //     let (rect, _) = ui.allocate_exact_size(hover_size, egui::Sense::hover());
-                    //     // let mut child = ui.child_ui(rect, egui::Layout::left_to_right(egui::Align::Center), None);
-                    //
-                    //     let mut child = ui.new_child(egui::UiBuilder{
-                    //         max_rect: Some(rect),
-                    //         // layout: Some(egui::Layout::left_to_right(egui::Align::Center)),
-                    //         ..Default::default()
-                    //     });
-                    //
-                    //     // wrapped in a add_enabled_ui because .add() required a response and ComboBox
-                    //     // doesnt give one.
-                    //     child.add_enabled_ui(true, |ui|{
-                    //         egui::ComboBox::from_id_salt("camera_controls")
-                    //             .width(ui.available_width())
-                    //             .selected_text(camera_controls.to_string())
-                    //             .wrap_mode(egui::TextWrapMode::Truncate)
-                    //             .show_ui(ui, |ui|{
-                    //                 for control in crate::CameraControls::ALL{
-                    //                     ui.selectable_value(&mut *camera_controls, control, control.to_string());
-                    //                 }
-                    //             });
-                    //     });
-                    //     child.interact(rect, "camera_controls_hover".into(), egui::Sense::hover())
-                    //         .on_hover_text("select camera control");
-                    //     });
                 });
+
                 ui.separator();
 
                 // 
                 // AUDIO
                 //
+
                 ui.horizontal(|ui|{
-                    ui.checkbox(&mut audio_controls.enabled, "Audio");
-                    // let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
-                    //     .id_salt("scroll_parsed_collapsible")
-                    //     .default_open(false)
-                    //     .show(ui, |_ui| {
-                    // });
-                    //
-                    // if !collapse_response.fully_closed(){
+                    ui.checkbox(&mut audio_controls.enabled, "Audio ")
+                        .on_hover_text("toggle audio");
+
                     ui.vertical_centered_justified(|ui|{
+                        // TODO: do same to collapse widget as done with collapse at parse_warning_string to avoid more logic each egui poss?
+                        // let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
+                        //     .id_salt("scroll_parsed_collapsible")
+                        //     .default_open(false)
+                        //     .show(ui, |_ui| {
+                        // });
+                        //
+                        // if !collapse_response.fully_closed(){
+
                         ui.collapsing("Audio Settings", |ui|{
                             ui.add(
                                 egui::Slider::new(&mut audio_controls.volume, 0.1..=10.0).text("Volume")
                                 .max_decimals(1)
                                 .step_by(0.1)
-                            );
+                            ).on_hover_text("adjust volume of selected sound");
+
                             ui.add(
                                 egui::Slider::new(&mut audio_controls.pitch, 0.1..=2.0).text("Pitch")
                                 .max_decimals(1)
                                 .step_by(0.1)
-                            );
+                            ).on_hover_text("adjust pitch of selected sound");
+
                             ui.columns(2, |cols|{
                                 cols[0].add_enabled_ui(true, |ui|{
                                     ui.vertical_centered_justified(|ui|{
                                         #[cfg(not(target_arch = "wasm32"))]
-                                        if ui.button("Select Audio").clicked(){
-                                            #[allow(clippy::collapsible_if)]
-                                            if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["aac", "flac", "wav", "ogg", "mp3"]).pick_file(){
-                                                if let Ok(bytes) = std::fs::read(&path){
-                                                    let file_name = path.file_name().unwrap().to_string_lossy().to_string();
-                                                    crate::change_audio_source(&mut audio_controls, &mut audio_assets, file_name, bytes);
+                                        if ui.button("Select Audio")
+                                            .on_hover_text("open file dialog to select supported audio file")
+                                            .clicked(){
+                                                #[allow(clippy::collapsible_if)]
+                                                if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["aac", "flac", "wav", "ogg", "mp3"]).pick_file(){
+                                                    if let Ok(bytes) = std::fs::read(&path){
+                                                        let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+                                                        crate::change_audio_source(&mut audio_controls, &mut audio_assets, file_name, bytes);
+                                                    }
                                                 }
-                                            }
                                         }
 
                                         // just adding rust_analyzer to cfg so code doesn't appear
@@ -1131,67 +1107,73 @@ pub fn ui_system(
                                             // detected (camera input, button click, font scale, anything)
                                             // ui.add_enabled_ui(*audio_reciever_state == crate::WasmAudioReceiverListening::NotListening, |ui|{
                                             ui.add_enabled_ui(true, |ui|{
-                                                if ui.button("Select Audio").clicked(){
-                                                    // audio_controls
-                                                    let input_element = web_sys::window()
-                                                        .expect("window should exist")
-                                                        .document()
-                                                        .expect("document should exist")
-                                                        .get_element_by_id("audio_picker")
-                                                        .expect("audio_picker input should exist in index.html")
-                                                        .dyn_into::<HtmlInputElement>()
-                                                        .expect("audio_picker id must be on a input element");
+                                                if ui.button("Select Audio")
+                                                    .on_hover_text("open file dialog to select supported audio file")
+                                                    .clicked(){
+                                                        // audio_controls
+                                                        let input_element = web_sys::window()
+                                                            .expect("window should exist")
+                                                            .document()
+                                                            .expect("document should exist")
+                                                            .get_element_by_id("audio_picker")
+                                                            .expect("audio_picker input should exist in index.html")
+                                                            .dyn_into::<HtmlInputElement>()
+                                                            .expect("audio_picker id must be on a input element");
 
-                                                    input_element.click();
-                                                    // make receiver listen for selected file
-                                                    audio_receiver_listening_set.expect("audio receiver state should exist")
-                                                        .set(crate::WasmAudioReceiverListening::Listening);
+                                                        input_element.click();
+                                                        // make receiver listen for selected file
+                                                        audio_receiver_listening_set.expect("audio receiver state should exist")
+                                                            .set(crate::WasmAudioReceiverListening::Listening);
                                                 }
                                             });
                                         }
                                         });
                                     });
                                     cols[1].vertical_centered_justified(|ui|{
-                                        if ui.button("Default").clicked(){
-                                            // set to default
-                                            if let Some(audio_handle) = &audio_controls.audio_source_handle{
-                                                audio_assets.remove(audio_handle);
-                                            }
-                                            audio_controls.selected_file_name = None;
-                                            audio_controls.audio_source_handle = None;
+                                        if ui.button("Default")
+                                            .on_hover_text("reset selected file to default")
+                                            .clicked(){
+                                                // set to default
+                                                if let Some(audio_handle) = &audio_controls.audio_source_handle{
+                                                    audio_assets.remove(audio_handle);
+                                                }
+                                                audio_controls.selected_file_name = None;
+                                                audio_controls.audio_source_handle = None;
                                         }
                                     })
                                 });
                                 ui.vertical_centered_justified(|ui|{
-                                    let mut file_name = &audio_controls.default_file_name;
-                                    if let Some(selected_file_name) = &audio_controls.selected_file_name{
-                                        file_name = selected_file_name;
-                                    }
-                                    ui.add_enabled(false,
-                                        egui::Button::new(file_name)
+                                    let file_name = audio_controls.selected_file_name.as_ref().unwrap_or(&audio_controls.default_file_name);
+                                    // change color of button
+                                    if ui.add(egui::Button::new(file_name)
                                         .wrap_mode(egui::TextWrapMode::Truncate)
-                                    );
-                                });
-                                ui.vertical_centered_justified(|ui|{
-                                    if ui.button("play selected (debug)").clicked(){
-                                        crate::play_audio(&mut commands, &mut audio_controls);
+                                        .fill(egui::Color32::from_rgb(0, 0, 0)))
+                                        .on_hover_text("play selected sound")
+                                        .clicked(){
+                                            crate::play_audio(&mut commands, &mut audio_controls);
                                     }
-                                })
+                                });
                             });
                         });
                     });
 
                     ui.separator();
 
-
                     //
                     // RNG values
                     // 
 
-
                     ui.horizontal(|ui|{
-                        if ui.button("RNG #").clicked(){
-                            generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, &mut user_text.val, &mut random);
+                        if ui.button("RNG ")
+                            .on_hover_text("replace your text with random numbers")
+                            .clicked(){
+                                generate_random_string_nums(
+                                    rng_values_controls.amount, 
+                                    rng_values_controls.min, 
+                                    rng_values_controls.max, 
+                                    &mut user_text.val, 
+                                    &mut random
+                                );
                             *generated_rng_values = true;
                         }
                         ui.vertical_centered_justified(|ui|{
@@ -1200,27 +1182,32 @@ pub fn ui_system(
                                     egui::Slider::new(&mut rng_values_controls.amount, 2..=100)
                                     .clamping(egui::SliderClamping::Never)
                                     .text("amount")
-                                ).changed(){
-                                    // must at least be 2
-                                    rng_values_controls.amount = rng_values_controls.amount.max(2);
+                                )
+                                    .on_hover_text("set amount of numbers to generate")
+                                    .changed(){
+                                        rng_values_controls.amount = rng_values_controls.amount.max(2); // at least 2
                                 }
                                 if ui.add(
                                     egui::Slider::new(&mut rng_values_controls.min, -100.0..=100.0)
                                     .clamping(egui::SliderClamping::Never)
                                     .min_decimals(1)
                                     .text("min")
-                                ).changed(){
-                                    // set max to be the same as this, if this is bigger than max.
-                                    rng_values_controls.max = rng_values_controls.max.max(rng_values_controls.min);
+                                )
+                                    .on_hover_text("set smallest number that can be generated")
+                                    .changed(){
+                                        // set max to be the same as this, if this is bigger than max.
+                                        rng_values_controls.max = rng_values_controls.max.max(rng_values_controls.min);
                                 }
                                 if ui.add(
                                     egui::Slider::new(&mut rng_values_controls.max, -100.0..=100.0)
                                     .clamping(egui::SliderClamping::Never)
                                     .min_decimals(1)
                                     .text("max")
-                                ).changed(){
-                                    // set min to be the same as this, if this is smaller than min.
-                                    rng_values_controls.min = rng_values_controls.min.min(rng_values_controls.max);
+                                )
+                                    .on_hover_text("set largest number that can be generated")
+                                    .changed(){
+                                        // set min to be the same as this, if this is smaller than min.
+                                        rng_values_controls.min = rng_values_controls.min.min(rng_values_controls.max);
                                 }
                             })
                         })
@@ -1233,22 +1220,25 @@ pub fn ui_system(
                     //
 
                     ui.horizontal(|ui|{
-                        if ui.button("RNG Colors").clicked(){
-                            rng_color_controls.rng_cubes_enabled = true;
-                            set_cube_colors(
-                                rng_color_controls.rng_cubes_enabled, 
-                                true,
-                                &mut parsed_values, 
-                                &mut cubes_query, 
-                                &cube_assets, 
-                                &mut materials, 
-                                &mut random
-                            );
+                        if ui.button("RNG ")
+                            .on_hover_text("replace cube colors with random colors")
+                            .clicked(){
+                                rng_color_controls.rng_cubes_enabled = true;
+                                set_cube_colors(
+                                    rng_color_controls.rng_cubes_enabled, 
+                                    true,
+                                    &mut parsed_values, 
+                                    &mut cubes_query, 
+                                    &cube_assets, 
+                                    &mut materials, 
+                                    &mut random
+                                );
                         };
                         ui.vertical_centered_justified(|ui|{
                             ui.collapsing("Colors Settings", |ui|{
                                 ui.horizontal(|ui|{
                                     if ui.color_edit_button_srgb(&mut rng_color_controls.background_color)
+                                        .on_hover_text("replace background color")
                                         .changed(){
                                             bg_color.0 = Color::srgb_u8(
                                                 rng_color_controls.background_color[0], 
@@ -1258,64 +1248,78 @@ pub fn ui_system(
                                     }
                                     ui.label("background color");
                                 });
-                                if ui.checkbox(&mut rng_color_controls.rng_cubes_enabled, "Use RNG colors").changed(){
-                                    set_cube_colors(
-                                        rng_color_controls.rng_cubes_enabled, 
-                                        false,
-                                        &mut parsed_values, 
-                                        &mut cubes_query, 
-                                        &cube_assets, 
-                                        &mut materials, 
-                                        &mut random
-                                    );
+                                if ui.checkbox(&mut rng_color_controls.rng_cubes_enabled, "Use RNG colors")
+                                    .on_hover_text("toggle random color usage")
+                                    .changed(){
+                                        set_cube_colors(
+                                            rng_color_controls.rng_cubes_enabled, 
+                                            false,
+                                            &mut parsed_values, 
+                                            &mut cubes_query, 
+                                            &cube_assets, 
+                                            &mut materials, 
+                                            &mut random
+                                        );
                                 }
                             });
                         });
                     });
 
                     ui.separator();
+
                     // 
                     // Cube Scale: Width, Height
                     //
-                    if ui.checkbox(&mut cube_scale_controls.positional_heights, "Positional Heights").changed(){
-                        control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+
+                    if ui.checkbox(&mut cube_scale_controls.positional_heights, "Positional Heights 󰄩")
+                        .on_hover_text("set cube heights to be relative to the position they will be in their final sorted positions instead of relative to their given value")
+                        .changed(){
+                            control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
                     }
                     ui.horizontal(|ui|{
-                        if ui.checkbox(&mut cube_scale_controls.height_scale_enable, "Height Scale").changed(){
-                            control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+                        if ui.checkbox(&mut cube_scale_controls.height_scale_enable, "Height Scale ")
+                            .on_hover_text("use height scale to scale the heights of cubes")
+                            .changed(){
+                                control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
                         }
                         if ui.add_enabled(
                             cube_scale_controls.height_scale_enable, 
                             egui::Slider::new(&mut cube_scale_controls.height_scale, 0.0..=10.0)
                             .clamping(egui::SliderClamping::Never)
-                        ).changed(){
-                            control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
+                        )
+                            .on_hover_text("set height scale for cubes")
+                            .changed(){
+                                control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
                         }
                     });
                     ui.horizontal(|ui|{
-                        if ui.checkbox(&mut cube_scale_controls.width_scale_enable, "Width Scale").changed(){
-                            control_cube_widths(
-                                &mut parsed_values, 
-                                &cube_scale_controls, 
-                                &mut cubes_query, 
-                                &mut camera_query, 
-                                *camera_controls_auto_rotate_get.get(),
-                                *camera_controls_follow_get.get(),
-                            );
+                        if ui.checkbox(&mut cube_scale_controls.width_scale_enable, "Width Scale ")
+                            .on_hover_text("use width scale to scale the widths of cubes")
+                            .changed(){
+                                control_cube_widths(
+                                    &mut parsed_values, 
+                                    &cube_scale_controls, 
+                                    &mut cubes_query, 
+                                    &mut camera_query, 
+                                    *camera_controls_auto_rotate_get.get(),
+                                    *camera_controls_follow_get.get(),
+                                );
                         }
                         if ui.add_enabled(
                             cube_scale_controls.width_scale_enable, 
                             egui::Slider::new(&mut cube_scale_controls.width_scale, 0.0..=100.0)
                             .clamping(egui::SliderClamping::Never)
-                        ).changed(){
-                            control_cube_widths(
-                                &mut parsed_values, 
-                                &cube_scale_controls, 
-                                &mut cubes_query, 
-                                &mut camera_query, 
-                                *camera_controls_auto_rotate_get.get(),
-                                *camera_controls_follow_get.get(),
-                            );
+                        )
+                            .on_hover_text("set total width that the cubes can encompass")
+                            .changed(){
+                                control_cube_widths(
+                                    &mut parsed_values, 
+                                    &cube_scale_controls, 
+                                    &mut cubes_query, 
+                                    &mut camera_query, 
+                                    *camera_controls_auto_rotate_get.get(),
+                                    *camera_controls_follow_get.get(),
+                                );
                         }
                     });
 
@@ -1325,46 +1329,51 @@ pub fn ui_system(
 
                     let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
 
-                    let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
+                    // ui.collapsing(heading, add_contents)
+
+
+                    // Remove collapsible visuals:
+                    ui.style_mut().visuals.widgets.noninteractive.bg_stroke = egui::Stroke::NONE;
+
+                    egui::CollapsingHeader
+                        ::new(egui::RichText::new(parse_warning_string)
+                            .color(parse_warning_color))
                         .id_salt("scroll_parsed_collapsible")
                         .default_open(false)
-                        .show(ui, |_ui| {
-                        });
+                        .show_unindented(ui, |ui|{
+                            ui.vertical_centered_justified(|ui|{
+                                ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
+                                let clean_button = ui.add_enabled(*text_is_dirty, egui::Button::new("Clean 󰃢"))
+                                    .on_hover_text("replace text with internal representation of your numbers")
+                                    .on_disabled_hover_text("replace text with internal representation of your numbers");
+                                if clean_button.clicked(){
+                                    *text_just_cleaned = true;
+                                    *text_is_dirty = false;
+                                    user_text.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x|{
+                                        x.converted_value.to_string()
+                                    }).collect::<Vec<_>>().join(", ");
+                                }
+                                ui.style_mut().override_text_style = None;
+                            });
 
-                    if !collapse_response.fully_closed(){
-                        ui.vertical_centered_justified(|ui|{
-                            ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-                            let clean_button = ui.add_enabled(*text_is_dirty, egui::Button::new("Clean 󰃢"))
-                                .on_hover_text("Replace text with internal representation of your numbers")
-                                .on_disabled_hover_text("Replace text with internal representation of your numbers");
-                            if clean_button.clicked(){
-                                *text_just_cleaned = true;
-                                *text_is_dirty = false;
-                                user_text.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x|{
-                                    x.converted_value.to_string()
-                                }).collect::<Vec<_>>().join(", ");
+                            if !num_strings.cleaned_string{
+                                num_strings.cleaned_string = true;
+                                num_strings.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
                             }
-                            ui.style_mut().override_text_style = None;
-                        });
-
-                        if !num_strings.cleaned_string{
-                            num_strings.cleaned_string = true;
-                            num_strings.val = parsed_values.vals[..parsed_values.end_index].iter().map(|x| x.converted_value.to_string()).collect::<Vec<_>>().join(", ");
-                        }
-                        ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
-                            ui.push_id("scroll_parsed", |ui|{
-                                egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
-                                    ui.add_enabled(false, 
-                                        egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
-                                    );
+                            ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
+                                ui.push_id("scroll_parsed", |ui|{
+                                    egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
+                                        ui.add_enabled(false, 
+                                            egui::TextEdit::multiline(&mut num_strings.val).hint_text("parsed numbers here").desired_width(ui.available_width())
+                                        ).on_disabled_hover_text("shows internal representation of your numbers");
+                                    });
                                 });
                             });
                         });
-                    };
 
                     ui.vertical_centered_justified(|ui|{
                         ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-                        let copy_response = ui.button("Copy 󰨸").on_hover_text("Copy text to clipboard");
+                        let copy_response = ui.button("Copy 󰨸").on_hover_text("copy text to clipboard");
                         if copy_response.clicked(){
                             clipboard.set_text(&user_text.val);
                             copy_timer.copy_timer.reset();
@@ -1591,13 +1600,25 @@ fn setup_font(ctx: &mut egui::Context) {
     // and choose when to use that font instead. But this is just for nerd font glyhps, so can just
     // add it to the normal font family and will be used when needed.
 
-    // symbols in added from font: https://www.nerdfonts.com/cheat-sheet
+    // symbols added in from font: https://www.nerdfonts.com/cheat-sheet
     // font ONLY has these symbols in it and NOTHING else:
-    //  (github - U+E709)
-    //  (font increase - U+EB69)
-    //  (font decrease - U+EB6A) // this glyph was changed from the standard nerd font glyph at this position to a flipped version of U+eb69.
-    // 󰨸 (clipboard - U+F0A38)
-    // 󰃢 (broom - U+F00E2)
+    //
+    //  // (github) U+e709
+    //  // (font increase) U+eb69
+    //  // (font decrease) U+eb6a // this glyph was changed from the standard nerd font glyh at this position to a flipped version of U+eb69.
+    // 󰔛 // U+f051b (sort speed)
+    //  // (camera) U+f447
+    // 󱦙 // (rotate camera) U+f1999
+    // 󰮄 // (follow cube) U+f0b84
+    //  // (audio toggle) U+e638
+    //  // (random numbers) U+edec
+    //  // (randomize color) U+e22b
+    // 󰄩 // (positional heights) U+f0129
+    //  // (height scale) U+f07d
+    //  // (width scale) U+f07e
+    // 󰨸 // (clipboard) U+f0a38
+    // 󰃢 // (broom / clean) U+f00e2
+    //
     // this makes the font very small in size AND allows no pixelation when displaying these
     // symbols in different sizes (since they are essentially SVGs).
 

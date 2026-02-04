@@ -29,37 +29,15 @@ use std::{
 
 // Not added into the system even on non-wasm builds, in which case this enum definition just
 // exists but an instance of it is never created.
-// {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum WasmAudioReceiverListening {
     #[default]
     NotListening,
     Listening,
 }
-// // same as above. only in wasm
-// pub enum FileEvent {
-//     FileLoaded(Vec<u8>),
-//     FileNoSelected,
-//     Error(String),
-// }
-// // same as above. only in wasm.
-// #[derive(Resource)]
-// pub struct BrowserAudioElements {
-//     sender: Sender<FileEvent>,
-//     receiver: Receiver<FileEvent>,
-//     // file_reader: FileReader,
-//     // on_load_closure: Closure<dyn fnmut()>,
-// }
-// }
 
 pub const PROGRAM_TITLE: &str = "3D Sorting";
 
-// #[derive(Resource, Default)]
-// pub struct CameraControls {
-//     auto_rotate: bool,
-//     follow_selected: bool,
-// }
-//
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum CameraControlsFollow {
     #[default]
@@ -74,30 +52,6 @@ pub enum CameraControlsAutoRotate {
     AutoRotate,
 }
 
-// #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
-// pub enum CameraControls {
-//     #[default]
-//     DragControl,
-//     AutoRotate,
-//     FollowSelected,
-// }
-//
-// impl fmt::Display for CameraControls {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         match self {
-//             CameraControls::DragControl => write!(f, "Drag Control"),
-//             CameraControls::AutoRotate => write!(f, "Auto Rotate"),
-//             CameraControls::FollowSelected => write!(f, "Follow Selected"),
-//         }
-//     }
-// }
-// impl CameraControls {
-//     pub const ALL: [CameraControls; 3] = [
-//         CameraControls::DragControl,
-//         CameraControls::AutoRotate,
-//         CameraControls::FollowSelected,
-//     ];
-// }
 #[derive(Resource, Default)]
 pub struct AudioControls {
     enabled: bool,
@@ -255,12 +209,6 @@ fn main() {
     app.run();
 }
 
-// fn audio_select(mut audio_controls: ResMut<AudioControls>) {
-//     if let Some(file_dialog) = &mut audio_controls.open_file_dialog {
-//         //
-//     }
-// }
-
 fn play_audio(commands: &mut Commands, audio_controls: &mut ResMut<AudioControls>) {
     if !audio_controls.enabled {
         return;
@@ -328,53 +276,6 @@ fn spawn_audio_sources(
         ..Default::default()
     });
 }
-
-// fn update_cubes(
-//     mut update_list: ResMut<ui::UpdateList>,
-//     mut query: Query<(
-//         &mut Transform,
-//         &mut MeshMaterial3d<StandardMaterial>,
-//         &mut Visibility,
-//     )>,
-// ) {
-//     for update_data in &update_list.vals {
-//         if let Ok((mut transform, mut material, mut visibility)) = query.get_mut(update_data.entity)
-//         {
-//             //
-//         }
-//     }
-//     update_list.vals.clear();
-// }
-
-// fn change_heights(
-//     mut commands: Commands,
-//     query: Query<(Entity, &mut Transform, &ui::ChangeHeight)>,
-// ) {
-//     for (entity, mut transform, component) in query {
-//         //
-//         transform.scale.y = component.height as f32;
-//         commands.entity(entity).remove::<ui::ChangeHeight>();
-//     }
-// }
-//
-// fn change_materials(
-//     mut commands: Commands,
-//     cube_assets: Res<ui::CubeAssets>,
-//     query: Query<(
-//         Entity,
-//         &mut MeshMaterial3d<StandardMaterial>,
-//         &ui::ChangeMaterial,
-//     )>,
-// ) {
-//     for (entity, mut material, component) in query {
-//         *material = cube_assets
-//             .materials
-//             .get(&component.parsed_warning)
-//             .unwrap()
-//             .clone();
-//         commands.entity(entity).remove::<ui::ChangeMaterial>();
-//     }
-// }
 
 fn finish_timers(
     mut copy_timer: ResMut<ui::CopyTimer>,
@@ -478,11 +379,6 @@ fn spawn_cube_assets(
         ]),
     });
 }
-
-// fn center_camera(mut query: Query<&mut Transform, With<PanOrbitCamera>>) {
-//     let mut pan_orbit = query.single_mut().unwrap();
-//     // pan_orbit.translation.x =
-// }
 
 fn auto_rotate_camera(mut camera_query: Query<&mut PanOrbitCamera>) {
     let mut pan_orbit = camera_query.single_mut().unwrap();
