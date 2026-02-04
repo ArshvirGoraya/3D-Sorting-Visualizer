@@ -1,19 +1,16 @@
 use crate::{AudioControls, CameraControlsFollow, PROGRAM_TITLE, sorter};
 
 use core::{f64, fmt};
-use std::{cmp::Ordering, ffi::OsStr, path::Path};
 
-use bevy::{audio::{PlaybackMode, Volume}, platform::collections::HashMap, prelude::*, reflect::Enum};
+use bevy::{platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Margin, Rangef, Spacing, style::ScrollStyle, vec2},
+    egui::{self, Margin, Spacing, style::ScrollStyle, vec2},
 };
 
 use bevy_panorbit_camera::PanOrbitCamera;
 use regex_lite::Regex;
-
-use core::time::Duration;
 
 const CUBE_WIDTH : f32 = 1.0;
 
@@ -248,11 +245,10 @@ fn update_parsed_values(
     random: &mut ResMut<Random>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     rng_color_controls_enabled: bool,
-    mut cube_scale_controls: &mut ResMut<crate::CubeScaleControls>
+    cube_scale_controls: &mut ResMut<crate::CubeScaleControls>
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
-    let mut any_requires_change_material_height = (false, false);
     log::info!("--");
     number_regex
         .re
@@ -291,11 +287,10 @@ fn update_parsed_values(
                         commands, 
                         cube_assets, 
                         cubes_query, 
-                        &mut any_requires_change_material_height, 
                         random, 
                         materials, 
                         rng_color_controls_enabled,
-                        &mut cube_scale_controls,
+                        cube_scale_controls,
                     );
                 },
                 Err(_err) => {
@@ -311,11 +306,10 @@ fn update_parsed_values(
                         commands, 
                         cube_assets, 
                         cubes_query, 
-                        &mut any_requires_change_material_height, 
                         random, 
                         materials, 
                         rng_color_controls_enabled,
-                        &mut cube_scale_controls,
+                        cube_scale_controls,
                     );
                 }
             }
@@ -483,11 +477,10 @@ fn add_parsed_value(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
     )>,
-    any_requires_change_material_height: &mut (bool, bool),
-    mut random: &mut ResMut<Random>,
-    mut materials: &mut ResMut<Assets<StandardMaterial>>,
+    random: &mut ResMut<Random>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
     rng_color_controls_enabled: bool,
-    mut cube_scale_controls: &mut ResMut<crate::CubeScaleControls>
+    cube_scale_controls: &mut ResMut<crate::CubeScaleControls>
 ) {
     let previous_raw_string_end_index = {
         if index == 0 {
@@ -509,13 +502,6 @@ fn add_parsed_value(
         parsed_value.matched_string.start_index = match_start;
         parsed_value.matched_string.end_index = match_end;
 
-        // if parsed_value.parsed_warning != parsed_warning{
-        //     any_requires_change_material_height.0 = true;
-        // }
-        // if parsed_value.converted_value != converted_value{
-        //     any_requires_change_material_height.1 = true;
-        // }
-
         if let Ok((mut transform, mut material, mut visibility)) = cubes_query.get_mut(parsed_value.cube_handle)
         {
             if parsed_value.converted_value != converted_value{
@@ -524,8 +510,8 @@ fn add_parsed_value(
                 // transform.scale.y = converted_value as f32;
                 // transform.translation.y = (converted_value / 2.0) as f32;
                 if !cube_scale_controls.positional_heights{
-                    // dont call this if using positional_heights. Can still add it but Will be overwitten later anyway.
-                    set_height_and_vertical_position(converted_value, &mut transform, &cube_scale_controls)
+                    // don't call this if using positional_heights. Can still add it but Will be overwritten later anyway.
+                    set_height_and_vertical_position(converted_value, &mut transform, cube_scale_controls)
                 }
             }
             if parsed_value.parsed_warning != parsed_warning{
@@ -541,7 +527,7 @@ fn add_parsed_value(
         parsed_value.converted_value = converted_value;
         log::info!("updating cube/value at index {}", index);
     } else {
-        let rng_color = crate::spawn_and_get_random_color_handle(&mut materials, random);
+        let rng_color = crate::spawn_and_get_random_color_handle(materials, random);
         parsed_values.vals.push(ParsedValue {
             converted_value,
             parsed_warning,
@@ -554,7 +540,17 @@ fn add_parsed_value(
                 end_index: match_end,
             },
             rng_color: rng_color.clone(),
-            cube_handle: spawn_a_cube(commands, cube_assets, index, parsed_warning, converted_value, materials, rng_color_controls_enabled, rng_color, &cube_scale_controls),
+            cube_handle: spawn_a_cube(
+                commands, 
+                cube_assets, 
+                index, 
+                parsed_warning, 
+                converted_value, 
+                // materials, 
+                rng_color_controls_enabled, 
+                rng_color, 
+                cube_scale_controls
+            ),
             sorted_position: 0, // this gets changed later
             // ..Default::default()
         });
@@ -562,13 +558,14 @@ fn add_parsed_value(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_a_cube(
     commands: &mut Commands, 
     cube_assets: & Res<CubeAssets>, 
     index: usize, 
     parsed_warning: ParsedWarning, 
     converted_value: f64, 
-    materials: &mut ResMut<Assets<StandardMaterial>>, 
+    // materials: &mut ResMut<Assets<StandardMaterial>>, 
     rng_color_controls_enabled: bool, 
     rng_color: MeshMaterial3d<StandardMaterial>,
     cube_scale_controls: & ResMut<crate::CubeScaleControls>
@@ -650,8 +647,8 @@ fn center_camera(
         let center = cube_width * ((end_index) as f32) / 2.0;
 
         if !pan_orbit.initialized{
-            // setting target_focus before initialization = doesnt do anything.
-            // setting both target_focus and focus each time = doesnt update if egui is in focus
+            // setting target_focus before initialization = doesn't do anything.
+            // setting both target_focus and focus each time = doesn't update if egui is in focus
             // has to be set focus before initialization, and set target_focus afterwards.
             pan_orbit.focus.x = center;
         }else{
@@ -938,7 +935,7 @@ pub fn ui_system(
                     });
                     cols[1].add_enabled_ui(true, |ui|{
                         // INFO: Must wrap around a rect for tooltip...
-                        // UI will not auto-update vertically when comobox is
+                        // UI will not auto-update vertically when ComboBox is
                         // wrapped, but can use truncate wrapping to not worry about this.
                         let hover_size = egui::vec2(ui.available_width(), ui.spacing().interact_size.y);
                         let (rect, _) = ui.allocate_exact_size(hover_size, egui::Sense::hover());
@@ -1049,15 +1046,6 @@ pub fn ui_system(
                         .on_hover_text("toggle audio");
 
                     ui.vertical_centered_justified(|ui|{
-                        // TODO: do same to collapse widget as done with collapse at parse_warning_string to avoid more logic each egui poss?
-                        // let collapse_response = egui::CollapsingHeader::new(egui::RichText::new(parse_warning_string).color(parse_warning_color))
-                        //     .id_salt("scroll_parsed_collapsible")
-                        //     .default_open(false)
-                        //     .show(ui, |_ui| {
-                        // });
-                        //
-                        // if !collapse_response.fully_closed(){
-
                         ui.collapsing("Audio Settings", |ui|{
                             ui.add(
                                 egui::Slider::new(&mut audio_controls.volume, 0.1..=10.0).text("Volume")
@@ -1074,60 +1062,58 @@ pub fn ui_system(
                             ui.columns(2, |cols|{
                                 cols[0].add_enabled_ui(true, |ui|{
                                     ui.vertical_centered_justified(|ui|{
-                                        #[cfg(not(target_arch = "wasm32"))]
                                         if ui.button("Select Audio")
                                             .on_hover_text("open file dialog to select supported audio file")
                                             .clicked(){
-                                                #[allow(clippy::collapsible_if)]
-                                                if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["aac", "flac", "wav", "ogg", "mp3"]).pick_file(){
-                                                    if let Ok(bytes) = std::fs::read(&path){
-                                                        let file_name = path.file_name().unwrap().to_string_lossy().to_string();
-                                                        crate::change_audio_source(&mut audio_controls, &mut audio_assets, file_name, bytes);
+
+                                                #[cfg(not(target_arch = "wasm32"))]
+                                                {
+                                                    #[allow(clippy::collapsible_if)]
+                                                    if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["aac", "flac", "wav", "ogg", "mp3"]).pick_file(){
+                                                        if let Ok(bytes) = std::fs::read(&path){
+                                                            let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+                                                            crate::change_audio_source(&mut audio_controls, &mut audio_assets, file_name, bytes);
+                                                        }
                                                     }
                                                 }
-                                        }
+                                                // just adding rust_analyzer to cfg so code doesn't appear
+                                                // disabled in IDE.
+                                                #[cfg(any(target_arch = "wasm32", rust_analyzer))]
+                                                {
+                                                    use web_sys::{HtmlInputElement, wasm_bindgen::JsCast};
+                                                    // let audio_receiver_state = audio_receiver_listening_get.expect("audio receiver state should exist");
+                                                    // INFO: never disable this: previously, was disabled when audio
+                                                    // receiver was listening for a file selection.
+                                                    // There is no way to stop the receiver if cancel is selected
+                                                    // in the file dialog (as there is not reliable way to detect 
+                                                    // file dialog is cancelled). So, if cancelled, this would just stay
+                                                    // disabled. Which we don't want. No bad consequences to leaving
+                                                    // this enabled while receiving files (only bad thing is
+                                                    // receiver is still running even tho file selection is
+                                                    // cancelled, but that's not that expensive, and receiver will
+                                                    // stop once a file is ever selected).
+                                                    // TODO: could stop the receiver if any other kind of input is
+                                                    // detected (camera input, button click, font scale, anything)
+                                                    // ui.add_enabled_ui(*audio_receiver_state == crate::WasmAudioReceiverListening::NotListening, |ui|{
+                                                    //
+                                                    // audio_controls
+                                                    let input_element = web_sys::window()
+                                                        .expect("window should exist")
+                                                        .document()
+                                                        .expect("document should exist")
+                                                        .get_element_by_id("audio_picker")
+                                                        .expect("audio_picker input should exist in index.html")
+                                                        .dyn_into::<HtmlInputElement>()
+                                                        .expect("audio_picker id must be on a input element");
 
-                                        // just adding rust_analyzer to cfg so code doesn't appear
-                                        // disabled in IDE.
-                                        #[cfg(any(target_arch = "wasm32", rust_analyzer))]
-                                        {
-                                            use web_sys::{HtmlInputElement, wasm_bindgen::JsCast};
-                                            let audio_reciever_state = audio_receiver_listening_get.expect("audio receiver state should exist");
-                                            // never disable this: previously, was disabled when audio
-                                            // receiver was listening for a file selection.
-                                            // There is no way to stop the receiver if cancel is selected
-                                            // in the file dialog (as there is not reliable way to detect 
-                                            // file dialog is cancelled). So, if cancelled, this would just stay
-                                            // disabled. Which we don't want. No bad consequences to leaving
-                                            // this enabled while receiving files (only bad thing is
-                                            // recevier is still running even tho file selection is
-                                            // cancelled, but that's not that expensive, and receiver will
-                                            // stop once a file is ever selected).
-                                            // TODO: could stop the receiver if any other kind of input is
-                                            // detected (camera input, button click, font scale, anything)
-                                            // ui.add_enabled_ui(*audio_reciever_state == crate::WasmAudioReceiverListening::NotListening, |ui|{
-                                            ui.add_enabled_ui(true, |ui|{
-                                                if ui.button("Select Audio")
-                                                    .on_hover_text("open file dialog to select supported audio file")
-                                                    .clicked(){
-                                                        // audio_controls
-                                                        let input_element = web_sys::window()
-                                                            .expect("window should exist")
-                                                            .document()
-                                                            .expect("document should exist")
-                                                            .get_element_by_id("audio_picker")
-                                                            .expect("audio_picker input should exist in index.html")
-                                                            .dyn_into::<HtmlInputElement>()
-                                                            .expect("audio_picker id must be on a input element");
-
-                                                        input_element.click();
-                                                        // make receiver listen for selected file
-                                                        audio_receiver_listening_set.expect("audio receiver state should exist")
-                                                            .set(crate::WasmAudioReceiverListening::Listening);
+                                                    input_element.click();
+                                                    // make receiver listen for selected file
+                                                    audio_receiver_listening_set.expect("audio receiver state should exist")
+                                                        .set(crate::WasmAudioReceiverListening::Listening);
+                                                    }
                                                 }
-                                            });
-                                        }
-                                        });
+                                            }
+                                        );
                                     });
                                     cols[1].vertical_centered_justified(|ui|{
                                         if ui.button("Default")
@@ -1326,14 +1312,8 @@ pub fn ui_system(
                     ui.separator();
 
                     ui.style_mut().override_text_style = None;
-
-                    let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
-
-                    // ui.collapsing(heading, add_contents)
-
-
-                    // Remove collapsible visuals:
                     ui.style_mut().visuals.widgets.noninteractive.bg_stroke = egui::Stroke::NONE;
+                    let (parse_warning_color, parse_warning_string) = get_parse_warning_color(&worse_parse_problem);
 
                     egui::CollapsingHeader
                         ::new(egui::RichText::new(parse_warning_string)
@@ -1605,7 +1585,7 @@ fn setup_font(ctx: &mut egui::Context) {
     //
     //  // (github) U+e709
     //  // (font increase) U+eb69
-    //  // (font decrease) U+eb6a // this glyph was changed from the standard nerd font glyh at this position to a flipped version of U+eb69.
+    //  // (font decrease) U+eb6a // this glyph was changed from the standard nerd font glyph at this position to a flipped version of U+eb69.
     // 󰔛 // U+f051b (sort speed)
     //  // (camera) U+f447
     // 󱦙 // (rotate camera) U+f1999

@@ -6,7 +6,7 @@ mod wasm_audio_picker;
 
 use bevy::{
     asset::AssetMetaCheck,
-    audio::{AudioPlugin, PlaybackMode, Volume},
+    audio::{PlaybackMode, Volume},
     core_pipeline::tonemapping::Tonemapping,
     input::mouse::MouseWheel,
     platform::collections::HashMap,
@@ -17,15 +17,8 @@ use bevy::{
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use futures::channel::mpsc::{Receiver, Sender};
-use rfd::FileHandle;
-use web_sys::{js_sys::Uint8Array, wasm_bindgen::JsValue};
 
-use core::{fmt, time::Duration};
-use std::{
-    fs,
-    path::{self, PathBuf},
-};
+use core::time::Duration;
 
 // Not added into the system even on non-wasm builds, in which case this enum definition just
 // exists but an instance of it is never created.
@@ -61,11 +54,6 @@ pub struct AudioControls {
     audio_source_handle_default: Handle<AudioSource>,
     selected_file_name: Option<String>,
     audio_source_handle: Option<Handle<AudioSource>>,
-    // bevy egui:
-    selected_path_buf: Option<PathBuf>,
-    // open_file_dialog: Option<egui_file::FileDialog>,
-    // audio_entity: Option<Entity>,
-    // filter_closure: Box,
 }
 
 #[derive(Resource)]
@@ -273,7 +261,7 @@ fn spawn_audio_sources(
         // if these are none: the default audio plays
         selected_file_name: None,
         audio_source_handle: None,
-        ..Default::default()
+        // ..Default::default()
     });
 }
 
@@ -283,15 +271,6 @@ fn finish_timers(
 ) {
     copy_timer.copy_timer.finish();
     increment_timer.increment_timer.finish();
-}
-
-fn get_sorted_indices(values: &[f64]) -> Vec<usize> {
-    // todo: sort indices by original value to get final positions
-    let mut sorted_indices: Vec<usize> = (0..values.len()).collect();
-
-    sorted_indices.sort_by(|&i, &j| values[i].partial_cmp(&values[j]).unwrap());
-
-    sorted_indices
 }
 
 fn font_scale_inputs(

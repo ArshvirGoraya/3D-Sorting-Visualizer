@@ -33,3 +33,10 @@ despawn
 glyhps
 emath
 srgb
+flac
+generate_random_string_nums
+noninteractive
+tonemapping
+Tonemapping
+BloomPrefilter
+prefilter
