@@ -6,7 +6,7 @@ use bevy::{platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Margin, Spacing, style::ScrollStyle, vec2},
+    egui::{self, Margin, RichText, Spacing, pos2, style::ScrollStyle, vec2},
 };
 
 use bevy_panorbit_camera::PanOrbitCamera;
@@ -591,10 +591,37 @@ fn spawn_a_cube(
     }
 
     commands.spawn((
-            cube_assets.mesh.clone(), 
-            get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, rng_color), 
-            transform
-    )).id()
+        cube_assets.mesh.clone(), 
+        get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, rng_color), 
+        transform,
+        Pickable::default(),
+        crate::CubeData
+    )).observe(|mut event: On<Pointer<Click>>, transform: Query<&Transform>, mut camera_query: Query<&mut PanOrbitCamera>|{
+        let cube_transform = transform.get(event.entity).unwrap();
+        let mut cube_center = cube_transform.translation;
+        cube_center.x += cube_transform.scale.x / 2.0;
+
+        let mut pan_orbit = camera_query.single_mut().unwrap();
+        pan_orbit.target_focus = cube_center;
+        log::info!("Cursor clicked a cube at position: {}", transform.get(event.entity).unwrap().translation.x);
+        event.propagate(false);
+        //
+    })
+    // .observe(|mut event: On<Pointer<Over>>, mut hovered_cube: ResMut<crate::HoveredCube>|{
+    //     // Add a egui frame at the cursor position
+    //     log::info!("cursor over a cube. Cursor's screen position : {}", event.pointer_location.position);
+    //     // Add all information about the hovered cube into a resource which will be contained in an
+    //     // egui frame
+    //     event.propagate(false);
+    // })
+    .id()
+
+    // cube.id()
+    // commands.spawn((
+    //         cube_assets.mesh.clone(), 
+    //         get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, rng_color), 
+    //         transform
+    // )).id()
 }
 
 fn set_width_and_horizontal_position(index: usize, transform: &mut Transform, cube_width: f32){
@@ -657,7 +684,7 @@ fn center_camera(
 
     }else{
         //  TODO:
-        log::warn!("no functionality for centering camera on fol;ow selected yet,")
+        log::warn!("no functionality for centering camera on follow selected yet")
     }
 }
 
@@ -788,12 +815,19 @@ pub fn ui_system(
     (time, mut copy_timer, mut increment_timer): (Res<Time>, ResMut<CopyTimer>, ResMut<sorter::IncrementTimer>),
 
     // cubes:
-    cube_assets: Res<CubeAssets>,
-    mut cubes_query: Query<(
-        &mut Transform,
-        &mut MeshMaterial3d<StandardMaterial>,
-        &mut Visibility,
-    )>,
+    (cube_assets,
+     mut cubes_query,
+     hovered_cube
+    ):
+    (
+        Res<CubeAssets>, 
+        Query<(
+            &mut Transform,
+            &mut MeshMaterial3d<StandardMaterial>,
+            &mut Visibility,
+        )>,
+        Res<crate::HoveredCube>
+    ),
 
     // camera:
     (mut camera_query, 
@@ -876,7 +910,7 @@ pub fn ui_system(
 
     let mut first_button_size: egui::Vec2 = Default::default();
 
-    egui::Window::new(PROGRAM_TITLE).max_width(width).min_width(width).resizable(false).default_pos([0.0,0.0]).show(ctx, |ui| {
+    let window_area = egui::Window::new(PROGRAM_TITLE).max_width(width).min_width(width).resizable(false).default_pos([0.0,0.0]).show(ctx, |ui| {
         ui.allocate_ui(vec2(ui.available_width(), scroll_height), |ui|{
             egui::ScrollArea::vertical().auto_shrink([true, true]).show(ui, |ui|{
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
@@ -1001,13 +1035,13 @@ pub fn ui_system(
                         if ui.button("Reset ")
                             .on_hover_text("reset the camera to original position")
                             .clicked(){
-                                let mut pan_orbit = camera_query.single_mut().unwrap();
-                                // log::info!("{}, {}, {}", pan_orbit.target_yaw, pan_orbit.target_pitch, pan_orbit.target_radius);
-                                //
-                                // INFO: set to the same xyz values in the transform used when spawning
-                                pan_orbit.target_yaw = 0.0;
-                                pan_orbit.target_pitch = 0.0;
-                                // pan_orbit.target_radius = 100.0;
+                                center_camera(
+                                    get_cube_size_from_width_scale(parsed_values.end_index, &cube_scale_controls), 
+                                    parsed_values.end_index, 
+                                    &mut camera_query, 
+                                    *camera_controls_auto_rotate_get.get(), 
+                                    *camera_controls_follow_get.get()
+                                );
                         }
                     });
                     cols[1].vertical_centered_justified(|ui|{
@@ -1441,6 +1475,47 @@ pub fn ui_system(
         ctx.all_styles_mut(move |style| {
             scale_ui(style, scale);
         });
+    }
+
+
+    let mut pointer_pos = ctx.pointer_latest_pos().unwrap_or_default();
+    pointer_pos.x += 10.0;
+    let window_contains_pointer = window_area.unwrap().response.rect.contains(pointer_pos);
+
+    // draw egui frame over hovered cube:
+    if !window_contains_pointer && hovered_cube.display{
+        egui::Area::new(egui::Id::new("cube_hover_area"))
+            .fixed_pos(pointer_pos)
+            .interactable(false)
+            .show(ctx, |ui|{
+                egui::Frame::default()
+                    .fill(egui::Color32::BLACK)
+                    .corner_radius(2.0)
+                    .inner_margin(egui::Margin::same(10))
+                    .show(ui, |ui|{
+                        // ui.colored_label(color, text)
+                        ui.add(
+                            egui::Label::new(
+                                format!("Value: {}", hovered_cube.value)
+                                // RichText::new(format!("Value: {}", hovered_cube.value))
+                                // .color(egui::Color32::WHITE)
+                            ).wrap_mode(egui::TextWrapMode::Extend)
+                        );
+                        ui.add(egui::Label::new(
+                                format!("Starting Position: {}", hovered_cube.starting_pos)
+                                // RichText::new(format!("Starting Position: {}", hovered_cube.starting_pos))
+                                // .color(egui::Color32::WHITE)
+                            ).wrap_mode(egui::TextWrapMode::Extend)
+                        );
+                        ui.add(
+                            egui::Label::new(
+                                format!("Ending Position: {}", hovered_cube.ending_pos)
+                                // RichText::new(format!("Ending Position: {}", hovered_cube.ending_pos))
+                                // .color(egui::Color32::WHITE)
+                            ).wrap_mode(egui::TextWrapMode::Extend)
+                        );
+                    })
+            });
     }
 
     Ok(())

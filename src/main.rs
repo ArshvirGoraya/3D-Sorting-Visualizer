@@ -14,7 +14,7 @@ use bevy::{
     prelude::*,
 };
 
-use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
+use bevy_egui::{EguiPlugin, EguiPrimaryContextPass, egui::style::Interaction};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
@@ -86,6 +86,26 @@ pub struct CubeScaleControls {
     width_scale: f64,
 }
 
+#[derive(Resource, Default)]
+pub struct HoveredCube {
+    id: Option<Entity>,
+    display: bool,
+    screen_position: Vec2,
+    value: f64,
+    starting_pos: usize,
+    ending_pos: usize,
+}
+
+#[derive(Component)]
+pub struct CubeData;
+
+// Wrap HoveredCube in a state to make it update at the end of a frame/tick instead of possibly in-between.
+// #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
+// pub enum HoveredCubeState {
+//     #[default]
+//     CubeState(HoveredCube),
+// }
+
 // Marker Components:
 #[derive(Component)]
 pub struct DefaultAudio;
@@ -121,6 +141,11 @@ fn main() {
     // https://github.com/Plonq/bevy_panorbit_camera
     .add_plugins(PanOrbitCameraPlugin)
     .add_plugins(EguiPlugin::default())
+    .add_plugins(MeshPickingPlugin)
+    .insert_resource(MeshPickingSettings {
+        require_markers: true,
+        ..Default::default()
+    })
     // .add_plugins(GlobalsPlugin)
     // .init_asset::<AudioSource>()
     .init_resource::<ui::NumberRegex>()
@@ -128,6 +153,7 @@ fn main() {
     .init_resource::<ui::ParsedValues>()
     .init_resource::<ui::FontScale>()
     .init_resource::<ui::UserText>()
+    .init_resource::<HoveredCube>()
     // .init_resource::<CameraControls>()
     // .insert_resource(ClearColorConfig)
     .insert_resource(ClearColor {
@@ -184,17 +210,50 @@ fn main() {
         wasm_audio_picker::audio_select_listener
             .run_if(in_state(WasmAudioReceiverListening::Listening)),
     );
-
-    app.add_systems(
-        Update,
-        auto_rotate_camera.run_if(in_state(CameraControlsAutoRotate::AutoRotate)),
-    );
-
-    // .add_systems(Update, audio_select.run_if(in_state(AudioPicking::Picking)))
     app.add_systems(Update, font_scale_inputs)
-        .add_systems(EguiPrimaryContextPass, ui::ui_system);
+        .add_systems(
+            Update,
+            auto_rotate_camera.run_if(in_state(CameraControlsAutoRotate::AutoRotate)),
+        )
+        .add_systems(EguiPrimaryContextPass, ui::ui_system)
+        .add_systems(
+            Update,
+            (detect_cube_hover_enter, detect_cube_hover_exit).chain(),
+        );
 
     app.run();
+}
+
+fn detect_cube_hover_enter(
+    mut event_hover_enter: MessageReader<Pointer<Over>>,
+    mut hovered_cube: ResMut<HoveredCube>,
+    cube_query: Query<Entity, With<CubeData>>,
+) {
+    if let Some(e) = event_hover_enter.read().last()
+        && let Ok(cube_id) = cube_query.get(e.entity)
+    {
+        // log::info!("hovered in: {}", cube_id);
+        hovered_cube.id = Some(cube_id);
+        hovered_cube.display = true;
+    }
+}
+fn detect_cube_hover_exit(
+    mut event_hover_exit: MessageReader<Pointer<Out>>,
+    mut hovered_cube: ResMut<HoveredCube>,
+    cube_query: Query<Entity, With<CubeData>>,
+) {
+    if let Some(hovered_cube_id) = hovered_cube.id {
+        for e in event_hover_exit.read() {
+            if let Ok(exited_cube) = cube_query.get(e.entity)
+                && exited_cube == hovered_cube_id
+            {
+                // log::info!("hovered out: {}", hovered_cube_id);
+                hovered_cube.id = None;
+                hovered_cube.display = false;
+                return;
+            }
+        }
+    }
 }
 
 fn play_audio(commands: &mut Commands, audio_controls: &mut ResMut<AudioControls>) {
@@ -381,6 +440,7 @@ fn spawn_3d_camera(mut commands: Commands) {
     // also: do not zoom when ctrl is pressed: that is for zooming in and out UI
     // do not zoom when pinching in within ui: in that case scale the UI instead?
     commands.spawn((
+        MeshPickingCamera::default(),
         PanOrbitCamera {
             focus: Vec3::ZERO,
             allow_upside_down: true,
