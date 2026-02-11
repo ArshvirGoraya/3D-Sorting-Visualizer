@@ -73,7 +73,7 @@ impl Default for RNGValuesControls {
 }
 #[derive(Resource)]
 pub struct RNGColorControls {
-    rng_cubes_enabled: bool,
+    pub rng_cubes_enabled: bool,
     background_color: [u8; 3],
 }
 
@@ -97,7 +97,9 @@ pub struct HoveredCube {
 }
 
 #[derive(Component)]
-pub struct CubeData;
+pub struct CubeData {
+    index: usize,
+}
 
 // Wrap HoveredCube in a state to make it update at the end of a frame/tick instead of possibly in-between.
 // #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
@@ -180,7 +182,6 @@ fn main() {
     })
     // set tonemapping to none for accurate color
     //
-    .init_state::<sorter::SortState>()
     .init_state::<CameraControlsFollow>()
     .init_state::<CameraControlsAutoRotate>();
 
@@ -220,6 +221,42 @@ fn main() {
             Update,
             (detect_cube_hover_enter, detect_cube_hover_exit).chain(),
         );
+
+    // sort systems
+    app.init_state::<sorter::SortState>()
+        .init_state::<sorter::Algorithms>()
+        .add_systems(OnEnter(sorter::SortState::Sorting), sorter::begin_sorting)
+        // Quick Sort:
+        .init_resource::<sorter::quick_sort::QuickSortColors>()
+        .add_message::<sorter::quick_sort::SetupRange>()
+        .add_systems(
+            Update, 
+            sorter::quick_sort::setup_range.run_if(on_message::<sorter::quick_sort::SetupRange>)
+        )
+        .add_message::<sorter::quick_sort::Compare>()
+        .add_systems(
+            Update, 
+            sorter::quick_sort::compare.run_if(on_message::<sorter::quick_sort::Compare>)
+        )
+        .add_message::<sorter::quick_sort::Swap>()
+        .add_systems(
+            Update, 
+            sorter::quick_sort::swap.run_if(on_message::<sorter::quick_sort::Swap>)
+        )
+        // TODO:
+        // .add_message::<sorter::quick_sort::DetectComplete>()
+        // .add_message::<sorter::quick_sort::Complete>()
+
+
+        .add_systems(
+            OnEnter(sorter::SortState::NotSorting), 
+            sorter::quick_sort::clean_up.run_if(in_state(sorter::Algorithms::QuickSort))
+        )
+
+
+        
+        // separate comma
+        ;
 
     app.run();
 }

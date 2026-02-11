@@ -4,21 +4,22 @@ pub mod quick_sort;
 use bevy::prelude::*;
 use core::{fmt, time::Duration};
 
+use crate::ui::ParsedValues;
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum SortState {
     #[default]
     NotSorting,
     Sorting,
-    Paused,
+    // Paused,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum Algorithms {
     #[default]
     QuickSort,
     MergeSort,
 }
-
 impl fmt::Display for Algorithms {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -38,35 +39,27 @@ pub struct IncrementTimer {
     pub duration_f64: f64,
 }
 
-pub fn sort_control_button_clicked(sort_state: SortState) {
-    let mut next_state = SortState::NotSorting;
-    match sort_state {
-        SortState::Sorting => {
-            next_state = SortState::NotSorting;
+pub fn begin_sorting(
+    sort_select_get: Res<State<Algorithms>>,
+    mut quick_sort_event: MessageWriter<quick_sort::SetupRange>,
+    // mut quick_sort_state: ResMut<NextState<quick_sort::SortStep>>,
+) {
+    match *sort_select_get.get() {
+        Algorithms::QuickSort => {
+            quick_sort_event.write(quick_sort::SetupRange);
         }
-        SortState::NotSorting => {
-            next_state = SortState::Sorting;
-        }
-        SortState::Paused => {
-            next_state = SortState::Sorting;
-        }
-    }
+        Algorithms::MergeSort => {}
+    };
 }
 
-pub fn begin_sorting() {
-    // begin the correct sort sequence depending on the selected sorter (e.g., quicksort)
-    // set all cube materials
-
-    quick_sort::start();
-    // quick_sort::start();
-}
-
-pub fn increment_sorting() {
-    quick_sort::increment_sorting();
-
-    //
-
-    // check if need to pause
-    // check if can stop
-    // next step after some delay
-}
+// pub fn increment_sorting(
+//     sort_select_get: Res<State<Algorithms>>,
+//     mut quick_sort_event: MessageReader<quick_sort::SortIncrement>,
+// ) {
+//     // TODO: check if needs to stop.
+//     // TODO: delay by timer setting.
+//     match *sort_select_get.get() {
+//         Algorithms::QuickSort => quick_sort::increment_sorting(quick_sort_event),
+//         Algorithms::MergeSort => {}
+//     };
+// }

@@ -95,13 +95,13 @@ pub struct StringInfo {
 
 #[derive(Resource)]
 pub struct ParsedValue {
-    raw_string: StringInfo,
-    matched_string: StringInfo,
-    converted_value: f64,
-    parsed_warning: ParsedWarning,
+    pub raw_string: StringInfo,
+    pub matched_string: StringInfo,
+    pub converted_value: f64,
+    pub parsed_warning: ParsedWarning,
     pub cube_handle: Entity,
-    rng_color: MeshMaterial3d<StandardMaterial>,
-    sorted_position: usize, // final_position
+    pub rng_color: MeshMaterial3d<StandardMaterial>,
+    pub sorted_position: usize, // final_position
 }
 
 #[derive(Resource, Default)]
@@ -191,6 +191,7 @@ pub fn spawn_random_parsed_values(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
+        &mut crate::CubeData,
     )>,
     (mut camera_query, 
      camera_controls_auto_rotate_get,
@@ -238,6 +239,7 @@ fn update_parsed_values(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
+        &mut crate::CubeData,
     )>,
     camera_query: &mut Query<&mut PanOrbitCamera>,
     camera_controls_auto_rotate_get: Res<State<crate::CameraControlsAutoRotate>>,
@@ -330,7 +332,7 @@ fn update_parsed_values(
     if parsed_values.end_index < parsed_values.vals.len() {
         log::info!("making cubes >= index {} invisible", parsed_values.end_index);
         for parsed_value in &parsed_values.vals[parsed_values.end_index..]{
-            if let Ok((_, _, mut visibility)) = cubes_query.get_mut(parsed_value.cube_handle){
+            if let Ok((_, _, mut visibility, _)) = cubes_query.get_mut(parsed_value.cube_handle){
                 if *visibility == Visibility::Hidden{
                     // break out when first cube that is hidden is found: we know that the rest are
                     // all hidden from the first encountered hidden.
@@ -391,6 +393,7 @@ fn update_parsed_values_second_loop(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
+        &mut crate::CubeData,
     )>,
     commands: &mut Commands,
     cube_width: f32,
@@ -410,7 +413,7 @@ fn update_parsed_values_second_loop(
     let end_index = parsed_values.end_index;
 
     for (index, parsed_value) in parsed_values.vals[..end_index].iter_mut().enumerate() {
-        if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+        if let Ok((mut transform, _, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
 
             if cube_scale_controls.width_scale_enable{
                 set_width_and_horizontal_position(index, &mut transform, cube_width);
@@ -476,6 +479,7 @@ fn add_parsed_value(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
+        &mut crate::CubeData,
     )>,
     random: &mut ResMut<Random>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
@@ -502,7 +506,7 @@ fn add_parsed_value(
         parsed_value.matched_string.start_index = match_start;
         parsed_value.matched_string.end_index = match_end;
 
-        if let Ok((mut transform, mut material, mut visibility)) = cubes_query.get_mut(parsed_value.cube_handle)
+        if let Ok((mut transform, mut material, mut visibility, _)) = cubes_query.get_mut(parsed_value.cube_handle)
         {
             if parsed_value.converted_value != converted_value{
                 // change height to reflect new value - positional value is done later on after all
@@ -595,7 +599,9 @@ fn spawn_a_cube(
         get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, rng_color), 
         transform,
         Pickable::default(),
-        crate::CubeData
+        crate::CubeData{
+            index
+        }
     )).observe(|mut event: On<Pointer<Click>>, transform: Query<&Transform>, mut camera_query: Query<&mut PanOrbitCamera>|{
         let cube_transform = transform.get(event.entity).unwrap();
         let mut cube_center = cube_transform.translation;
@@ -643,6 +649,7 @@ fn control_cube_widths(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
+        &mut crate::CubeData,
     )>,
     camera_query: &mut Query<&mut PanOrbitCamera>,
     camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
@@ -653,7 +660,7 @@ fn control_cube_widths(
     let cube_width = get_cube_size_from_width_scale(parsed_values.end_index, cube_scale_controls);
 
     for (index, parsed_value) in parsed_values.vals[..end_index].iter_mut().enumerate() {
-        if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+        if let Ok((mut transform, _, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
             set_width_and_horizontal_position(index, &mut transform, cube_width);
         }
     }
@@ -713,6 +720,7 @@ fn control_cube_heights(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
+        &mut crate::CubeData,
     )>
 ){
     let end_index = parsed_values.end_index;
@@ -722,21 +730,21 @@ fn control_cube_heights(
             update_sorted_positions(parsed_values);
         }
         for parsed_value in &mut parsed_values.vals[..end_index] {
-            if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+            if let Ok((mut transform, _, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
                 set_position_height_and_vertical_position(parsed_value.sorted_position, &mut transform, cube_scale_controls);
             }
         }
     }
     else{
         for parsed_value in &mut parsed_values.vals[..end_index] {
-            if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+            if let Ok((mut transform, _, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
                 set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
             }
         }
     }
 }
 
-fn get_cube_material(rng_color_controls_enabled: bool, parsed_warning: ParsedWarning, cube_assets: & Res<CubeAssets>, rng_color: MeshMaterial3d<StandardMaterial>) -> MeshMaterial3d<StandardMaterial> {
+pub fn get_cube_material(rng_color_controls_enabled: bool, parsed_warning: ParsedWarning, cube_assets: & Res<CubeAssets>, rng_color: MeshMaterial3d<StandardMaterial>) -> MeshMaterial3d<StandardMaterial> {
     // if using rng AND no parse warning, use RNG material. Else get the parse warning material.
     if rng_color_controls_enabled && parsed_warning == ParsedWarning::Ok{
         rng_color
@@ -753,6 +761,7 @@ fn set_cube_colors(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
+        &mut crate::CubeData,
     )>,
     cube_assets: &Res<CubeAssets>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
@@ -773,7 +782,7 @@ fn set_cube_colors(
         }
 
         let parsed_warning = parsed_value.parsed_warning;
-        if let Ok((_, mut material, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
+        if let Ok((_, mut material, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
             *material = get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, parsed_value.rng_color.clone());
         }
     }
@@ -825,6 +834,7 @@ pub fn ui_system(
             &mut Transform,
             &mut MeshMaterial3d<StandardMaterial>,
             &mut Visibility,
+            &mut crate::CubeData,
         )>,
         Res<crate::HoveredCube>
     ),
@@ -881,14 +891,17 @@ pub fn ui_system(
     // sort state
     (mut sort_state_set, 
      sort_state_get, 
-     mut sort_select
+     mut sort_select_set,
+     sort_select_get,
     ): (
         ResMut<NextState<sorter::SortState>>, 
         Res<State<sorter::SortState>>, 
-        Local<sorter::Algorithms>
+        ResMut<NextState<sorter::Algorithms>>, 
+        Res<State<sorter::Algorithms>>, 
     ),
-    mut is_sorting: Local<bool>,
 ) -> Result {
+    let is_sorting = *sort_state_get.get() == sorter::SortState::Sorting;
+
     // if *sort_state == sorter::SortState::NotSorting{}
 
     let ctx = contexts.ctx_mut()?;
@@ -950,22 +963,20 @@ pub fn ui_system(
                 ui.columns(2, |cols|{
                     cols[0].vertical_centered_justified(|ui|{
                         // TODO: if already sorting, change this to stop!
-                        if !*is_sorting{
+                        if !is_sorting{
                             if ui.add(egui::Button::new("Sort!").fill(egui::Color32::from_rgb(48, 64, 43)))
                                 .on_hover_text("click to begin sorting")
                                 .clicked(){
                                     log::info!("Begin sort!");
-                                    *is_sorting = !*is_sorting;
+                                    sort_state_set.set(sorter::SortState::Sorting);
                             }
-                        }else{
-                            #[allow(clippy::collapsible_else_if)]
-                            if ui.add(egui::Button::new("Stop!").fill(egui::Color32::from_rgb(83, 47, 52)))
+                        } else if ui.add(egui::Button::new("Stop!").fill(egui::Color32::from_rgb(83, 47, 52)))
                             .on_hover_text("click to stop sorting")
                             .clicked(){
                                 log::info!("Stop sort!");
-                                *is_sorting = !*is_sorting;
-                            }
+                                sort_state_set.set(sorter::SortState::NotSorting);
                         }
+
                     });
                     cols[1].add_enabled_ui(true, |ui|{
                         // INFO: Must wrap around a rect for tooltip...
@@ -978,14 +989,16 @@ pub fn ui_system(
                             ..Default::default()
                         });
                         //
-                        child.add_enabled_ui(!*is_sorting, |ui|{
+                        child.add_enabled_ui(!is_sorting, |ui|{
                             egui::ComboBox::from_id_salt("sort_select")
                                 .width(ui.available_width())
-                                .selected_text(sort_select.to_string())
+                                .selected_text(sort_select_get.get().to_string())
                                 .wrap_mode(egui::TextWrapMode::Truncate)
                                 .show_ui(ui, |ui|{
                                     for algorithm in sorter::Algorithms::ALL{
-                                        ui.selectable_value(&mut *sort_select, algorithm, algorithm.to_string());
+                                        if ui.selectable_value(&mut sort_select_get.get().clone(), algorithm, algorithm.to_string()).clicked(){
+                                            sort_select_set.set(algorithm);
+                                        }
                                         // TODO: .clicked() here will tell you which value has been
                                         // selected!
                                     }
@@ -1019,7 +1032,8 @@ pub fn ui_system(
                     if ui.button("Increment (debug)")
                         .on_hover_text("debug: increment the sort by 1 step")
                         .clicked() {
-                            sorter::increment_sorting();
+                            log::info!("not implemented")
+                            // sorter::increment_sorting();
                     }
                 });
 
@@ -1184,18 +1198,20 @@ pub fn ui_system(
                     // 
 
                     ui.horizontal(|ui|{
-                        if ui.button("RNG ")
-                            .on_hover_text("replace your text with random numbers")
-                            .clicked(){
-                                generate_random_string_nums(
-                                    rng_values_controls.amount, 
-                                    rng_values_controls.min, 
-                                    rng_values_controls.max, 
-                                    &mut user_text.val, 
-                                    &mut random
-                                );
-                            *generated_rng_values = true;
-                        }
+                        ui.add_enabled_ui(!is_sorting, |ui|{
+                            if ui.button("RNG ")
+                                .on_hover_text("replace your text with random numbers")
+                                    .clicked(){
+                                        generate_random_string_nums(
+                                            rng_values_controls.amount, 
+                                            rng_values_controls.min, 
+                                            rng_values_controls.max, 
+                                            &mut user_text.val, 
+                                            &mut random
+                                        );
+                                        *generated_rng_values = true;
+                            }
+                        });
                         ui.vertical_centered_justified(|ui|{
                             ui.collapsing("RNG Settings", |ui|{
                                 if ui.add(
@@ -1357,7 +1373,7 @@ pub fn ui_system(
                         .show_unindented(ui, |ui|{
                             ui.vertical_centered_justified(|ui|{
                                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
-                                let clean_button = ui.add_enabled(*text_is_dirty, egui::Button::new("Clean 󰃢"))
+                                let clean_button = ui.add_enabled(*text_is_dirty && !is_sorting, egui::Button::new("Clean 󰃢"))
                                     .on_hover_text("replace text with internal representation of your numbers")
                                     .on_disabled_hover_text("replace text with internal representation of your numbers");
                                 if clean_button.clicked(){
@@ -1420,7 +1436,7 @@ pub fn ui_system(
 
                     ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
                         egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
-                            let mut text_edit_widget = ui.add(egui::TextEdit::multiline(&mut user_text.val)
+                            let mut text_edit_widget = ui.add_enabled(!is_sorting, egui::TextEdit::multiline(&mut user_text.val)
                                 .hint_text("numbers here")
                                 .desired_width(ui.available_width()))
                                 .on_hover_text("supports positive and negative ints and floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"");
@@ -1477,13 +1493,25 @@ pub fn ui_system(
         });
     }
 
-
+    let window_response = window_area.unwrap().response;
     let mut pointer_pos = ctx.pointer_latest_pos().unwrap_or_default();
-    pointer_pos.x += 10.0;
-    let window_contains_pointer = window_area.unwrap().response.rect.contains(pointer_pos);
+    let window_contains_pointer = window_response.rect.contains(pointer_pos) || window_response.dragged();
+    
+    if window_contains_pointer{
+        // TODO: disable camera input detection.
+        // But if dragging started OUTSIDE of egui and entered it later on, should still
+        // continue camera drag...
+        // MIGHT need to use a state here for egui hovered and let another system handle input
+        let mut pan_orbit = camera_query.single_mut().unwrap();
+        pan_orbit.enabled = false;
+    }else{
+        let mut pan_orbit = camera_query.single_mut().unwrap();
+        pan_orbit.enabled = true;
+    }
 
     // draw egui frame over hovered cube:
     if !window_contains_pointer && hovered_cube.display{
+        pointer_pos.x += 10.0; // frame offset
         egui::Area::new(egui::Id::new("cube_hover_area"))
             .fixed_pos(pointer_pos)
             .interactable(false)
@@ -1493,27 +1521,34 @@ pub fn ui_system(
                     .corner_radius(2.0)
                     .inner_margin(egui::Margin::same(10))
                     .show(ui, |ui|{
-                        // ui.colored_label(color, text)
-                        ui.add(
-                            egui::Label::new(
-                                format!("Value: {}", hovered_cube.value)
-                                // RichText::new(format!("Value: {}", hovered_cube.value))
-                                // .color(egui::Color32::WHITE)
-                            ).wrap_mode(egui::TextWrapMode::Extend)
-                        );
-                        ui.add(egui::Label::new(
-                                format!("Starting Position: {}", hovered_cube.starting_pos)
-                                // RichText::new(format!("Starting Position: {}", hovered_cube.starting_pos))
-                                // .color(egui::Color32::WHITE)
-                            ).wrap_mode(egui::TextWrapMode::Extend)
-                        );
-                        ui.add(
-                            egui::Label::new(
-                                format!("Ending Position: {}", hovered_cube.ending_pos)
-                                // RichText::new(format!("Ending Position: {}", hovered_cube.ending_pos))
-                                // .color(egui::Color32::WHITE)
-                            ).wrap_mode(egui::TextWrapMode::Extend)
-                        );
+                        // TODO: store the below used data right in cube_data instead of
+                        // parsed_values?
+                        if let Some(cube_id) = hovered_cube.id 
+                            && let Ok((_, _, _, cube_data)) = cubes_query.get(cube_id){
+                                let parsed_value = &parsed_values.vals[cube_data.index];
+                                ui.add(
+                                    egui::Label::new(
+                                        format!("Value: {}", parsed_value.converted_value)
+                                        // RichText::new(format!("Value: {}", hovered_cube.value))
+                                        // .color(egui::Color32::WHITE)
+                                    ).wrap_mode(egui::TextWrapMode::Extend)
+                                );
+                                ui.add(egui::Label::new(
+                                        format!("Starting Position: {}", cube_data.index)
+                                        // RichText::new(format!("Starting Position: {}", hovered_cube.starting_pos))
+                                        // .color(egui::Color32::WHITE)
+                                ).wrap_mode(egui::TextWrapMode::Extend)
+                                );
+                                ui.add(
+                                    egui::Label::new(
+                                        format!("Ending Position: {}", parsed_value.sorted_position)
+                                        // RichText::new(format!("Ending Position: {}", hovered_cube.ending_pos))
+                                        // .color(egui::Color32::WHITE)
+                                    ).wrap_mode(egui::TextWrapMode::Extend)
+                                );                               
+                                //
+                        }
+
                     })
             });
     }

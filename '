@@ -1,0 +1,122 @@
+use bevy::{
+    asset::Assets,
+    color::Color,
+    ecs::{
+        resource::Resource,
+        system::{Command, Commands, Res},
+        world::{FromWorld, World},
+    },
+    pbr::{MeshMaterial3d, StandardMaterial},
+    platform::collections::HashMap,
+};
+
+use crate::ui::ParsedValues;
+
+pub enum QuickSortState {}
+
+pub enum SortStep {
+    SetupRange,
+    Compare,
+    Swap,
+    DetectComplete,
+    Complete,
+}
+
+#[deruive(Event)]
+pub struct SortIncrement {
+    step: SortStep,
+}
+
+pub struct SortState {
+    started: bool,
+    sub_arrays: Vec<(usize, usize)>,
+}
+
+#[derive(Default, Hash, Eq, PartialEq, Clone, Copy)]
+pub enum SortColor {
+    #[default]
+    Range,
+    Pivot,
+    Swap,
+    J,
+    I,
+}
+
+#[derive(Resource)]
+pub struct QuickSortColors {
+    pub materials: HashMap<SortColor, MeshMaterial3d<StandardMaterial>>,
+}
+
+impl FromWorld for QuickSortColors {
+    fn from_world(world: &mut World) -> Self {
+        let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
+        Self {
+            materials: HashMap::from([
+                (
+                    SortColor::Range,
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::srgb_u8(202, 211, 245),
+                        unlit: true,
+                        ..Default::default()
+                    })),
+                ),
+                (
+                    SortColor::Pivot,
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::srgb_u8(202, 211, 245),
+                        unlit: true,
+                        ..Default::default()
+                    })),
+                ),
+                (
+                    SortColor::Swap,
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::srgb_u8(202, 211, 245),
+                        unlit: true,
+                        ..Default::default()
+                    })),
+                ),
+                (
+                    SortColor::I,
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::srgb_u8(202, 211, 245),
+                        unlit: true,
+                        ..Default::default()
+                    })),
+                ),
+                (
+                    SortColor::J,
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::srgb_u8(202, 211, 245),
+                        unlit: true,
+                        ..Default::default()
+                    })),
+                ),
+            ]),
+        }
+    }
+}
+
+// fn init_colors_resource(mut commands: &mut Commands) {
+//     // Only inserts if not already added:
+//     commands.init_resource::<QuickSortColors>()
+// }
+
+pub fn start(mut commands: Commands, parsed_values: Res<ParsedValues>) {
+    // Only inserts if not already added:
+    commands.init_resource::<QuickSortColors>();
+    // commands.remove_resource::<QuickSortColors>();
+
+    // parsed_values.end_index
+
+    // set all cube materials to the default color
+    println!("Quick Sorting...");
+
+    // Setup sorting before increment_sorting can be called.
+
+    increment_sorting();
+}
+
+pub fn increment_sorting() {
+    //
+}
