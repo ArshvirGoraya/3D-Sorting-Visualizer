@@ -1045,6 +1045,10 @@ pub fn ui_system(
                                     *camera_controls_auto_rotate_get.get(), 
                                     *camera_controls_follow_get.get()
                                 );
+                                // also reset rotation?
+                                let mut pan_orbit = camera_query.single_mut().unwrap();
+                                pan_orbit.target_yaw = 0.0;
+                                pan_orbit.target_pitch = 0.0;
                         }
                     });
                     cols[1].vertical_centered_justified(|ui|{

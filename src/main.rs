@@ -488,7 +488,7 @@ fn spawn_3d_camera(mut commands: Commands) {
             pan_sensitivity: 0.0,   // disable panning
             orbit_sensitivity: 2.0, // orbit faster
             // button_orbit: (MouseButton::Right, MouseButton::Left),
-            orbit_smoothness: 0.0, // orbit without any smoothing
+            orbit_smoothness: 0.01, // orbit without any smoothing
             ..Default::default()
         },
         Tonemapping::None, // more accurate colors

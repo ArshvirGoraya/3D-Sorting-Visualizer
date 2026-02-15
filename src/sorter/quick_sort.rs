@@ -110,6 +110,78 @@ pub struct SortState {
     next_step: SortStep,
 }
 
+pub fn increment_sorting(
+    mut commands: Commands,
+    mut sort_state: Option<ResMut<SortState>>,
+    mut parsed_values: ResMut<ParsedValues>,
+    mut cubes_query: Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    mut user_text: ResMut<UserText>,
+    mut sort_select_set: ResMut<NextState<sorter::SortState>>,
+    quick_sort_colors: Res<QuickSortColors>,
+    cube_assets: Res<CubeAssets>,
+    rng_color_controls: Res<crate::RNGColorControls>,
+    (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
+) {
+    // this system runs when in sorting state and in quick sort state.
+    // this system calls other functions, all of which can be systems themselves which trigger on
+    // events, but I want to avoid them running in parallel at all cost (which bevy may do), so just calling them one
+    // by one here.
+    if let Some(sort_state) = sort_state {
+        // sort already started, go to next step
+        // each of these functions change the next_step to be something else.
+        // compare: get out of the SortingState when sort is complete which stops this system from running
+
+        // only call the next step once increment timer is complete
+        increment_timer.increment_timer.tick(time.delta());
+        if !increment_timer.increment_timer.is_finished() {
+            return;
+        }
+        increment_timer.increment_timer.reset();
+
+        match sort_state.next_step {
+            SortStep::SetupRange => {
+                setup_range(
+                    commands,
+                    parsed_values.into(),
+                    Some(sort_state),
+                    cubes_query,
+                    quick_sort_colors,
+                    cube_assets,
+                    rng_color_controls,
+                );
+            }
+            SortStep::Compare => {
+                compare(
+                    cubes_query,
+                    sort_state,
+                    parsed_values.into(),
+                    quick_sort_colors,
+                    sort_select_set,
+                );
+            }
+            SortStep::Swap => {
+                swap(sort_state, parsed_values, cubes_query, user_text);
+            }
+        };
+    } else {
+        // sort not started: start first step and begin timer
+        setup_range(
+            commands,
+            parsed_values.into(),
+            sort_state,
+            cubes_query,
+            quick_sort_colors,
+            cube_assets,
+            rng_color_controls,
+        );
+        increment_timer.increment_timer.reset();
+    }
+}
+
 pub fn setup_range(
     mut commands: Commands,
     // parsed_values: Res<ParsedValues>,
@@ -738,87 +810,5 @@ fn setup_range_color(
                 parsed_value.rng_color.clone(),
             );
         }
-    }
-}
-
-pub fn increment_sorting(
-    mut commands: Commands,
-    mut sort_state: Option<ResMut<SortState>>,
-    mut parsed_values: ResMut<ParsedValues>,
-    mut cubes_query: Query<(
-        &mut Transform,
-        &mut MeshMaterial3d<StandardMaterial>,
-        &mut crate::CubeData,
-    )>,
-    mut user_text: ResMut<UserText>,
-    mut sort_select_set: ResMut<NextState<sorter::SortState>>,
-    quick_sort_colors: Res<QuickSortColors>,
-    cube_assets: Res<CubeAssets>,
-    rng_color_controls: Res<crate::RNGColorControls>,
-    (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
-) {
-    // this system runs when in sorting state and in quick sort state.
-    // this system calls other functions, all of which can be systems themselves which trigger on
-    // events, but I want to avoid them running in parallel at all cost (which bevy may do), so just calling them one
-    // by one here.
-    if let Some(sort_state) = sort_state {
-        // sort already started, go to next step
-        // each of these functions change the next_step to be something else.
-        // compare: get out of the SortingState when sort is complete which stops this system from running
-
-        // only call the next step once increment timer is complete
-        increment_timer.increment_timer.tick(time.delta());
-        if !increment_timer.increment_timer.is_finished() {
-            log::info!(
-                "sorting : timer not yet finished: {}",
-                increment_timer.increment_timer.elapsed_secs_f64()
-            );
-            return;
-        }
-        log::info!(
-            "sorting : timer finished: {}",
-            increment_timer.increment_timer.elapsed_secs_f64()
-        );
-
-        increment_timer.increment_timer.reset();
-
-        match sort_state.next_step {
-            SortStep::SetupRange => {
-                setup_range(
-                    commands,
-                    parsed_values.into(),
-                    Some(sort_state),
-                    cubes_query,
-                    quick_sort_colors,
-                    cube_assets,
-                    rng_color_controls,
-                );
-            }
-            SortStep::Compare => {
-                compare(
-                    cubes_query,
-                    sort_state,
-                    parsed_values.into(),
-                    quick_sort_colors,
-                    sort_select_set,
-                );
-            }
-            SortStep::Swap => {
-                swap(sort_state, parsed_values, cubes_query, user_text);
-            }
-        };
-    } else {
-        // sort not started: start first step and begin timer
-        setup_range(
-            commands,
-            parsed_values.into(),
-            sort_state,
-            cubes_query,
-            quick_sort_colors,
-            cube_assets,
-            rng_color_controls,
-        );
-        increment_timer.increment_timer.reset();
-        log::info!("sort started: reseting timer");
     }
 }
