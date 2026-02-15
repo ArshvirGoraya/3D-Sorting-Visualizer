@@ -16,6 +16,7 @@ use bevy::{
     platform::collections::HashMap,
     reflect::{List, Set},
     state::state::{NextState, States},
+    time::Time,
     transform::components::Transform,
 };
 
@@ -34,16 +35,13 @@ pub enum SortColor {
     I,
 }
 
-#[derive(Message)]
-pub struct SetupRange;
-#[derive(Message)]
-pub struct Compare;
-#[derive(Message)]
-pub struct Swap;
-// #[derive(Message)]
-// pub struct DetectComplete;
-// #[derive(Message)]
-// pub struct Complete;
+#[derive(Default, Hash, Eq, PartialEq, Clone, Copy)]
+pub enum SortStep {
+    #[default]
+    SetupRange,
+    Swap,
+    Compare,
+}
 
 #[derive(Resource)]
 pub struct QuickSortColors {
@@ -100,26 +98,6 @@ impl FromWorld for QuickSortColors {
     }
 }
 
-// fn init_colors_resource(mut commands: &mut Commands) {
-//     // Only inserts if not already added:
-//     commands.init_resource::<QuickSortColors>()
-// }
-
-// pub fn start(mut commands: Commands, parsed_values: Res<ParsedValues>) {
-//     // Only inserts if not already added:
-//     commands.init_resource::<QuickSortColors>();
-//     // commands.remove_resource::<QuickSortColors>();
-//
-//     // parsed_values.end_index
-//
-//     // set all cube materials to the default color
-//     println!("Quick Sorting...");
-//
-//     // Setup sorting before increment_sorting can be called.
-//
-//     // increment_sorting();
-// }
-
 #[derive(Resource)]
 pub struct SortState {
     started: bool,
@@ -129,17 +107,24 @@ pub struct SortState {
     j: usize,
     i: isize,
     swapped_cubes: Option<(usize, usize)>,
+    next_step: SortStep,
 }
 
 pub fn setup_range(
     mut commands: Commands,
+    // parsed_values: Res<ParsedValues>,
     parsed_values: Res<ParsedValues>,
     mut sort_state: Option<ResMut<SortState>>,
-    cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
+    mut cubes_query: Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    // cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
     quick_sort_colors: Res<QuickSortColors>,
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
-    mut next_event: MessageWriter<Compare>,
+    // mut next_event: MessageWriter<Compare>,
 ) {
     // Only inserts if not already added:
     // commands.init_resource::<QuickSortColors>();
@@ -172,6 +157,7 @@ pub fn setup_range(
             cube_assets,
             rng_color_controls,
         );
+        sort_state.next_step = SortStep::Compare;
     } else {
         let current_array = (0, parsed_values.end_index);
         commands.insert_resource(SortState {
@@ -182,6 +168,7 @@ pub fn setup_range(
             j: current_array.0,
             i: (current_array.0 as isize) - 1,
             swapped_cubes: None,
+            next_step: SortStep::Compare,
         });
         log::info!(
             "
@@ -205,63 +192,19 @@ pub fn setup_range(
             rng_color_controls,
         );
     }
-    log::info!("calling compare");
-    next_event.write(Compare);
 }
 
-// pub fn detect_complete(
-//     mut sort_state: ResMut<SortState>,
-//     mut next_event_compare: MessageWriter<Compare>,
-//     mut next_event_setup_range: MessageWriter<SetupRange>,
-//     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
-//     // mut next_event_complete: MessageWriter<Complete>,
-// ) {
-//     if sort_state.j < sort_state.pivot {
-//         log::info!("pivot not reached {}", sort_state.pivot);
-//         // not finished with the range yet
-//         next_event_compare.write(Compare);
-//     } else {
-//         // remove subarray we just did.
-//         log::info!("pivot reached");
-//         sort_state.sub_arrays.pop();
-//
-//         // check if next array will be valid: if the subarray will have more than 1 value in it.
-//         let (start, end) = sort_state.current_array;
-//
-//         let i = sort_state.i as usize;
-//         // right pivot is i + 1
-//
-//         let right_array_start = i + 1;
-//         if end.abs_diff(right_array_start) > 1 {
-//             log::info!("right array is valid: {} to {}", right_array_start, end);
-//             // Right array is valid
-//             sort_state.sub_arrays.push((right_array_start, end));
-//         }
-//         if start.abs_diff(i) > 1 {
-//             log::info!("left array is valid: {} to {}", start, i);
-//             // Left array is valid
-//             sort_state.sub_arrays.push((start, i));
-//         }
-//
-//         if sort_state.sub_arrays.is_empty() {
-//             sort_select_set.set(sorter::SortState::NotSorting);
-//             // next_event_complete.write(Complete);
-//         } else {
-//             // Not finished
-//             next_event_setup_range.write(SetupRange);
-//         }
-//     }
-// }
-
 pub fn compare(
-    mut cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
+    mut cubes_query: Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    // mut cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
     mut sort_state: ResMut<SortState>,
     parsed_values: Res<ParsedValues>,
     quick_sort_colors: Res<QuickSortColors>,
-    mut next_event_swap: MessageWriter<Swap>,
-    mut next_event_compare: MessageWriter<Compare>,
     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
-    mut next_event_setup_range: MessageWriter<SetupRange>,
 ) {
     if let Some((i, j)) = sort_state.swapped_cubes {
         // if just swapped, increment j and color the just swapped cubes the J/"covered" color.
@@ -323,7 +266,7 @@ pub fn compare(
             // if no arrays remain, done sorting.
             sort_select_set.set(sorter::SortState::NotSorting);
         } else {
-            next_event_setup_range.write(SetupRange);
+            sort_state.next_step = SortStep::SetupRange;
         }
         return;
     }
@@ -350,7 +293,7 @@ pub fn compare(
                     &mut cubes_query,
                 );
             }
-            next_event_compare.write(Compare);
+            sort_state.next_step = SortStep::Compare;
             return;
         }
 
@@ -373,7 +316,7 @@ pub fn compare(
             &parsed_values,
             &mut cubes_query,
         );
-        next_event_swap.write(Swap);
+        sort_state.next_step = SortStep::Swap;
     } else {
         // if pivot_value < j_value
         // do not swap. just increment j.
@@ -385,153 +328,9 @@ pub fn compare(
             &parsed_values,
             &mut cubes_query,
         );
-        next_event_compare.write(Compare);
+        sort_state.next_step = SortStep::Compare;
     }
 }
-
-// pub fn compare_old(
-//     mut cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
-//     mut sort_state: ResMut<SortState>,
-//     parsed_values: Res<ParsedValues>,
-//     quick_sort_colors: Res<QuickSortColors>,
-//     mut next_event_swap: MessageWriter<Swap>,
-//     mut next_event_compare: MessageWriter<Compare>,
-//     // mut next_event_detect_complete: MessageWriter<DetectComplete>,
-// ) {
-//     // set previously swapped cubes to j/"covered" colors:
-//     if let Some((i, j)) = sort_state.swapped_cubes {
-//         // cubes were swapped previously.
-//         color_cube(
-//             i,
-//             SortColor::J,
-//             &quick_sort_colors,
-//             &parsed_values,
-//             &mut cubes_query,
-//         );
-//         color_cube(
-//             j,
-//             SortColor::J,
-//             &quick_sort_colors,
-//             &parsed_values,
-//             &mut cubes_query,
-//         );
-//
-//         // j must increment after swapping.
-//         sort_state.j += 1;
-//         log::info!("increment j: {}", sort_state.j);
-//         color_cube(
-//             sort_state.j,
-//             SortColor::J,
-//             &quick_sort_colors,
-//             &parsed_values,
-//             &mut cubes_query,
-//         );
-//     }
-//
-//     let pivot_value = &parsed_values.vals[sort_state.pivot].converted_value;
-//     let j_value = &parsed_values.vals[sort_state.j].converted_value;
-//
-//     if pivot_value > j_value || sort_state.pivot == sort_state.j {
-//         // increment i and swap with j.
-//         if sort_state.i > -1 {
-//             // color cube at what i used to be with the j/"covered" color.
-//             color_cube(
-//                 sort_state.i as usize,
-//                 SortColor::J,
-//                 &quick_sort_colors,
-//                 &parsed_values,
-//                 &mut cubes_query,
-//             )
-//         }
-//         sort_state.i += 1;
-//         log::info!("incremented i: {}", sort_state.i);
-//
-//         log::info!(
-//             "
-//             j smaller than pivot swapping: [{}]{} < [{}]{} =  {},
-//             or pivot reached [{}] == [{}] = {}
-//             swapping i and j: [{}]{}, [{}]{}",
-//             sort_state.j,
-//             j_value,
-//             sort_state.pivot,
-//             pivot_value,
-//             pivot_value > j_value,
-//             sort_state.j,
-//             sort_state.pivot,
-//             sort_state.j == sort_state.pivot,
-//             sort_state.i,
-//             &parsed_values.vals[sort_state.i as usize].converted_value,
-//             sort_state.j,
-//             j_value,
-//         );
-//
-//         if sort_state.i as usize == sort_state.j {
-//             log::info!("i reached j: no swap needed");
-//             sort_state.j += 1;
-//             log::info!("increment j: {}", sort_state.j);
-//             color_cube(
-//                 sort_state.j,
-//                 SortColor::J,
-//                 &quick_sort_colors,
-//                 &parsed_values,
-//                 &mut cubes_query,
-//             );
-//             next_event_compare.write(Compare);
-//             return;
-//         }
-//
-//         // color cubes j and i with "swap" color.
-//         sort_state.swapped_cubes = Some((sort_state.i as usize, sort_state.j));
-//
-//         color_cube(
-//             sort_state.i as usize,
-//             SortColor::Swap,
-//             &quick_sort_colors,
-//             &parsed_values,
-//             &mut cubes_query,
-//         );
-//         color_cube(
-//             sort_state.j,
-//             SortColor::Swap,
-//             &quick_sort_colors,
-//             &parsed_values,
-//             &mut cubes_query,
-//         );
-//         log::info!(
-//             "
-//             i before swap is called: {}
-//             j before swap is called {}",
-//             sort_state.i,
-//             sort_state.j,
-//         );
-//         next_event_swap.write(Swap);
-//     } else {
-//         log::info!(
-//             "no swapping: [{}]{} < [{}]{}",
-//             sort_state.j,
-//             j_value,
-//             sort_state.pivot,
-//             pivot_value,
-//         );
-//
-//         // just increment j
-//         sort_state.j += 1;
-//         log::info!("incremented j: {}", sort_state.j);
-//         sort_state.swapped_cubes = None;
-//         // color cube at j with j/"covered" color.
-//
-//         log::info!("coloring cube");
-//         color_cube(
-//             sort_state.j,
-//             SortColor::J,
-//             &quick_sort_colors,
-//             &parsed_values,
-//             &mut cubes_query,
-//         );
-//         next_event_compare.write(Compare);
-//         // next_event_detect_complete.write(DetectComplete);
-//     }
-// }
 
 pub fn complete(
     sort_state: Option<Res<SortState>>,
@@ -573,8 +372,6 @@ pub fn swap(
         &mut crate::CubeData,
     )>,
     mut user_text: ResMut<UserText>,
-    // mut next_event: MessageWriter<DetectComplete>,
-    mut next_event: MessageWriter<Compare>,
 ) {
     log::info!("\n\t\t=-=-=Swapping=-=-=");
 
@@ -669,7 +466,7 @@ pub fn swap(
         &mut user_text,
     );
 
-    next_event.write(Compare);
+    sort_state.next_step = SortStep::Compare;
 }
 
 pub fn update_text_indices(
@@ -701,9 +498,6 @@ pub fn update_text_indices(
     // need to update 1 before right(since right itself is updated in swap_string_info)
     left += 1;
     right -= 1;
-
-    // log::info!("updating inbetween indices from: {}, {}", left, right);
-
     for parsed_value in &mut parsed_values.vals[left..=right] {
         if shift_left {
             parsed_value.matched_string.start_index -= text_shift_amount;
@@ -716,11 +510,6 @@ pub fn update_text_indices(
             parsed_value.raw_string.start_index += text_shift_amount;
             parsed_value.raw_string.end_index += text_shift_amount;
         }
-        // log::info!(
-        //     "updated match string (after): \"{}\"",
-        //     &user_text.val
-        //         [parsed_value.matched_string.start_index..parsed_value.matched_string.end_index]
-        // );
     }
 }
 
@@ -787,7 +576,6 @@ pub fn swap_text(
         let new_char_position = i_match_string.start_index + j_match_string_length;
         text_shift_amount = previous_char_position.abs_diff(new_char_position);
         shift_left = true;
-        // log::info!("text_shift_amount: {text_shift_amount}");
 
         // insert the saved utf8_temp at the position after everything shifted left.
         let new_i_match_string_position =
@@ -822,21 +610,11 @@ pub fn swap_text(
         let utf8_temp = Vec::from(&utf8_text[j_match_string.start_index..j_match_string.end_index]);
 
         // move left to right
-        // log::info!(
-        //     "\n\tbefore move left to right: {}",
-        //     std::str::from_utf8(utf8_text).unwrap()
-        // );
-
         let new_i_match_string_position = j_match_string.end_index - i_match_string_length;
         utf8_text.copy_within(
             i_match_string.start_index..i_match_string.end_index,
             new_i_match_string_position,
         );
-
-        // log::info!(
-        //     "\n\tafter move left to right: {}",
-        //     std::str::from_utf8(utf8_text).unwrap()
-        // );
 
         // shift all values in range:
         let shift_range = i_match_string.end_index..j_match_string.start_index;
@@ -850,23 +628,10 @@ pub fn swap_text(
         let new_char_position = i_match_string.start_index + j_match_string_length;
 
         text_shift_amount = previous_char_position.abs_diff(new_char_position);
-        // log::info!("text_shift_amount: {text_shift_amount}");
-
-        // log::info!(
-        //     "\n\tafter shifting left: {}",
-        //     std::str::from_utf8(utf8_text).unwrap()
-        // );
-
-        // insert the saved utf8_temp at the start of i.
 
         let new_j_match_string_position = i_match_string.start_index;
         utf8_text[new_j_match_string_position..new_j_match_string_position + j_match_string_length]
             .copy_from_slice(&utf8_temp);
-
-        // log::info!(
-        //     "\n\tafter inserting saved right: {}",
-        //     std::str::from_utf8(utf8_text).unwrap()
-        // );
 
         swap_string_info(
             i_match_string,
@@ -878,12 +643,9 @@ pub fn swap_text(
             i_match_string_length,
             j_match_string_length,
         );
-
-        // update_inbetween_text_indices()
     }
     (shift_left, text_shift_amount)
 }
-// pub fn update_inbetween_text_indices(parsed_values){}
 
 pub fn swap_string_info(
     i_match_string: &mut StringInfo,
@@ -895,29 +657,10 @@ pub fn swap_string_info(
     i_match_string_length: usize,
     j_match_string_length: usize,
 ) {
-    // log::info!("-=-=-=-=-=-=swap string info=-=-=-=-=-=-=\n\n");
-    // log::info!(
-    //     "\n\ti raw before: {} {}\n\ti match before: {} {}",
-    //     i_raw_string.start_index,
-    //     i_raw_string.end_index,
-    //     i_match_string.start_index,
-    //     i_match_string.end_index,
-    // );
-    // log::info!(
-    //     "\n\tj raw before: {} {}\n\tj match before: {} {}",
-    //     j_raw_string.start_index,
-    //     j_raw_string.end_index,
-    //     j_match_string.start_index,
-    //     j_match_string.end_index,
-    // );
-
     // length from where raw string begins to where match string starts.
     // use previous start and end indices for this!
     let i_raw_string_part_length = i_match_string.start_index - i_raw_string.start_index;
     let j_raw_string_part_length = j_match_string.start_index - j_raw_string.start_index;
-    // log::info!("i_raw_string_part_length: {i_raw_string_part_length}");
-    // log::info!("j_raw_string_part_length: {j_raw_string_part_length}");
-
     // i now starts where j starts and vice versa
     j_match_string.start_index = new_i_match_string_position;
     i_match_string.start_index = new_j_match_string_position;
@@ -928,51 +671,6 @@ pub fn swap_string_info(
     j_raw_string.end_index = j_match_string.end_index;
     i_raw_string.start_index = i_match_string.start_index - i_raw_string_part_length;
     j_raw_string.start_index = j_match_string.start_index - j_raw_string_part_length;
-
-    // log::info!(
-    //     "new i match position (left string): \n\t{} {}\n\t{} {}",
-    //     i_match_string.start_index,
-    //     i_match_string.end_index,
-    //     i_raw_string.start_index,
-    //     i_raw_string.end_index
-    // );
-    // log::info!(
-    //     "new j match position (right string): \n\t{} {} \n\t{} {}",
-    //     j_match_string.start_index,
-    //     j_match_string.end_index,
-    //     j_raw_string.start_index,
-    //     j_raw_string.end_index
-    // );
-
-    // force crash
-    // assert!(false);
-
-    // i_match_string.start_index = new_i_match_string_position;
-    // j_match_string.start_index = new_j_match_string_position;
-    // i_match_string.end_index = i_match_string.start_index + i_match_string_length;
-    // j_match_string.end_index = j_match_string.start_index + j_match_string_length;
-    // // raw string and match string end at the same exact place
-    // i_raw_string.end_index = i_match_string.end_index;
-    // j_raw_string.end_index = j_match_string.end_index;
-    //
-    // // start indices match minus the raw string part length.
-    // i_raw_string.start_index = i_match_string.start_index - j_raw_string_part_length;
-    // j_raw_string.start_index = j_match_string.start_index - i_raw_string_part_length;
-    //
-    // log::info!(
-    //     "\n\ti raw after: {} {}\n\ti match after: {} {}",
-    //     i_raw_string.start_index,
-    //     i_raw_string.end_index,
-    //     i_match_string.start_index,
-    //     i_match_string.end_index,
-    // );
-    // log::info!(
-    //     "\n\tj raw after: {} {}\n\tj match after: {} {}",
-    //     j_raw_string.start_index,
-    //     j_raw_string.end_index,
-    //     j_match_string.start_index,
-    //     j_match_string.end_index,
-    // );
 }
 
 fn color_cube(
@@ -980,9 +678,14 @@ fn color_cube(
     sort_color: SortColor,
     quick_sort_colors: &Res<QuickSortColors>,
     parsed_values: &Res<ParsedValues>,
-    mut cubes_query: &mut Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    // mut cubes_query: &mut Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
 ) {
-    let mut cube_material = cubes_query
+    let (_, mut cube_material, _) = cubes_query
         .get_mut(parsed_values.vals[cube_index].cube_handle)
         .unwrap();
 
@@ -996,7 +699,11 @@ fn color_cube(
 fn setup_range_color(
     previous_range: (usize, usize),
     current_range: (usize, usize),
-    mut cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
+    mut cubes_query: Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
     parsed_values: Res<ParsedValues>,
     quick_sort_colors: Res<QuickSortColors>,
     cube_assets: Res<CubeAssets>,
@@ -1007,7 +714,7 @@ fn setup_range_color(
 
     for i in min..max {
         let parsed_value = &parsed_values.vals[i];
-        let mut cube_material = cubes_query.get_mut(parsed_value.cube_handle).unwrap();
+        let (_, mut cube_material, _) = cubes_query.get_mut(parsed_value.cube_handle).unwrap();
 
         if i >= current_range.0 && i < current_range.1 {
             // exists in current range: give cube at this index the range color.
@@ -1034,16 +741,84 @@ fn setup_range_color(
     }
 }
 
-//
-// pub fn increment_sorting(mut quick_sort_event: MessageReader<SortIncrement>) {
-//     let sort_step = quick_sort_event.read().last().unwrap().step;
-//
-//     // match sort_step{
-//     //     SortStep::SetupRange => setup_range
-//     // }
-//
-//     // if let Some(event) = quick_sort_event.read().last() {
-//     //     //
-//     // }
-//     //
-// }
+pub fn increment_sorting(
+    mut commands: Commands,
+    mut sort_state: Option<ResMut<SortState>>,
+    mut parsed_values: ResMut<ParsedValues>,
+    mut cubes_query: Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    mut user_text: ResMut<UserText>,
+    mut sort_select_set: ResMut<NextState<sorter::SortState>>,
+    quick_sort_colors: Res<QuickSortColors>,
+    cube_assets: Res<CubeAssets>,
+    rng_color_controls: Res<crate::RNGColorControls>,
+    (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
+) {
+    // this system runs when in sorting state and in quick sort state.
+    // this system calls other functions, all of which can be systems themselves which trigger on
+    // events, but I want to avoid them running in parallel at all cost (which bevy may do), so just calling them one
+    // by one here.
+    if let Some(sort_state) = sort_state {
+        // sort already started, go to next step
+        // each of these functions change the next_step to be something else.
+        // compare: get out of the SortingState when sort is complete which stops this system from running
+
+        // only call the next step once increment timer is complete
+        increment_timer.increment_timer.tick(time.delta());
+        if !increment_timer.increment_timer.is_finished() {
+            log::info!(
+                "sorting : timer not yet finished: {}",
+                increment_timer.increment_timer.elapsed_secs_f64()
+            );
+            return;
+        }
+        log::info!(
+            "sorting : timer finished: {}",
+            increment_timer.increment_timer.elapsed_secs_f64()
+        );
+
+        increment_timer.increment_timer.reset();
+
+        match sort_state.next_step {
+            SortStep::SetupRange => {
+                setup_range(
+                    commands,
+                    parsed_values.into(),
+                    Some(sort_state),
+                    cubes_query,
+                    quick_sort_colors,
+                    cube_assets,
+                    rng_color_controls,
+                );
+            }
+            SortStep::Compare => {
+                compare(
+                    cubes_query,
+                    sort_state,
+                    parsed_values.into(),
+                    quick_sort_colors,
+                    sort_select_set,
+                );
+            }
+            SortStep::Swap => {
+                swap(sort_state, parsed_values, cubes_query, user_text);
+            }
+        };
+    } else {
+        // sort not started: start first step and begin timer
+        setup_range(
+            commands,
+            parsed_values.into(),
+            sort_state,
+            cubes_query,
+            quick_sort_colors,
+            cube_assets,
+            rng_color_controls,
+        );
+        increment_timer.increment_timer.reset();
+        log::info!("sort started: reseting timer");
+    }
+}

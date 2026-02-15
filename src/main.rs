@@ -135,7 +135,7 @@ fn main() {
                 ..Default::default()
             })
             .set(AssetPlugin {
-                // for assets to work on browser (not sure when)
+                // for assets to work on browser
                 meta_check: AssetMetaCheck::Never,
                 ..Default::default()
             }),
@@ -148,8 +148,6 @@ fn main() {
         require_markers: true,
         ..Default::default()
     })
-    // .add_plugins(GlobalsPlugin)
-    // .init_asset::<AudioSource>()
     .init_resource::<ui::NumberRegex>()
     .init_resource::<ui::Random>()
     .init_resource::<ui::ParsedValues>()
@@ -157,8 +155,6 @@ fn main() {
     .init_resource::<ui::UserText>()
     .init_resource::<HoveredCube>()
     .init_resource::<RNGValuesControls>()
-    // .init_resource::<CameraControls>()
-    // .insert_resource(ClearColorConfig)
     .insert_resource(ClearColor {
         ..Default::default()
     })
@@ -166,7 +162,6 @@ fn main() {
         copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
     })
     .insert_resource(sorter::IncrementTimer {
-        duration: Duration::new(0, 0),
         increment_timer: Timer::from_seconds(0.0, TimerMode::Once),
         duration_f64: 0.0,
     })
@@ -181,17 +176,13 @@ fn main() {
         width_scale_enable: false,
         width_scale: 5.0,
     })
-    // set tonemapping to none for accurate color
-    //
     .init_state::<CameraControlsFollow>()
     .init_state::<CameraControlsAutoRotate>();
 
     #[cfg(any(target_arch = "wasm32", rust_analyzer))]
     app.init_state::<WasmAudioReceiverListening>();
 
-    // .init_state::<AudioPicking>()
     // .add_systems(Startup, tests)
-    // .add_systems(Update, center_camera.run_if())
     app.add_systems(
         Startup,
         (
@@ -226,51 +217,42 @@ fn main() {
     // sort systems
     app.init_state::<sorter::SortState>()
         .init_state::<sorter::Algorithms>()
-        .add_systems(OnEnter(sorter::SortState::Sorting), sorter::begin_sorting)
+        // .add_systems(OnEnter(sorter::SortState::Sorting), sorter::begin_sorting)
         // Quick Sort:
         .init_resource::<sorter::quick_sort::QuickSortColors>()
-        .add_message::<sorter::quick_sort::SetupRange>()
-        .add_systems(
-            Update, 
-            sorter::quick_sort::setup_range
-            .run_if(on_message::<sorter::quick_sort::SetupRange>)
-            .run_if(in_state(sorter::Algorithms::QuickSort))
-            .run_if(in_state(sorter::SortState::Sorting))
-        )
-        .add_message::<sorter::quick_sort::Swap>()
-        .add_systems(
-            Update, 
-            sorter::quick_sort::swap
-            .run_if(on_message::<sorter::quick_sort::Swap>)
-            .run_if(in_state(sorter::Algorithms::QuickSort))
-            .run_if(in_state(sorter::SortState::Sorting))
-        )
-        .add_message::<sorter::quick_sort::Compare>()
-        .add_systems(
-            Update, 
-            sorter::quick_sort::compare
-            .run_if(on_message::<sorter::quick_sort::Compare>)
-            .run_if(in_state(sorter::Algorithms::QuickSort))
-            .run_if(in_state(sorter::SortState::Sorting))
-            // ensure this main function doesn't run at the same time as any others (ideally all
-            // sort functions NEVER run in parallel).
-            .after(sorter::quick_sort::setup_range)
-            .before(sorter::quick_sort::swap)
-        )
-
-        // .add_message::<sorter::quick_sort::DetectComplete>()
+        // .add_message::<sorter::quick_sort::SetupRange>()
         // .add_systems(
         //     Update, 
-        //     sorter::quick_sort::detect_complete
-        //     .run_if(on_message::<sorter::quick_sort::DetectComplete>)
+        //     sorter::quick_sort::setup_range
+        //     .run_if(on_message::<sorter::quick_sort::SetupRange>)
         //     .run_if(in_state(sorter::Algorithms::QuickSort))
         //     .run_if(in_state(sorter::SortState::Sorting))
         // )
-        // .add_message::<sorter::quick_sort::Complete>()
+        // .add_message::<sorter::quick_sort::Swap>()
         // .add_systems(
         //     Update, 
-        //     sorter::quick_sort::complete.run_if(on_message::<sorter::quick_sort::Complete>)
+        //     sorter::quick_sort::swap
+        //     .run_if(on_message::<sorter::quick_sort::Swap>)
+        //     .run_if(in_state(sorter::Algorithms::QuickSort))
+        //     .run_if(in_state(sorter::SortState::Sorting))
         // )
+        // .add_message::<sorter::quick_sort::Compare>()
+        // .add_systems(
+        //     Update, 
+        //     sorter::quick_sort::compare
+        //     .run_if(on_message::<sorter::quick_sort::Compare>)
+        //     .run_if(in_state(sorter::Algorithms::QuickSort))
+        //     .run_if(in_state(sorter::SortState::Sorting))
+        //     // ensure this main function doesn't run at the same time as any others (ideally all
+        //     // sort functions NEVER run in parallel).
+        //     .after(sorter::quick_sort::setup_range)
+        //     .before(sorter::quick_sort::swap)
+        // )
+        .add_systems(
+            Update, sorter::quick_sort::increment_sorting
+            .run_if(in_state(sorter::SortState::Sorting))
+            .run_if(in_state(sorter::Algorithms::QuickSort))
+            )
         .add_systems(
             OnEnter(sorter::SortState::NotSorting), 
             sorter::quick_sort::complete.run_if(in_state(sorter::Algorithms::QuickSort))

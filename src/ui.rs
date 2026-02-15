@@ -1,6 +1,7 @@
 use crate::{AudioControls, CameraControlsFollow, PROGRAM_TITLE, sorter};
 
 use core::{f64, fmt};
+use std::time::Duration;
 
 use bevy::{platform::collections::HashMap, prelude::*};
 
@@ -998,6 +999,7 @@ pub fn ui_system(
                 ui.horizontal(|ui|{
                     ui.label("Sort speed 󰔛 ");
                     ui.spacing_mut().slider_width = ui.available_width() - ui.spacing().interact_size.x - ui.spacing().item_spacing.x - 1.0;
+                    // let step_timer = &mut increment_timer.increment_timer;
                     if ui.add(
                         egui::Slider::new(&mut increment_timer.duration_f64, 0.0..=1.0)
                         .step_by(0.01)
@@ -1007,7 +1009,10 @@ pub fn ui_system(
                         .on_hover_text("seconds waited between each increment when sorting")
                         .changed(){
                             increment_timer.duration_f64 = increment_timer.duration_f64.max(0.0);
-                            increment_timer.increment_timer.reset();
+                            let duration = increment_timer.duration_f64;
+                            increment_timer.increment_timer.set_duration(
+                                Duration::from_secs_f64(duration)
+                            );
                             log::info!("increment speed changed {}", increment_timer.duration_f64);
                     }
                 });
