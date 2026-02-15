@@ -65,7 +65,7 @@ pub struct RNGValuesControls {
 impl Default for RNGValuesControls {
     fn default() -> Self {
         Self {
-            amount: 25,
+            amount: 10,
             min: -50.0,
             max: 50.0,
         }
@@ -98,7 +98,7 @@ pub struct HoveredCube {
 
 #[derive(Component)]
 pub struct CubeData {
-    index: usize,
+    index: usize, // matches the index at ParsedValues.val (which holds this cube's data).
 }
 
 // Wrap HoveredCube in a state to make it update at the end of a frame/tick instead of possibly in-between.
@@ -156,6 +156,7 @@ fn main() {
     .init_resource::<ui::FontScale>()
     .init_resource::<ui::UserText>()
     .init_resource::<HoveredCube>()
+    .init_resource::<RNGValuesControls>()
     // .init_resource::<CameraControls>()
     // .insert_resource(ClearColorConfig)
     .insert_resource(ClearColor {
@@ -231,30 +232,49 @@ fn main() {
         .add_message::<sorter::quick_sort::SetupRange>()
         .add_systems(
             Update, 
-            sorter::quick_sort::setup_range.run_if(on_message::<sorter::quick_sort::SetupRange>)
-        )
-        .add_message::<sorter::quick_sort::Compare>()
-        .add_systems(
-            Update, 
-            sorter::quick_sort::compare.run_if(on_message::<sorter::quick_sort::Compare>)
+            sorter::quick_sort::setup_range
+            .run_if(on_message::<sorter::quick_sort::SetupRange>)
+            .run_if(in_state(sorter::Algorithms::QuickSort))
+            .run_if(in_state(sorter::SortState::Sorting))
         )
         .add_message::<sorter::quick_sort::Swap>()
         .add_systems(
             Update, 
-            sorter::quick_sort::swap.run_if(on_message::<sorter::quick_sort::Swap>)
+            sorter::quick_sort::swap
+            .run_if(on_message::<sorter::quick_sort::Swap>)
+            .run_if(in_state(sorter::Algorithms::QuickSort))
+            .run_if(in_state(sorter::SortState::Sorting))
         )
-        // TODO:
+        .add_message::<sorter::quick_sort::Compare>()
+        .add_systems(
+            Update, 
+            sorter::quick_sort::compare
+            .run_if(on_message::<sorter::quick_sort::Compare>)
+            .run_if(in_state(sorter::Algorithms::QuickSort))
+            .run_if(in_state(sorter::SortState::Sorting))
+            // ensure this main function doesn't run at the same time as any others (ideally all
+            // sort functions NEVER run in parallel).
+            .after(sorter::quick_sort::setup_range)
+            .before(sorter::quick_sort::swap)
+        )
+
         // .add_message::<sorter::quick_sort::DetectComplete>()
+        // .add_systems(
+        //     Update, 
+        //     sorter::quick_sort::detect_complete
+        //     .run_if(on_message::<sorter::quick_sort::DetectComplete>)
+        //     .run_if(in_state(sorter::Algorithms::QuickSort))
+        //     .run_if(in_state(sorter::SortState::Sorting))
+        // )
         // .add_message::<sorter::quick_sort::Complete>()
-
-
+        // .add_systems(
+        //     Update, 
+        //     sorter::quick_sort::complete.run_if(on_message::<sorter::quick_sort::Complete>)
+        // )
         .add_systems(
             OnEnter(sorter::SortState::NotSorting), 
-            sorter::quick_sort::clean_up.run_if(in_state(sorter::Algorithms::QuickSort))
+            sorter::quick_sort::complete.run_if(in_state(sorter::Algorithms::QuickSort))
         )
-
-
-        
         // separate comma
         ;
 

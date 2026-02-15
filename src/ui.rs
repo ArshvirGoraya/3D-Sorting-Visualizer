@@ -89,8 +89,8 @@ pub struct CubeAssets {
 
 #[derive(Default)]
 pub struct StringInfo {
-    start_index: usize,
-    end_index: usize,
+    pub start_index: usize,
+    pub end_index: usize,
 }
 
 #[derive(Resource)]
@@ -102,6 +102,7 @@ pub struct ParsedValue {
     pub cube_handle: Entity,
     pub rng_color: MeshMaterial3d<StandardMaterial>,
     pub sorted_position: usize, // final_position
+    // pub start_position: usize,
 }
 
 #[derive(Resource, Default)]
@@ -183,6 +184,8 @@ pub fn spawn_random_parsed_values(
                                                // parse warning on the first spawn.
     number_regex: Res<NumberRegex>,
     cube_assets: Res<CubeAssets>,
+
+    rng_values_controls: Res<crate::RNGValuesControls>,
     rng_color_controls: Res<crate::RNGColorControls>,
     // mut update_list: ResMut<UpdateList>,
     // update_cubes_event: MessageWriter<UpdateCubes>,
@@ -205,10 +208,10 @@ pub fn spawn_random_parsed_values(
     mut cube_scale_controls: ResMut<crate::CubeScaleControls>
 ) {
     // generate_random_string_nums(5, -100.0, 100.0, &mut user_text.val, &mut random);
+    generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, &mut user_text.val, &mut random);
 
     // Just doing this for now: uncomment the above in release!
-    user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
-
+    // user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
     update_parsed_values(
         number_regex, 
         user_text, 
@@ -443,25 +446,6 @@ fn update_parsed_values_second_loop(
 
             cube.insert(transform);
         }
-
-
-        // log::info!("enumerated: {index}");
-        // if cube_scale_controls.width_scale_enable{
-        //     if let Ok((mut transform, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
-        //         log::info!("acquired transform:");
-        //         set_width_and_horizontal_position(index, &mut transform, cube_width);
-        //     }else{
-        //         // If query does not contains the transform, it is because the cube has JUST been added,
-        //         // and is not available to the query. In this case, commands can be used to overwrite
-        //         // the cube's Transform component (but this also requires recreating its height which
-        //         // was done during spawn - this part is overwritten anyway if positional_heights is true).
-        //         let mut cube = commands.get_entity(parsed_value.cube_handle).unwrap();
-        //         let mut transform = Transform::from_translation(Vec3::ZERO);
-        //         set_height_and_vertical_position(parsed_value.converted_value, &mut transform, cube_scale_controls);
-        //         set_width_and_horizontal_position(index, &mut transform, cube_width);
-        //         cube.insert(transform);
-        //     }
-        // }
     }
 }
 
@@ -790,7 +774,7 @@ fn set_cube_colors(
 
 #[derive(Resource, Default)]
 pub struct UserText{
-    val: String,
+    pub val: String,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -879,7 +863,7 @@ pub fn ui_system(
      mut bg_color,
     ): 
         (ResMut<Random>,
-         Local<crate::RNGValuesControls>, 
+         ResMut<crate::RNGValuesControls>, 
          Local<bool>,
          ResMut<crate::RNGColorControls>,
          ResMut<ClearColor>,
@@ -1448,7 +1432,7 @@ pub fn ui_system(
                                 *text_just_cleaned = false;
                             }
 
-                            if text_edit_widget.changed(){
+                            if !is_sorting && text_edit_widget.changed(){
                                 log::info!("text widget changed");
                                 if !*generated_rng_values{
                                     // if rng values were generated, already clean.
@@ -1534,14 +1518,14 @@ pub fn ui_system(
                                     ).wrap_mode(egui::TextWrapMode::Extend)
                                 );
                                 ui.add(egui::Label::new(
-                                        format!("Starting Position: {}", cube_data.index)
+                                        format!("Start Position: {}", cube_data.index)
                                         // RichText::new(format!("Starting Position: {}", hovered_cube.starting_pos))
                                         // .color(egui::Color32::WHITE)
                                 ).wrap_mode(egui::TextWrapMode::Extend)
                                 );
                                 ui.add(
                                     egui::Label::new(
-                                        format!("Ending Position: {}", parsed_value.sorted_position)
+                                        format!("End Position: {}", parsed_value.sorted_position)
                                         // RichText::new(format!("Ending Position: {}", hovered_cube.ending_pos))
                                         // .color(egui::Color32::WHITE)
                                     ).wrap_mode(egui::TextWrapMode::Extend)
