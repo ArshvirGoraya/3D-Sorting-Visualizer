@@ -110,7 +110,7 @@ pub struct ParsedValue {
 pub struct ParsedValues {
     pub vals: Vec<ParsedValue>,
     pub end_index: usize, // marks the position of visible and invisible cubes
-    updated_sorted_positions: bool,
+    // updated_sorted_positions: bool,
 }
 
 #[derive(Default)]
@@ -360,11 +360,23 @@ fn update_parsed_values(
     // positional heights
 
 
-    parsed_values.updated_sorted_positions = false;
+    // parsed_values.updated_sorted_positions = false;
 
-    if cube_scale_controls.positional_heights{
-        update_sorted_positions(parsed_values);
-    }
+    // INFO: update sorted positions regardless of whether we want positional_heights or not.
+    // Because: all sorting algorithms use sorted_position instead of converted_value to sort
+    // because it converted_value of the SAME value has NO gurantee of being put in the same 
+    // position as the sorted_position dictates (this is because same sort algorithms are 
+    // NOT stable (e.g., if two elements are equal their relative order is not preserved)). 
+    // This leads to boxes which are visually taller/shorter being in the wrong order
+    // If we sort by sorted_position, then we dont't have to deal with this.
+    // 
+    // ALSO: for hovering over elements: i want to see their final position on hover data even if
+    // positional_heights is not used.
+    update_sorted_positions(parsed_values);
+
+    // if cube_scale_controls.positional_heights{
+    //     update_sorted_positions(parsed_values);
+    // }
 
     // Update 
     update_parsed_values_second_loop(parsed_values, cube_scale_controls, cubes_query, commands, cube_width);
@@ -385,7 +397,7 @@ fn update_sorted_positions(parsed_values: &mut ParsedValues){
         parsed_values.vals[*current_position].sorted_position = final_position;
     }
 
-    parsed_values.updated_sorted_positions = true;
+    // parsed_values.updated_sorted_positions = true;
 }
 
 
@@ -711,9 +723,9 @@ fn control_cube_heights(
     let end_index = parsed_values.end_index;
 
     if cube_scale_controls.positional_heights{
-        if !parsed_values.updated_sorted_positions{
-            update_sorted_positions(parsed_values);
-        }
+        // if !parsed_values.updated_sorted_positions{
+        update_sorted_positions(parsed_values);
+        // }
         for parsed_value in &mut parsed_values.vals[..end_index] {
             if let Ok((mut transform, _, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
                 set_position_height_and_vertical_position(parsed_value.sorted_position, &mut transform, cube_scale_controls);

@@ -182,7 +182,7 @@ fn main() {
     #[cfg(any(target_arch = "wasm32", rust_analyzer))]
     app.init_state::<WasmAudioReceiverListening>();
 
-    // .add_systems(Startup, tests)
+    app.add_systems(Startup, tests);
     app.add_systems(
         Startup,
         (
@@ -262,6 +262,24 @@ fn main() {
 
     app.run();
 }
+
+fn tests(){
+    let test_vec = [1, 1, 1, 1, 1];
+    let mut sorted_indices: Vec<usize> = (0..test_vec.len()).collect();
+    // sort by the values inside of these indices.
+    sorted_indices.sort_by(
+        |&i, &j| {
+            test_vec[i].partial_cmp(&test_vec[j])
+    }.unwrap());
+    log::info!("[{}, {}, {}, {}, {}]", 
+        sorted_indices[0],
+        sorted_indices[1],
+        sorted_indices[2],
+        sorted_indices[3],
+        sorted_indices[4]
+        );
+}
+
 
 fn detect_cube_hover_enter(
     mut event_hover_enter: MessageReader<Pointer<Over>>,

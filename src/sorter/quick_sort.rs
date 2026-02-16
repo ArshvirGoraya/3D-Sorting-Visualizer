@@ -343,8 +343,12 @@ pub fn compare(
         return;
     }
     //
-    let pivot_value = &parsed_values.vals[sort_state.pivot].converted_value;
-    let j_value = &parsed_values.vals[sort_state.j].converted_value;
+    // let pivot_value = &parsed_values.vals[sort_state.pivot].converted_value;
+    // let j_value = &parsed_values.vals[sort_state.j].converted_value;
+
+    let pivot_value = &parsed_values.vals[sort_state.pivot].sorted_position;
+    let j_value = &parsed_values.vals[sort_state.j].sorted_position;
+
     if sort_state.j == sort_state.pivot || pivot_value > j_value {
         // if j reached the pivot do a last swap with i and j
         // if j value is smaller than pivot, swap i and j.
@@ -784,6 +788,20 @@ fn setup_range_color(
     let min = usize::min(previous_range.0, current_range.0);
     let max = usize::max(previous_range.1, current_range.1);
 
+    // log::info!(
+    //     "
+    // previous_range: {} to {}
+    // current_range: {} to {}
+    // - pivot: {}
+    // - j: {}",
+    //     previous_range.0,
+    //     previous_range.1,
+    //     current_range.0,
+    //     current_range.1,
+    //     current_range.1 - 1,
+    //     current_range.0,
+    // );
+    //
     for i in min..max {
         let parsed_value = &parsed_values.vals[i];
         let (_, mut cube_material, _) = cubes_query.get_mut(parsed_value.cube_handle).unwrap();
