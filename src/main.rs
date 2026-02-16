@@ -49,7 +49,10 @@ pub enum CameraControlsAutoRotate {
 pub struct AudioControls {
     enabled: bool,
     volume: f32,
-    pitch: f32,
+    // pitch: f32,
+    low_pitch: f32,
+    high_pitch: f32,
+    pitch_range: f32,
     default_file_name: String,
     audio_source_handle_default: Handle<AudioSource>,
     selected_file_name: Option<String>,
@@ -113,6 +116,9 @@ pub struct CubeData {
 pub struct DefaultAudio;
 #[derive(Component)]
 pub struct SelectedAudio;
+
+#[derive(Message)]
+pub struct StopAllAudio;
 
 fn main() {
     let mut app = App::new();
@@ -214,6 +220,9 @@ fn main() {
             (detect_cube_hover_enter, detect_cube_hover_exit).chain(),
         );
 
+    app.add_message::<StopAllAudio>();
+    app.add_systems(Update, stop_all_audio.run_if(on_message::<StopAllAudio>));
+
     // sort systems
     app.init_state::<sorter::SortState>()
         .init_state::<sorter::Algorithms>()
@@ -280,7 +289,6 @@ fn tests(){
         );
 }
 
-
 fn detect_cube_hover_enter(
     mut event_hover_enter: MessageReader<Pointer<Over>>,
     mut hovered_cube: ResMut<HoveredCube>,
@@ -294,6 +302,7 @@ fn detect_cube_hover_enter(
         hovered_cube.display = true;
     }
 }
+
 fn detect_cube_hover_exit(
     mut event_hover_exit: MessageReader<Pointer<Out>>,
     mut hovered_cube: ResMut<HoveredCube>,
@@ -313,19 +322,49 @@ fn detect_cube_hover_exit(
     }
 }
 
-fn play_audio(commands: &mut Commands, audio_controls: &mut ResMut<AudioControls>) {
+
+fn stop_all_audio(
+    mut commands: Commands,
+    audio_query: Query<Entity, With<AudioPlayer>>,
+    ){
+    for e in audio_query.iter(){
+        commands.entity(e).despawn();
+    }
+}
+
+
+
+fn play_audio(
+    commands: &mut Commands, 
+    audio_controls: &Res<AudioControls>,
+    cube_index: usize,
+    total_cubes: usize,
+) {
     if !audio_controls.enabled {
         return;
     }
+    // normalize selected cube
+    // 1 minus to reverse the pitch: higher values = deeper, and lower values = higher
+    let normalized_cube = 1.0 - (cube_index as f32 / total_cubes as f32);
+    // get pitch from normalized cube
+    // let min_pitch = audio_controls.pitch * 0.75;
+    // let max_pitch = audio_controls.pitch * 1.25;
+    // let range = max_pitch - min_pitch; 
+    let pitch = audio_controls.low_pitch + normalized_cube * audio_controls.pitch_range;
+    
+    // let pitch = audio_controls.pitch / (cube_index+1) as f32;
+    log::info!("pitch for cube {}: {}", cube_index, pitch);
+
     let audio_source_handle = audio_controls
         .audio_source_handle
         .clone()
         .unwrap_or(audio_controls.audio_source_handle_default.clone());
+
     commands.spawn((
         AudioPlayer::new(audio_source_handle),
         PlaybackSettings {
             volume: Volume::Linear(audio_controls.volume),
-            speed: audio_controls.pitch,
+            speed: pitch,
             mode: PlaybackMode::Despawn,
             ..Default::default()
         },
@@ -366,11 +405,17 @@ fn spawn_audio_sources(
         asset_server.load("audio/impactWood_medium_000.ogg");
     //
     let file_name = "impactWood_medium_000.ogg".to_string();
-    let default_pitch = 1.0;
+    // let default_pitch = 1.0;
+    let high_pitch = 2.0;
+    let low_pitch = 0.5;
+    let pitch_range = high_pitch - low_pitch;
     //
     commands.insert_resource(AudioControls {
         volume: default_volume,
-        pitch: default_pitch,
+        // pitch: default_pitch,
+        low_pitch, 
+        high_pitch,
+        pitch_range,
         enabled: true,
         default_file_name: file_name,
         audio_source_handle_default: default_handle,

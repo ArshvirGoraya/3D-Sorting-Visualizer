@@ -21,7 +21,7 @@ use bevy::{
 };
 
 use crate::{
-    sorter,
+    AudioControls, sorter,
     ui::{CubeAssets, ParsedValue, ParsedValues, StringInfo, UserText},
 };
 
@@ -125,6 +125,7 @@ pub fn increment_sorting(
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
     (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
+    audio_controls: Res<AudioControls>,
 ) {
     // this system runs when in sorting state and in quick sort state.
     // this system calls other functions, all of which can be systems themselves which trigger on
@@ -161,6 +162,8 @@ pub fn increment_sorting(
                     parsed_values.into(),
                     quick_sort_colors,
                     sort_select_set,
+                    audio_controls,
+                    commands,
                 );
             }
             SortStep::Swap => {
@@ -208,17 +211,17 @@ pub fn setup_range(
         sort_state.pivot = sort_state.current_array.1 - 1;
         sort_state.j = sort_state.current_array.0;
         sort_state.i = (sort_state.current_array.0 as isize) - 1;
-        log::info!(
-            "
-            current array: ({}, {})
-            j: {}
-            i: {}
-            ",
-            sort_state.current_array.0,
-            sort_state.current_array.1,
-            sort_state.j,
-            sort_state.i
-        );
+        // log::info!(
+        //     "
+        //     current array: ({}, {})
+        //     j: {}
+        //     i: {}
+        //     ",
+        //     sort_state.current_array.0,
+        //     sort_state.current_array.1,
+        //     sort_state.j,
+        //     sort_state.i
+        // );
 
         setup_range_color(
             previous_array,
@@ -242,17 +245,17 @@ pub fn setup_range(
             swapped_cubes: None,
             next_step: SortStep::Compare,
         });
-        log::info!(
-            "
-            current array: ({}, {})
-            j: {}
-            i: {}
-            ",
-            current_array.0,
-            current_array.1,
-            current_array.0,
-            (current_array.0 as isize) - 1
-        );
+        // log::info!(
+        //     "
+        //     current array: ({}, {})
+        //     j: {}
+        //     i: {}
+        //     ",
+        //     current_array.0,
+        //     current_array.1,
+        //     current_array.0,
+        //     (current_array.0 as isize) - 1
+        // );
 
         setup_range_color(
             current_array,
@@ -262,6 +265,37 @@ pub fn setup_range(
             quick_sort_colors,
             cube_assets,
             rng_color_controls,
+        );
+    }
+}
+
+pub fn increment_j(
+    sort_state: &mut ResMut<SortState>,
+    quick_sort_colors: &Res<QuickSortColors>,
+    parsed_values: &Res<ParsedValues>,
+    mut cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    mut commands: &mut Commands,
+    audio_controls: &Res<AudioControls>,
+) {
+    sort_state.j += 1;
+    if sort_state.j != sort_state.pivot + 1 {
+        // j may be pivot + 1: This is the condition used for detecting when a subarray is finished.
+        color_cube(
+            sort_state.j,
+            SortColor::J,
+            &quick_sort_colors,
+            &parsed_values,
+            &mut cubes_query,
+        );
+        crate::play_audio(
+            commands,
+            audio_controls,
+            sort_state.j,
+            parsed_values.end_index,
         );
     }
 }
@@ -277,6 +311,8 @@ pub fn compare(
     parsed_values: Res<ParsedValues>,
     quick_sort_colors: Res<QuickSortColors>,
     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
+    audio_controls: Res<AudioControls>,
+    mut commands: Commands,
 ) {
     if let Some((i, j)) = sort_state.swapped_cubes {
         // if just swapped, increment j and color the just swapped cubes the J/"covered" color.
@@ -297,23 +333,21 @@ pub fn compare(
         sort_state.swapped_cubes = None;
 
         // j must increment after swapping.
-        sort_state.j += 1;
-        if sort_state.j != sort_state.pivot + 1 {
-            color_cube(
-                sort_state.j,
-                SortColor::J,
-                &quick_sort_colors,
-                &parsed_values,
-                &mut cubes_query,
-            );
-        }
+        increment_j(
+            &mut sort_state,
+            &quick_sort_colors,
+            &parsed_values,
+            &mut cubes_query,
+            &mut commands,
+            &audio_controls,
+        );
     }
     if sort_state.j == sort_state.pivot + 1 {
         // when pivot has been reached, j and i swap and j increments 1. That is when new subarrays
         // are creted. j must be 1 larger than pivot.
         // pivot has been reached, create new subarrays or complete.
 
-        log::info!("pivot overreached last swap complete: {}", sort_state.j);
+        // log::info!("pivot overreached last swap complete: {}", sort_state.j);
 
         sort_state.sub_arrays.pop();
 
@@ -324,12 +358,12 @@ pub fn compare(
         let right_array_start = i + 1;
 
         if end.abs_diff(right_array_start) > 1 {
-            log::info!("right array is valid: {} to {}", right_array_start, end);
+            // log::info!("right array is valid: {} to {}", right_array_start, end);
             // Right array is valid
             sort_state.sub_arrays.push((right_array_start, end));
         }
         if start.abs_diff(i) > 1 {
-            log::info!("left array is valid: {} to {}", start, i);
+            // log::info!("left array is valid: {} to {}", start, i);
             // Left array is valid
             sort_state.sub_arrays.push((start, i));
         }
@@ -359,16 +393,14 @@ pub fn compare(
         if sort_state.i as usize == sort_state.j {
             // if both indices point to the same thing, no need to swap them.
             // just increment j and return.
-            sort_state.j += 1;
-            if sort_state.j != sort_state.pivot + 1 {
-                color_cube(
-                    sort_state.j,
-                    SortColor::J,
-                    &quick_sort_colors,
-                    &parsed_values,
-                    &mut cubes_query,
-                );
-            }
+            increment_j(
+                &mut sort_state,
+                &quick_sort_colors,
+                &parsed_values,
+                &mut cubes_query,
+                &mut commands,
+                &audio_controls,
+            );
             sort_state.next_step = SortStep::Compare;
             return;
         }
@@ -396,13 +428,13 @@ pub fn compare(
     } else {
         // if pivot_value < j_value
         // do not swap. just increment j.
-        sort_state.j += 1;
-        color_cube(
-            sort_state.j,
-            SortColor::J,
+        increment_j(
+            &mut sort_state,
             &quick_sort_colors,
             &parsed_values,
             &mut cubes_query,
+            &mut commands,
+            &audio_controls,
         );
         sort_state.next_step = SortStep::Compare;
     }
@@ -449,39 +481,39 @@ pub fn swap(
     )>,
     mut user_text: ResMut<UserText>,
 ) {
-    log::info!("\n\t\t=-=-=Swapping=-=-=");
+    // log::info!("\n\t\t=-=-=Swapping=-=-=");
 
-    log::info!(
-        "geting parsed value at: {} and {}",
-        sort_state.i as usize,
-        sort_state.j
-    );
+    // log::info!(
+    //     "geting parsed value at: {} and {}",
+    //     sort_state.i as usize,
+    //     sort_state.j
+    // );
 
     let [mut i_data, mut j_data] = parsed_values
         .vals
         .get_disjoint_mut([sort_state.i as usize, sort_state.j])
         .unwrap();
 
-    log::info!(
-        "
-        \ttext before: {}
-        \ti index: [{}], value: {}, text value: \"{}\", raw start: {}, match start: {}, end: {}
-        \tj index: [{}], value: {}, text value: \"{}\", , raw start: {}, match start: {}, end: {}
-        ",
-        user_text.val,
-        sort_state.i,
-        i_data.converted_value,
-        &user_text.val[i_data.matched_string.start_index..i_data.matched_string.end_index],
-        i_data.raw_string.start_index,
-        i_data.matched_string.start_index,
-        i_data.matched_string.end_index,
-        sort_state.j,
-        j_data.converted_value,
-        &user_text.val[j_data.matched_string.start_index..j_data.matched_string.end_index],
-        j_data.raw_string.start_index,
-        j_data.matched_string.start_index,
-        j_data.matched_string.end_index,
-    );
+    // log::info!(
+    //     "
+    //     \ttext before: {}
+    //     \ti index: [{}], value: {}, text value: \"{}\", raw start: {}, match start: {}, end: {}
+    //     \tj index: [{}], value: {}, text value: \"{}\", , raw start: {}, match start: {}, end: {}
+    //     ",
+    //     user_text.val,
+    //     sort_state.i,
+    //     i_data.converted_value,
+    //     &user_text.val[i_data.matched_string.start_index..i_data.matched_string.end_index],
+    //     i_data.raw_string.start_index,
+    //     i_data.matched_string.start_index,
+    //     i_data.matched_string.end_index,
+    //     sort_state.j,
+    //     j_data.converted_value,
+    //     &user_text.val[j_data.matched_string.start_index..j_data.matched_string.end_index],
+    //     j_data.raw_string.start_index,
+    //     j_data.matched_string.start_index,
+    //     j_data.matched_string.end_index,
+    // );
 
     let [
         (mut transform_i, mut material_i, mut cube_data_i),
@@ -512,27 +544,27 @@ pub fn swap(
         &mut user_text,
     );
 
-    log::info!(
-        "
-        \ttext after: {}
-        \ti index: [{}], value: {}, text value: \"{}\", raw start: {}, match start: {}, end: {}
-        \tj index: [{}], value: {}, text value: \"{}\", , raw start: {}, match start: {}, end: {}
-        \t=-=-=-=-=-=-=-=-=
-        ",
-        user_text.val,
-        sort_state.i,
-        i_data.converted_value,
-        &user_text.val[i_data.matched_string.start_index..i_data.matched_string.end_index],
-        i_data.raw_string.start_index,
-        i_data.matched_string.start_index,
-        i_data.matched_string.end_index,
-        sort_state.j,
-        j_data.converted_value,
-        &user_text.val[j_data.matched_string.start_index..j_data.matched_string.end_index],
-        j_data.raw_string.start_index,
-        j_data.matched_string.start_index,
-        j_data.matched_string.end_index,
-    );
+    // log::info!(
+    //     "
+    //     \ttext after: {}
+    //     \ti index: [{}], value: {}, text value: \"{}\", raw start: {}, match start: {}, end: {}
+    //     \tj index: [{}], value: {}, text value: \"{}\", , raw start: {}, match start: {}, end: {}
+    //     \t=-=-=-=-=-=-=-=-=
+    //     ",
+    //     user_text.val,
+    //     sort_state.i,
+    //     i_data.converted_value,
+    //     &user_text.val[i_data.matched_string.start_index..i_data.matched_string.end_index],
+    //     i_data.raw_string.start_index,
+    //     i_data.matched_string.start_index,
+    //     i_data.matched_string.end_index,
+    //     sort_state.j,
+    //     j_data.converted_value,
+    //     &user_text.val[j_data.matched_string.start_index..j_data.matched_string.end_index],
+    //     j_data.raw_string.start_index,
+    //     j_data.matched_string.start_index,
+    //     j_data.matched_string.end_index,
+    // );
 
     update_text_indices(
         &mut sort_state,
@@ -562,11 +594,11 @@ pub fn update_text_indices(
     let mut right = sort_state.j;
 
     if left + 1 == right {
-        log::info!(
-            "no need to updated inbetween indices since left+1 == right: {}+1 = {}",
-            left,
-            right
-        );
+        // log::info!(
+        //     "no need to updated inbetween indices since left+1 == right: {}+1 = {}",
+        //     left,
+        //     right
+        // );
         return;
     }
 
@@ -608,7 +640,7 @@ pub fn swap_text(
     let utf8_text = unsafe { user_text.val.as_bytes_mut() };
 
     if i_match_string_length == j_match_string_length {
-        log::info!("\n\t\tswapping same length text");
+        // log::info!("\n\t\tswapping same length text");
         // In-place swap
         let [i_utf8, j_utf8] = utf8_text
             .get_disjoint_mut([
@@ -618,13 +650,13 @@ pub fn swap_text(
             .unwrap();
         i_utf8.swap_with_slice(j_utf8);
     } else if i_match_string_length > j_match_string_length {
-        log::info!(
-            "\n\t\tswapping: left text is bigger: \"{}\" > \"{}\"",
-            std::str::from_utf8(&utf8_text[i_match_string.start_index..i_match_string.end_index])
-                .unwrap(),
-            std::str::from_utf8(&utf8_text[j_match_string.start_index..j_match_string.end_index])
-                .unwrap(),
-        );
+        // log::info!(
+        //     "\n\t\tswapping: left text is bigger: \"{}\" > \"{}\"",
+        //     std::str::from_utf8(&utf8_text[i_match_string.start_index..i_match_string.end_index])
+        //         .unwrap(),
+        //     std::str::from_utf8(&utf8_text[j_match_string.start_index..j_match_string.end_index])
+        //         .unwrap(),
+        // );
 
         // left is bigger: copy left, put right text to left position, shift everything between
         // left and right text leftwards, insert copied text right of everything that just shifted.
@@ -672,13 +704,13 @@ pub fn swap_text(
             j_match_string_length,
         );
     } else {
-        log::info!(
-            "\n\t\tswapping: right text is bigger: \"{}\" < \"{}\"",
-            std::str::from_utf8(&utf8_text[i_match_string.start_index..i_match_string.end_index])
-                .unwrap(),
-            std::str::from_utf8(&utf8_text[j_match_string.start_index..j_match_string.end_index])
-                .unwrap(),
-        );
+        // log::info!(
+        //     "\n\t\tswapping: right text is bigger: \"{}\" < \"{}\"",
+        //     std::str::from_utf8(&utf8_text[i_match_string.start_index..i_match_string.end_index])
+        //         .unwrap(),
+        //     std::str::from_utf8(&utf8_text[j_match_string.start_index..j_match_string.end_index])
+        //         .unwrap(),
+        // );
         // right is bigger: copy right, put left text to right position, shift everything between
         // left and right text rightwards, insert copied text left of everything that just shifted.
 

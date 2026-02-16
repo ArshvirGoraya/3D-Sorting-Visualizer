@@ -860,13 +860,15 @@ pub fn ui_system(
     (mut audio_controls, 
      mut audio_assets,
      audio_receiver_listening_get,
-     audio_receiver_listening_set
+     audio_receiver_listening_set,
+     mut stop_all_audio_event
     ): 
         (
             ResMut<AudioControls>,
             ResMut<Assets<AudioSource>>,
             Option<Res<State<crate::WasmAudioReceiverListening>>>,
             Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
+            MessageWriter<crate::StopAllAudio>,
         ),
     // random:
     (mut random,
@@ -1095,8 +1097,11 @@ pub fn ui_system(
                 //
 
                 ui.horizontal(|ui|{
-                    ui.checkbox(&mut audio_controls.enabled, "Audio ")
-                        .on_hover_text("toggle audio");
+                    if ui.checkbox(&mut audio_controls.enabled, "Audio ")
+                        .on_hover_text("toggle audio").changed(){
+                            // This deletes ALL running audio if toggle is EVER changed.
+                            stop_all_audio_event.write(crate::StopAllAudio);
+                    }
 
                     ui.vertical_centered_justified(|ui|{
                         ui.collapsing("Audio Settings", |ui|{
@@ -1106,16 +1111,26 @@ pub fn ui_system(
                                 .step_by(0.1)
                             ).on_hover_text("adjust volume of selected sound");
 
-                            ui.add(
-                                egui::Slider::new(&mut audio_controls.pitch, 0.1..=2.0).text("Pitch")
+                            if ui.add(
+                                egui::Slider::new(&mut audio_controls.high_pitch, 0.1..=2.0).text("High Pitch")
                                 .max_decimals(1)
                                 .step_by(0.1)
-                            ).on_hover_text("adjust pitch of selected sound");
+                            ).on_hover_text("adjust pitch of selected sound at high range").changed(){
+                                audio_controls.pitch_range = audio_controls.high_pitch - audio_controls.low_pitch;
+                            };
+
+                            if ui.add(
+                                egui::Slider::new(&mut audio_controls.low_pitch, 0.1..=2.0).text("Low Pitch")
+                                .max_decimals(1)
+                                .step_by(0.1)
+                            ).on_hover_text("adjust pitch of selected sound at low range").changed(){
+                                audio_controls.pitch_range = audio_controls.high_pitch - audio_controls.low_pitch;
+                            };
 
                             ui.columns(2, |cols|{
                                 cols[0].add_enabled_ui(true, |ui|{
                                     ui.vertical_centered_justified(|ui|{
-                                        if ui.button("Select Audio")
+                                        if ui.button("Pick Audio")
                                             .on_hover_text("open file dialog to select supported audio file")
                                             .clicked(){
 
@@ -1169,16 +1184,18 @@ pub fn ui_system(
                                         );
                                     });
                                     cols[1].vertical_centered_justified(|ui|{
-                                        if ui.button("Default")
-                                            .on_hover_text("reset selected file to default")
-                                            .clicked(){
-                                                // set to default
-                                                if let Some(audio_handle) = &audio_controls.audio_source_handle{
-                                                    audio_assets.remove(audio_handle);
-                                                }
-                                                audio_controls.selected_file_name = None;
-                                                audio_controls.audio_source_handle = None;
-                                        }
+                                        ui.add_enabled_ui(audio_controls.audio_source_handle.is_some(), |ui|{
+                                            if ui.button("Default")
+                                                .on_hover_text("reset selected audio to default")
+                                                    .clicked(){
+                                                        // set to default
+                                                        if let Some(audio_handle) = &audio_controls.audio_source_handle{
+                                                            audio_assets.remove(audio_handle);
+                                                        }
+                                                        audio_controls.selected_file_name = None;
+                                                        audio_controls.audio_source_handle = None;
+                                                    }
+                                        });
                                     })
                                 });
                                 ui.vertical_centered_justified(|ui|{
@@ -1189,7 +1206,10 @@ pub fn ui_system(
                                         .fill(egui::Color32::from_rgb(0, 0, 0)))
                                         .on_hover_text("play selected sound")
                                         .clicked(){
-                                            crate::play_audio(&mut commands, &mut audio_controls);
+                                            // play base pitch by calling audio and making it think
+                                            // we selected the middle cube (of 3 cubes (0, 1, 2), 1
+                                            // is selected)
+                                            crate::play_audio(&mut commands, &audio_controls.into(), 1, 2);
                                     }
                                 });
                             });
