@@ -215,7 +215,7 @@ pub fn spawn_random_parsed_values(
     // user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
     update_parsed_values(
         number_regex, 
-        user_text, 
+        &user_text, 
         worse_parse_problem, 
         &mut commands, 
         & cube_assets, 
@@ -234,7 +234,7 @@ pub fn spawn_random_parsed_values(
 #[allow(clippy::too_many_arguments)]
 fn update_parsed_values(
     number_regex: Res<NumberRegex>,
-    user_text: ResMut<UserText>,
+    user_text: &ResMut<UserText>,
     mut worse_parse_problem: Local<ParsedWarning>,
     commands: &mut Commands,
     cube_assets: &Res<CubeAssets>,
@@ -1468,7 +1468,7 @@ pub fn ui_system(
                                 num_strings.cleaned_string = false;
                                 update_parsed_values(
                                     number_regex,
-                                    user_text,
+                                    &user_text,
                                     worse_parse_problem,
                                     &mut commands,
                                     & cube_assets,
@@ -1516,15 +1516,15 @@ pub fn ui_system(
 
     // draw egui frame over hovered cube:
     if !window_contains_pointer && hovered_cube.display{
-        pointer_pos.x += 10.0; // frame offset
+        pointer_pos.x += 0.0; // frame offset
         egui::Area::new(egui::Id::new("cube_hover_area"))
             .fixed_pos(pointer_pos)
             .interactable(false)
             .show(ctx, |ui|{
                 egui::Frame::default()
                     .fill(egui::Color32::BLACK)
-                    .corner_radius(2.0)
-                    .inner_margin(egui::Margin::same(10))
+                    .corner_radius(10.0)
+                    .inner_margin(egui::Margin::same(15))
                     .show(ui, |ui|{
                         // TODO: store the below used data right in cube_data instead of
                         // parsed_values?
@@ -1534,24 +1534,34 @@ pub fn ui_system(
                                 ui.add(
                                     egui::Label::new(
                                         format!("Value: {}", parsed_value.converted_value)
-                                        // RichText::new(format!("Value: {}", hovered_cube.value))
-                                        // .color(egui::Color32::WHITE)
                                     ).wrap_mode(egui::TextWrapMode::Extend)
                                 );
                                 ui.add(egui::Label::new(
                                         format!("Start Position: {}", cube_data.index)
-                                        // RichText::new(format!("Starting Position: {}", hovered_cube.starting_pos))
-                                        // .color(egui::Color32::WHITE)
                                 ).wrap_mode(egui::TextWrapMode::Extend)
                                 );
                                 ui.add(
                                     egui::Label::new(
                                         format!("End Position: {}", parsed_value.sorted_position)
-                                        // RichText::new(format!("Ending Position: {}", hovered_cube.ending_pos))
-                                        // .color(egui::Color32::WHITE)
                                     ).wrap_mode(egui::TextWrapMode::Extend)
-                                );                               
-                                //
+                                );
+                                if parsed_value.parsed_warning != ParsedWarning::Ok{
+                                    ui.add(
+                                        egui::Label::new(
+                                            RichText::new(format!("Parse Warning: {}", parsed_value.parsed_warning))
+                                            .color(get_parse_warning_color(&parsed_value.parsed_warning).0)
+                                        ).wrap_mode(egui::TextWrapMode::Extend)
+                                    );
+                                    ui.add(
+                                        egui::Label::new(
+                                            RichText::new(format!("Raw string: \"{}\"", 
+                                                    &user_text.val[parsed_value.matched_string.start_index..parsed_value.matched_string.end_index]
+                                                    ))
+                                            .color(get_parse_warning_color(&parsed_value.parsed_warning).0)
+
+                                        ).wrap_mode(egui::TextWrapMode::Wrap)
+                                    );
+                                }
                         }
 
                     })
