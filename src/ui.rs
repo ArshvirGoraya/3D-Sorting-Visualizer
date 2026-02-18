@@ -33,6 +33,9 @@ pub struct FontScale {
     scale_step: f32,
     max: f32,
     min: f32,
+    min_window_width: f32,
+    max_window_width: f32,
+    default_window_width: f32,
 }
 impl Default for FontScale {
     fn default() -> Self {
@@ -41,6 +44,11 @@ impl Default for FontScale {
             scale_step: 0.1,
             max: 2.0,
             min: 0.5,
+            // these get set every frame (relative to the screen size which may change during
+            // update)
+            min_window_width: 0.0,
+            max_window_width: 0.0,
+            default_window_width: 0.0,
         }
     }
 }
@@ -925,10 +933,11 @@ pub fn ui_system(
         });
     }
 
-    // font_scale.scale
-    // let max_width = ctx.content_rect().width() * 0.37;
-    let width = (ctx.content_rect().width() * 0.28) * font_scale.scale;
     let scroll_height = ctx.content_rect().height() * 0.85;
+
+    // Width of the window scales with font:
+    clamp_font_scale(ctx.content_rect().width(), &mut font_scale);
+    let width = font_scale.default_window_width * font_scale.scale;
 
     let mut first_button_size: egui::Vec2 = Default::default();
 
@@ -1683,6 +1692,18 @@ pub fn increase_font(font_scale: &mut FontScale) {
 pub fn decrease_font(font_scale: &mut FontScale) {
     font_scale.scale = f32::max(font_scale.min, font_scale.scale - font_scale.scale_step);
     // log::info!("scale size: {}", font_scale.scale);
+}
+
+fn clamp_font_scale(screen_width: f32, font_scale: &mut FontScale){
+    font_scale.max_window_width = screen_width * 0.97;
+    font_scale.min_window_width = screen_width * 0.20;
+    font_scale.default_window_width = screen_width * 0.30;
+
+    // what is the font_scale min/max allowed to be such that when default_width is multiplied with
+    // it, it doesn't go over/under the min/max window width
+    font_scale.min = font_scale.min_window_width / font_scale.default_window_width;
+    font_scale.max = font_scale.max_window_width / font_scale.default_window_width;
+    font_scale.scale = font_scale.scale.clamp(font_scale.min, font_scale.max);
 }
 
 fn scale_ui(style: &mut egui::Style, scale: f32) {
