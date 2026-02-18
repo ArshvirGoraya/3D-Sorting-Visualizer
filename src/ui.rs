@@ -784,7 +784,8 @@ pub struct UserText{
 
 #[allow(clippy::too_many_arguments)]
 pub fn ui_system(
-    (mut commands, mut contexts): (Commands, EguiContexts),
+    (mut commands, mut contexts, keyboard_input): (Commands, EguiContexts, Res<ButtonInput<KeyCode>>),
+    // TODO: why get materials here and materials in cubes_query? 
     mut materials: ResMut<Assets<StandardMaterial>>,
 
     // text:
@@ -1341,7 +1342,7 @@ pub fn ui_system(
                     //
 
                     if ui.checkbox(&mut cube_scale_controls.positional_heights, "Positional Heights 󰄩")
-                        .on_hover_text("set cube heights to be relative to the position they will be in their final sorted positions instead of relative to their given value")
+                        .on_hover_text("set cube heights to be relative to the position they will be in their final sorted positions instead of simply being as tall as their value")
                         .changed(){
                             control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
                     }
@@ -1537,12 +1538,20 @@ pub fn ui_system(
     let window_contains_pointer = window_response.rect.contains(pointer_pos) || window_response.dragged();
     
 
+    let mut pan_orbit = camera_query.single_mut().unwrap();
     if ctx.is_using_pointer(){
-        let mut pan_orbit = camera_query.single_mut().unwrap();
         pan_orbit.enabled = false;
     }else{
-        let mut pan_orbit = camera_query.single_mut().unwrap();
         pan_orbit.enabled = true;
+    }
+
+    let control_pressed = keyboard_input.pressed(KeyCode::ControlLeft) || keyboard_input.pressed(KeyCode::ControlRight);
+    if window_contains_pointer || control_pressed{
+        // disable zooming in camera
+        pan_orbit.zoom_sensitivity = 0.0;
+    }else{
+        // set to default sensitivity
+        pan_orbit.zoom_sensitivity = 1.0;
     }
 
     // draw egui frame over hovered cube:

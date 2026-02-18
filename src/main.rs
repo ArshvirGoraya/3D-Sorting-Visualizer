@@ -506,6 +506,7 @@ fn font_scale_inputs(
         Res<ButtonInput<KeyCode>>,
     ),
 ) {
+
     if keyboard_input.pressed(KeyCode::ControlLeft) || keyboard_input.pressed(KeyCode::ControlRight)
     {
         // Keyboard:
