@@ -39,8 +39,8 @@ impl Default for FontScale {
         Self {
             scale: 1.0,
             scale_step: 0.1,
-            max: 10.0,
-            min: 0.1,
+            max: 2.0,
+            min: 0.5,
         }
     }
 }
@@ -208,7 +208,8 @@ pub fn spawn_random_parsed_values(
      scanned_cube: ResMut<crate::ScannedCube>,
      camera_controls_follow_selected: Local<bool>,
 
-    mut cube_scale_controls: ResMut<crate::CubeScaleControls>
+    mut cube_scale_controls: ResMut<crate::CubeScaleControls>,
+    sort_state_get: Res<State<sorter::SortState>>,
 ) {
     // generate_random_string_nums(5, -100.0, 100.0, &mut user_text.val, &mut random);
     generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, &mut user_text.val, &mut random);
@@ -231,7 +232,8 @@ pub fn spawn_random_parsed_values(
         rng_color_controls.rng_cubes_enabled,
         &mut cube_scale_controls,
         &scanned_cube,
-        &camera_controls_follow_selected
+        &camera_controls_follow_selected,
+        &sort_state_get,
     );
 }
 
@@ -258,6 +260,7 @@ fn update_parsed_values(
     cube_scale_controls: &mut ResMut<crate::CubeScaleControls>,
     scanned_cube: &ResMut<crate::ScannedCube>,
     camera_controls_follow_selected: &Local<bool>,
+    sort_state_get: &Res<State<sorter::SortState>>,
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
@@ -366,7 +369,8 @@ fn update_parsed_values(
         camera_query,
         scanned_cube,
         camera_controls_follow_selected,
-        cubes_query
+        cubes_query,
+        sort_state_get,
     );
 
 
@@ -643,6 +647,7 @@ fn control_cube_widths(
     // camera_controls_follow_get: crate::CameraControlsFollow,
     scanned_cube: &ResMut<crate::ScannedCube>,
     camera_controls_follow_selected: &Local<bool>,
+    sort_state_get: &Res<State<sorter::SortState>>,
 ){
     let end_index = parsed_values.end_index;
     
@@ -654,7 +659,15 @@ fn control_cube_widths(
         }
     }
     // Center camera:
-    center_camera(cube_width, end_index, camera_query, scanned_cube, camera_controls_follow_selected, cubes_query);
+    center_camera(
+        cube_width, 
+        end_index, 
+        camera_query, 
+        scanned_cube, 
+        camera_controls_follow_selected, 
+        cubes_query,
+        sort_state_get,
+    );
 }
 
 fn center_camera(
@@ -670,12 +683,14 @@ fn center_camera(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut Visibility,
         &mut crate::CubeData,
-    )>
+    )>,
+    sort_state_get: &Res<State<sorter::SortState>>,
 ){
     if 
         **camera_controls_follow_selected
         && let Some(scanned_cube) = scanned_cube.entity
-        && let Ok((cube_transform, _, _, _)) = cubes_query.get(scanned_cube) 
+        && let Ok((cube_transform, _, _, _)) = cubes_query.get(scanned_cube)
+        && *sort_state_get.get() == sorter::SortState::Sorting
     {
         crate::center_camera_on_cube(cube_transform, camera_query);
     }else{
@@ -1058,7 +1073,8 @@ pub fn ui_system(
                                     &mut camera_query, 
                                     &scanned_cube,
                                     &camera_controls_follow_selected,
-                                    &cubes_query
+                                    &cubes_query,
+                                    &sort_state_get
                                 );
                                 // also reset rotation?
                                 let mut pan_orbit = camera_query.single_mut().unwrap();
@@ -1374,7 +1390,8 @@ pub fn ui_system(
                                     // *camera_controls_auto_rotate_get.get(),
                                     // *camera_controls_follow_get.get(),
                                     &scanned_cube,
-                                    &camera_controls_follow_selected
+                                    &camera_controls_follow_selected,
+                                    &sort_state_get,
                                 );
                         }
                         if ui.add_enabled(
@@ -1392,7 +1409,8 @@ pub fn ui_system(
                                     // *camera_controls_auto_rotate_get.get(),
                                     // *camera_controls_follow_get.get(),
                                     &scanned_cube,
-                                    &camera_controls_follow_selected
+                                    &camera_controls_follow_selected,
+                                    &sort_state_get,
                                 );
                         }
                     });
@@ -1515,7 +1533,8 @@ pub fn ui_system(
                                     rng_color_controls.rng_cubes_enabled,
                                     &mut cube_scale_controls,
                                     &scanned_cube,
-                                    &camera_controls_follow_selected
+                                    &camera_controls_follow_selected,
+                                    &sort_state_get,
                                 );
                             }
                             *generated_rng_values = false;
@@ -1659,9 +1678,11 @@ fn string_trim_zeros(s: &str) -> String {
 
 pub fn increase_font(font_scale: &mut FontScale) {
     font_scale.scale = f32::min(font_scale.max, font_scale.scale + font_scale.scale_step);
+    // font_scale.scale += font_scale.scale_step;
 }
 pub fn decrease_font(font_scale: &mut FontScale) {
     font_scale.scale = f32::max(font_scale.min, font_scale.scale - font_scale.scale_step);
+    // log::info!("scale size: {}", font_scale.scale);
 }
 
 fn scale_ui(style: &mut egui::Style, scale: f32) {

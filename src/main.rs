@@ -341,6 +341,7 @@ pub fn center_camera_on_all_cubes(camera_query: &mut Query<&mut PanOrbitCamera>,
         pan_orbit.focus.x = center;
     }else{
         pan_orbit.target_focus.x = center;
+        pan_orbit.target_focus.y = 0.0;
     }
 
 }
