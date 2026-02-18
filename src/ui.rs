@@ -1522,11 +1522,19 @@ pub fn ui_system(
     let mut pointer_pos = ctx.pointer_latest_pos().unwrap_or_default();
     let window_contains_pointer = window_response.rect.contains(pointer_pos) || window_response.dragged();
     
-    if window_contains_pointer{
-        // TODO: disable camera input detection.
-        // But if dragging started OUTSIDE of egui and entered it later on, should still
-        // continue camera drag...
-        // MIGHT need to use a state here for egui hovered and let another system handle input
+    // if window_contains_pointer{
+    //     // TODO: disable camera input detection.
+    //     // But if dragging started OUTSIDE of egui and entered it later on, should still
+    //     // continue camera drag...
+    //     // MIGHT need to use a state here for egui hovered and let another system handle input
+    //     let mut pan_orbit = camera_query.single_mut().unwrap();
+    //     pan_orbit.enabled = false;
+    // }else{
+    //     let mut pan_orbit = camera_query.single_mut().unwrap();
+    //     pan_orbit.enabled = true;
+    // }
+
+    if ctx.is_using_pointer(){
         let mut pan_orbit = camera_query.single_mut().unwrap();
         pan_orbit.enabled = false;
     }else{
