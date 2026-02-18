@@ -126,6 +126,7 @@ pub fn increment_sorting(
     rng_color_controls: Res<crate::RNGColorControls>,
     (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
     audio_controls: Res<AudioControls>,
+    scanned_cube: ResMut<crate::ScannedCube>,
 ) {
     // this system runs when in sorting state and in quick sort state.
     // this system calls other functions, all of which can be systems themselves which trigger on
@@ -153,6 +154,7 @@ pub fn increment_sorting(
                     quick_sort_colors,
                     cube_assets,
                     rng_color_controls,
+                    scanned_cube,
                 );
             }
             SortStep::Compare => {
@@ -164,6 +166,7 @@ pub fn increment_sorting(
                     sort_select_set,
                     audio_controls,
                     commands,
+                    scanned_cube,
                 );
             }
             SortStep::Swap => {
@@ -180,6 +183,7 @@ pub fn increment_sorting(
             quick_sort_colors,
             cube_assets,
             rng_color_controls,
+            scanned_cube,
         );
         increment_timer.increment_timer.reset();
     }
@@ -199,6 +203,7 @@ pub fn setup_range(
     quick_sort_colors: Res<QuickSortColors>,
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
+    mut scanned_cube: ResMut<crate::ScannedCube>,
     // mut next_event: MessageWriter<Compare>,
 ) {
     // Only inserts if not already added:
@@ -211,6 +216,7 @@ pub fn setup_range(
         sort_state.pivot = sort_state.current_array.1 - 1;
         sort_state.j = sort_state.current_array.0;
         sort_state.i = (sort_state.current_array.0 as isize) - 1;
+        scanned_cube.entity = Some(parsed_values.vals[sort_state.j].cube_handle);
         // log::info!(
         //     "
         //     current array: ({}, {})
@@ -245,6 +251,7 @@ pub fn setup_range(
             swapped_cubes: None,
             next_step: SortStep::Compare,
         });
+        scanned_cube.entity = Some(parsed_values.vals[current_array.0].cube_handle);
         // log::info!(
         //     "
         //     current array: ({}, {})
@@ -280,10 +287,12 @@ pub fn increment_j(
     )>,
     mut commands: &mut Commands,
     audio_controls: &Res<AudioControls>,
+    mut scanned_cube: &mut ResMut<crate::ScannedCube>,
 ) {
     sort_state.j += 1;
     if sort_state.j != sort_state.pivot + 1 {
         // j may be pivot + 1: This is the condition used for detecting when a subarray is finished.
+        scanned_cube.entity = Some(parsed_values.vals[sort_state.j].cube_handle);
         color_cube(
             sort_state.j,
             SortColor::J,
@@ -313,6 +322,7 @@ pub fn compare(
     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
     audio_controls: Res<AudioControls>,
     mut commands: Commands,
+    mut scanned_cube: ResMut<crate::ScannedCube>,
 ) {
     if let Some((i, j)) = sort_state.swapped_cubes {
         // if just swapped, increment j and color the just swapped cubes the J/"covered" color.
@@ -340,6 +350,7 @@ pub fn compare(
             &mut cubes_query,
             &mut commands,
             &audio_controls,
+            &mut scanned_cube,
         );
     }
     if sort_state.j == sort_state.pivot + 1 {
@@ -400,6 +411,7 @@ pub fn compare(
                 &mut cubes_query,
                 &mut commands,
                 &audio_controls,
+                &mut scanned_cube,
             );
             sort_state.next_step = SortStep::Compare;
             return;
@@ -435,6 +447,7 @@ pub fn compare(
             &mut cubes_query,
             &mut commands,
             &audio_controls,
+            &mut scanned_cube,
         );
         sort_state.next_step = SortStep::Compare;
     }

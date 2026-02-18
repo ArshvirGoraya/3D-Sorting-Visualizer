@@ -205,6 +205,8 @@ pub fn spawn_random_parsed_values(
      Res<State<crate::CameraControlsAutoRotate>>,
      Res<State<crate::CameraControlsFollow>>,
      ),
+     scanned_cube: ResMut<crate::ScannedCube>,
+     camera_controls_follow_selected: Local<bool>,
 
     mut cube_scale_controls: ResMut<crate::CubeScaleControls>
 ) {
@@ -228,6 +230,8 @@ pub fn spawn_random_parsed_values(
         &mut materials, 
         rng_color_controls.rng_cubes_enabled,
         &mut cube_scale_controls,
+        &scanned_cube,
+        &camera_controls_follow_selected
     );
 }
 
@@ -251,7 +255,9 @@ fn update_parsed_values(
     random: &mut ResMut<Random>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     rng_color_controls_enabled: bool,
-    cube_scale_controls: &mut ResMut<crate::CubeScaleControls>
+    cube_scale_controls: &mut ResMut<crate::CubeScaleControls>,
+    scanned_cube: &ResMut<crate::ScannedCube>,
+    camera_controls_follow_selected: &Local<bool>,
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
@@ -354,7 +360,14 @@ fn update_parsed_values(
 
     // center the camera (if amount or width scale has changed. Just centering it each time here as no
     // variable tracks if width scale has changed and not really expensive to do anyway).
-    center_camera(cube_width, parsed_values.end_index, camera_query, *camera_controls_auto_rotate_get.get(), *camera_controls_follow_get.get());
+    center_camera(
+        cube_width, 
+        parsed_values.end_index, 
+        camera_query,
+        scanned_cube,
+        camera_controls_follow_selected,
+        cubes_query
+    );
 
 
     // positional heights
@@ -599,32 +612,9 @@ fn spawn_a_cube(
         crate::CubeData{
             index
         }
-    )).observe(|mut event: On<Pointer<Click>>, transform: Query<&Transform>, mut camera_query: Query<&mut PanOrbitCamera>|{
-        let cube_transform = transform.get(event.entity).unwrap();
-        let mut cube_center = cube_transform.translation;
-        cube_center.x += cube_transform.scale.x / 2.0;
-
-        let mut pan_orbit = camera_query.single_mut().unwrap();
-        pan_orbit.target_focus = cube_center;
-        log::info!("Cursor clicked a cube at position: {}", transform.get(event.entity).unwrap().translation.x);
-        event.propagate(false);
-        //
-    })
-    // .observe(|mut event: On<Pointer<Over>>, mut hovered_cube: ResMut<crate::HoveredCube>|{
-    //     // Add a egui frame at the cursor position
-    //     log::info!("cursor over a cube. Cursor's screen position : {}", event.pointer_location.position);
-    //     // Add all information about the hovered cube into a resource which will be contained in an
-    //     // egui frame
-    //     event.propagate(false);
+    )).observe(crate::detect_cube_clicked)
     // })
     .id()
-
-    // cube.id()
-    // commands.spawn((
-    //         cube_assets.mesh.clone(), 
-    //         get_cube_material(rng_color_controls_enabled, parsed_warning, cube_assets, rng_color), 
-    //         transform
-    // )).id()
 }
 
 fn set_width_and_horizontal_position(index: usize, transform: &mut Transform, cube_width: f32){
@@ -632,7 +622,7 @@ fn set_width_and_horizontal_position(index: usize, transform: &mut Transform, cu
     transform.translation.x = transform.scale.x * (index as f32);
 }
 
-fn get_cube_size_from_width_scale(end_index : usize, cube_scale_controls: & ResMut<crate::CubeScaleControls>) -> f32{
+pub fn get_cube_size_from_width_scale(end_index : usize, cube_scale_controls: &ResMut<crate::CubeScaleControls>) -> f32{
     if cube_scale_controls.width_scale_enable{
         return (cube_scale_controls.width_scale / ((end_index-1) as f64)) as f32
     }
@@ -649,8 +639,10 @@ fn control_cube_widths(
         &mut crate::CubeData,
     )>,
     camera_query: &mut Query<&mut PanOrbitCamera>,
-    camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
-    camera_controls_follow_get: crate::CameraControlsFollow,
+    // camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
+    // camera_controls_follow_get: crate::CameraControlsFollow,
+    scanned_cube: &ResMut<crate::ScannedCube>,
+    camera_controls_follow_selected: &Local<bool>,
 ){
     let end_index = parsed_values.end_index;
     
@@ -662,34 +654,34 @@ fn control_cube_widths(
         }
     }
     // Center camera:
-    center_camera(cube_width, end_index, camera_query, camera_controls_auto_rotate_get, camera_controls_follow_get);
+    center_camera(cube_width, end_index, camera_query, scanned_cube, camera_controls_follow_selected, cubes_query);
 }
 
 fn center_camera(
     cube_width: f32,
     end_index: usize,
     camera_query: &mut Query<&mut PanOrbitCamera>,
-    camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
-    camera_controls_follow_get: crate::CameraControlsFollow,
+    // camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
+    // camera_controls_follow_get: crate::CameraControlsFollow,
+    scanned_cube: &ResMut<crate::ScannedCube>,
+    camera_controls_follow_selected: &Local<bool>,
+    cubes_query: &Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut Visibility,
+        &mut crate::CubeData,
+    )>
 ){
-    let mut pan_orbit = camera_query.single_mut().unwrap();
-
-    if camera_controls_follow_get == CameraControlsFollow::NotFollowing{
-        let center = cube_width * ((end_index) as f32) / 2.0;
-
-        if !pan_orbit.initialized{
-            // setting target_focus before initialization = doesn't do anything.
-            // setting both target_focus and focus each time = doesn't update if egui is in focus
-            // has to be set focus before initialization, and set target_focus afterwards.
-            pan_orbit.focus.x = center;
-        }else{
-            pan_orbit.target_focus.x = center;
-        }
-
+    if 
+        **camera_controls_follow_selected
+        && let Some(scanned_cube) = scanned_cube.entity
+        && let Ok((cube_transform, _, _, _)) = cubes_query.get(scanned_cube) 
+    {
+        crate::center_camera_on_cube(cube_transform, camera_query);
     }else{
-        //  TODO:
-        log::warn!("no functionality for centering camera on follow selected yet")
+        crate::center_camera_on_all_cubes(camera_query, cube_width, end_index);
     }
+
 }
 
 fn set_position_height_and_vertical_position(positional_value: usize, transform: &mut Transform, cube_scale_controls: & ResMut<crate::CubeScaleControls>){
@@ -823,7 +815,8 @@ pub fn ui_system(
     // cubes:
     (cube_assets,
      mut cubes_query,
-     hovered_cube
+     hovered_cube,
+     mut scanned_cube,
     ):
     (
         Res<CubeAssets>, 
@@ -833,7 +826,8 @@ pub fn ui_system(
             &mut Visibility,
             &mut crate::CubeData,
         )>,
-        Res<crate::HoveredCube>
+        Res<crate::HoveredCube>,
+        ResMut<crate::ScannedCube>
     ),
 
     // camera:
@@ -1052,12 +1046,18 @@ pub fn ui_system(
                         if ui.button("Reset ")
                             .on_hover_text("reset the camera to original position")
                             .clicked(){
+                                // remove following scanned cube if that is true
+                                // *camera_controls_follow_selected = false;
+                                // camera_controls_follow_set.set(crate::CameraControlsFollow::NotFollowing);
+                                // scanned_cube.entity = None;
+
                                 center_camera(
                                     get_cube_size_from_width_scale(parsed_values.end_index, &cube_scale_controls), 
                                     parsed_values.end_index, 
                                     &mut camera_query, 
-                                    *camera_controls_auto_rotate_get.get(), 
-                                    *camera_controls_follow_get.get()
+                                    &scanned_cube,
+                                    &camera_controls_follow_selected,
+                                    &cubes_query
                                 );
                                 // also reset rotation?
                                 let mut pan_orbit = camera_query.single_mut().unwrap();
@@ -1079,12 +1079,20 @@ pub fn ui_system(
                     });
                     cols[2].vertical_centered_justified(|ui|{
                         if ui.checkbox(&mut camera_controls_follow_selected, "Follow 󰮄")
-                            .on_hover_text("center camera on selected cube")
+                            .on_hover_text("follow the sorting algorithm as it scans across the cubes")
                             .changed(){
                                 if *camera_controls_follow_selected{
                                     camera_controls_follow_set.set(crate::CameraControlsFollow::Following);
                                 } else {
                                     camera_controls_follow_set.set(crate::CameraControlsFollow::NotFollowing);
+                                    // center_camera(
+                                    //     get_cube_size_from_width_scale(parsed_values.end_index, &cube_scale_controls), 
+                                    //     parsed_values.end_index, 
+                                    //     &mut camera_query, 
+                                    //     &scanned_cube,
+                                    //     &camera_controls_follow_selected,
+                                    //     &cubes_query
+                                    // );
                                 }
                         }
                     });
@@ -1362,8 +1370,10 @@ pub fn ui_system(
                                     &cube_scale_controls, 
                                     &mut cubes_query, 
                                     &mut camera_query, 
-                                    *camera_controls_auto_rotate_get.get(),
-                                    *camera_controls_follow_get.get(),
+                                    // *camera_controls_auto_rotate_get.get(),
+                                    // *camera_controls_follow_get.get(),
+                                    &scanned_cube,
+                                    &camera_controls_follow_selected
                                 );
                         }
                         if ui.add_enabled(
@@ -1378,8 +1388,10 @@ pub fn ui_system(
                                     &cube_scale_controls, 
                                     &mut cubes_query, 
                                     &mut camera_query, 
-                                    *camera_controls_auto_rotate_get.get(),
-                                    *camera_controls_follow_get.get(),
+                                    // *camera_controls_auto_rotate_get.get(),
+                                    // *camera_controls_follow_get.get(),
+                                    &scanned_cube,
+                                    &camera_controls_follow_selected
                                 );
                         }
                     });
@@ -1500,7 +1512,9 @@ pub fn ui_system(
                                     &mut random,
                                     &mut materials,
                                     rng_color_controls.rng_cubes_enabled,
-                                    &mut cube_scale_controls
+                                    &mut cube_scale_controls,
+                                    &scanned_cube,
+                                    &camera_controls_follow_selected
                                 );
                             }
                             *generated_rng_values = false;
@@ -1522,17 +1536,6 @@ pub fn ui_system(
     let mut pointer_pos = ctx.pointer_latest_pos().unwrap_or_default();
     let window_contains_pointer = window_response.rect.contains(pointer_pos) || window_response.dragged();
     
-    // if window_contains_pointer{
-    //     // TODO: disable camera input detection.
-    //     // But if dragging started OUTSIDE of egui and entered it later on, should still
-    //     // continue camera drag...
-    //     // MIGHT need to use a state here for egui hovered and let another system handle input
-    //     let mut pan_orbit = camera_query.single_mut().unwrap();
-    //     pan_orbit.enabled = false;
-    // }else{
-    //     let mut pan_orbit = camera_query.single_mut().unwrap();
-    //     pan_orbit.enabled = true;
-    // }
 
     if ctx.is_using_pointer(){
         let mut pan_orbit = camera_query.single_mut().unwrap();

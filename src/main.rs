@@ -104,12 +104,11 @@ pub struct CubeData {
     index: usize, // matches the index at ParsedValues.val (which holds this cube's data).
 }
 
-// Wrap HoveredCube in a state to make it update at the end of a frame/tick instead of possibly in-between.
-// #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
-// pub enum HoveredCubeState {
-//     #[default]
-//     CubeState(HoveredCube),
-// }
+#[derive(Resource, Default)]
+pub struct ScannedCube{
+    entity: Option<Entity>
+}
+
 
 // Marker Components:
 #[derive(Component)]
@@ -160,6 +159,7 @@ fn main() {
     .init_resource::<ui::FontScale>()
     .init_resource::<ui::UserText>()
     .init_resource::<HoveredCube>()
+    .init_resource::<ScannedCube>()
     .init_resource::<RNGValuesControls>()
     .insert_resource(ClearColor {
         ..Default::default()
@@ -218,13 +218,20 @@ fn main() {
         .add_systems(
             Update,
             (detect_cube_hover_enter, detect_cube_hover_exit).chain(),
-        );
+        )
+        .add_systems(Update,
+            keep_cube_centered
+            .run_if(in_state(sorter::SortState::Sorting))
+            .run_if(in_state(CameraControlsFollow::Following))
+        )
+        ;
 
     app.add_message::<StopAllAudio>();
     app.add_systems(Update, stop_all_audio.run_if(on_message::<StopAllAudio>));
 
     // sort systems
     app.init_state::<sorter::SortState>()
+        .add_systems(OnExit(sorter::SortState::Sorting), center_camera_on_sort_exited.run_if(in_state(CameraControlsFollow::Following)))
         .init_state::<sorter::Algorithms>()
         // .add_systems(OnEnter(sorter::SortState::Sorting), sorter::begin_sorting)
         // Quick Sort:
@@ -287,6 +294,64 @@ fn tests(){
         sorted_indices[3],
         sorted_indices[4]
         );
+}
+
+pub fn keep_cube_centered(
+    transform: Query<&Transform, With<CubeData>>,
+    scanned_cube: Res<ScannedCube>,
+    mut camera_query: Query<&mut PanOrbitCamera>,
+    ){
+    // INFO: runs if in state: Sorting, and Following.
+    if let Some(scanned_cube) = scanned_cube.entity{
+        // INFO: the scanned_cube is set when sorting (when algorithm scans through all the cubes).
+        center_camera_on_cube(transform.get(scanned_cube).unwrap(), &mut camera_query);
+    }
+}
+
+pub fn detect_cube_clicked(
+    mut event: On<Pointer<Click>>, 
+    transform: Query<&Transform, With<CubeData>>, 
+    mut camera_query: Query<&mut PanOrbitCamera>,
+){
+    // INFO: This system is attached to cubes when they are spawned
+    center_camera_on_cube(transform.get(event.entity).unwrap(), &mut camera_query);
+    event.propagate(false);
+}
+
+pub fn center_camera_on_sort_exited(
+    mut camera_query: Query<&mut PanOrbitCamera>, 
+    parsed_values: Res<ui::ParsedValues>, 
+    cube_scale_controls: ResMut<crate::CubeScaleControls>,
+){
+    // once sort is exited (early on after finishing) and if we are following scan cube
+    // recenter the camera
+    let end_index = parsed_values.end_index;
+    let cube_width = ui::get_cube_size_from_width_scale(parsed_values.end_index, &cube_scale_controls);
+    center_camera_on_all_cubes(&mut camera_query, cube_width, end_index);
+}
+
+pub fn center_camera_on_all_cubes(camera_query: &mut Query<&mut PanOrbitCamera>, cube_width: f32, end_index: usize){
+    let mut pan_orbit = camera_query.single_mut().unwrap();
+    let center = cube_width * ((end_index) as f32) / 2.0;
+
+    if !pan_orbit.initialized{
+        // setting target_focus before initialization = doesn't do anything.
+        // setting both target_focus and focus each time = doesn't update if egui is in focus
+        // has to be set focus before initialization, and set target_focus afterwards.
+        pan_orbit.focus.x = center;
+    }else{
+        pan_orbit.target_focus.x = center;
+    }
+
+}
+
+pub fn center_camera_on_cube(cube_transform: &Transform, camera_query: &mut Query<&mut PanOrbitCamera>){
+    let mut cube_center = cube_transform.translation;
+    cube_center.x += cube_transform.scale.x / 2.0;
+
+    let mut pan_orbit = camera_query.single_mut().unwrap();
+    pan_orbit.target_focus = cube_center;
+    // log::info!("Cursor clicked a cube at position: {}", transform.get(event.entity).unwrap().translation.x);
 }
 
 fn detect_cube_hover_enter(
