@@ -19,31 +19,38 @@ bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_render",
   "bevy_shader",
   "bevy_state",
-  "bevy_window",
   "bevy_winit",
   "mp3",
   "png",
   "symphonia-aac",
   "symphonia-flac",
-  # "symphonia-vorbis",
   "symphonia-wav",
-  # "dynamic_linking",
   "tonemapping_luts",
   "vorbis",
-  "web",
-  "webgl2",
   "zstd_rust"
 ] }
 bevy_egui = "0.38.1"
-# https://github.com/Plonq/bevy_panorbit_camera/blob/master/Cargo.toml#L14
 bevy_panorbit_camera = { version = "0.33.0" }
-console_error_panic_hook = "0.1.7"
-# egui_file = "0.24.2"
-fastrand = { version = "2.3.0", features = ["js"] }
-futures = "0.3.31"
+fastrand = { version = "2.3.0" }
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 regex-lite = "0.1.8"
-rfd = "0.17.2"
+rfd = "0.17.2"  # required in wasm as well: Error goes away: no method named `get` found for struct `FileList` in the current scope
+
+[dev-dependencies]
+bevy = { version = "0.17.3", default-features = false, features = ["debug"] }
+bevy_egui = { version = "0.38.1", features = [
+  "log_file_dnd_messages",
+  "log_input_messages"
+] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+bevy = { version = "0.17.3", default-features = false, features = [
+  "web",
+  "webgl2"
+] }
+console_error_panic_hook = "0.1.7"
+fastrand = { version = "2.3.0", features = ["js"] }
+futures = "0.3.31"
 wasm-bindgen-futures = "0.4.58"
 web-sys = { version = "0.3.85", features = [
   "Document",
@@ -52,51 +59,22 @@ web-sys = { version = "0.3.85", features = [
   "Window"
 ] }
 
-[dev-dependencies]  # only for debug builds
-bevy = { version = "0.17.3", default-features = false, features = ["debug"] }
-# https://github.com/vladbat00/bevy_egui/blob/main/Cargo.toml#L16
-bevy_egui = { version = "0.38.1", features = [
-  "log_file_dnd_messages",
-  "log_input_messages"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+bevy = { version = "0.17.3", default-features = false, features = [
+  "bevy_window",
 ] }
 
-## ######################## Bevy Compilation Settings #############################################
-# https://bevy.org/learn/quick-start/getting-started/setup/#compile-with-performance-optimizations
-
-# Enable a small amount of optimization in the dev profile.
 [profile.dev]
+# Very little optimizations on dev builds
 opt-level = 0
-debug = false
+debug = true  # not using a debugger currently so no need to enable this
 codegen-units = 16
 
-# Enable a large amount of optimization in the dev profile for dependencies.
 [profile.dev.package."*"]
 opt-level = 3
 
-# Release Builds #############################################################
-
-# Enable more optimization in the release profile at the cost of compile time.
 [profile.release]
-# Do a second optimization pass over the entire program, including dependencies.
-# Slows compile times, marginal improvements.
-lto = "thin"
-# Compile the entire crate as one unit.
-# Slows compile times, marginal improvements.
+lto = "fat"
 codegen-units = 1
-
-[profile.test]
-opt-level = 1  # higher = faster runtime. slower compile time.
-debug = true
-codegen-units = 16
-
-# Development Builds: ########################################################
-
-# Optimize for size in the wasm-release profile to reduce load times and bandwidth usage on web.
-[profile.wasm-release]
-# Default to release profile values.
-inherits = "release"
-# Optimize with size in mind (also try "z", sometimes it is better).
-# Slightly slows compile times, great improvements to file size and runtime performance.
-opt-level = "s"  # optimize for size instead of speed. 'z' optimizes for size even more at cost of performance.
-# Strip all debugging information from the binary to slightly reduce file size.
-strip = "debuginfo"
+# opt-level = "s" # set in index.html instead just for wasm builds
+# strip = "debuginfo" # may not want to do this for all builds

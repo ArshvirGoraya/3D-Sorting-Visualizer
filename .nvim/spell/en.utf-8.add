@@ -46,3 +46,13 @@ subarray
 subarrays
 onchange
 filelist
+bindgen
+zstd_rust
+vorbis
+tonemapping_luts
+bevy_winit
+msvc
+rustdocflags
+rustflags
+Zshare
+Zthreads

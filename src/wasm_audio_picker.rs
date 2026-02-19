@@ -9,16 +9,16 @@ use bevy::{
         resource::Resource,
         system::{Commands, ResMut},
     },
-    input::mouse::{MouseMotion, MouseWheel},
+    input::mouse::MouseMotion,
     state::state::NextState,
 };
 use web_sys::{
-    Document, FileReader, HtmlInputElement, Window, console,
-    js_sys::{self, ArrayBuffer, Uint8Array},
-    wasm_bindgen::{JsCast, JsValue, prelude::Closure},
+    HtmlInputElement, console,
+    js_sys::Uint8Array,
+    wasm_bindgen::{JsCast, prelude::Closure},
 };
 
-use futures::channel::mpsc::{Receiver, Sender, channel};
+use futures::channel::mpsc::{Receiver, channel};
 
 use crate::AudioControls;
 
@@ -88,7 +88,11 @@ pub fn spawn_browser_audio_handlers(mut commands: Commands) {
                             }))
                         {
                             // Failed to send file buffer...
-                            log::warn!("sender failed to send file {}", file.name());
+                            log::warn!(
+                                "sender failed to send file {} with error {}",
+                                file.name(),
+                                error
+                            );
                         }
                     }
                     Err(err) => {
@@ -104,7 +108,10 @@ pub fn spawn_browser_audio_handlers(mut commands: Commands) {
         } else {
             if let Err(error) = sender_clone.try_send(FileEvent::FileNotSelected) {
                 // Failed to get file from picker...
-                log::warn!("sender failed to send no file selected event");
+                log::warn!(
+                    "sender failed to send no file not selected event with error {}",
+                    error
+                );
             }
         }
     });
@@ -126,7 +133,7 @@ pub fn audio_select_listener(
     mut audio_assets: ResMut<Assets<AudioSource>>,
     mut audio_file_channel: ResMut<BrowserAudioFileChannel>,
     mut audio_receiver_listening_set: ResMut<NextState<crate::WasmAudioReceiverListening>>,
-    mut mouse_event: MessageReader<MouseMotion>,
+    mouse_event: MessageReader<MouseMotion>,
 ) {
     // INFO: only runs if in_state(WasmAudioReceiverListening::Listening)
 

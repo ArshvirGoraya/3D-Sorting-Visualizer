@@ -1,34 +1,21 @@
 <html>
   <head>
-    <!-- https://trunkrs.dev/guide/assets/index.html -->
+    <!-- https://trunk-rs.github.io/trunk/guide/assets/index.html -->
     <link data-trunk rel="copy-dir" href="./assets/" />
     <link data-trunk rel="scss" href="index.scss" />
     <link data-trunk rel="rust" data-wasm-opt="z" />
   </head>
   <style>
+    /* maybe remove when embedding in canvas that is NOT fullscreen on browser? */
     canvas {
       outline: none;
-    } /* maybe remove when embedding in canvas that is NOT fullscreen on browser? */
+    }
+    body{
+      margin: 10px;
+      background-color: 2b2c2f;
+    }
   </style>
-  <body style="margin: 10px; background-color: 2b2c2f">
+  <body>
     <input type="file" id="audio_picker" accept=".ogg,.flac,.wav,.mp3,.aac" style="display: none;"/>
   </body>
-  <!-- <script> -->
-  <!--   const input = document.getElementById("audio_picker"); -->
-  <!--   input.addEventListener("change", async (event) =>{ -->
-  <!--     const file = input.files[0]; -->
-  <!--     if (!file) return; -->
-  <!--     // Could check for file size here and limit the size so big files can't be added? -->
-  <!---->
-  <!--     // Browser copies data (doing this in Rust doesn't make it faster!!) -->
-  <!--     const arrayBuffer = await file.arrayBuffer(); -->
-  <!---->
-  <!--     // Small wrapper needed to convert to Vec<u8> in Rust. Nothing is copied here!! -->
-  <!--     const uint8Array = new Uint8Array(array_buffer) -->
-  <!---->
-  <!--     // new copy of the bytes gets created in this rust function! So 2 copies (even if you write this all in rust) :( -->
-  <!--     // Ideally garbage collection removes the first copy fast. -->
-  <!--     window.browser_file_bytes_response(uint8Array) -->
-  <!--   }) -->
-  <!-- </script> -->
 </html>

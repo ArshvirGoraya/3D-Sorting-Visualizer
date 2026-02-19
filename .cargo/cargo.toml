@@ -7,6 +7,3 @@ rustflags = [
   # "-Zshare-generics=n", # This needs to be off if you use dynamic linking on Windows.
   # "-Zthreads=0",
 ]
-
-# [target.wasm32-unknown-unknown]
-# rustdocflags = ["-Clinker=rust-lld.exe"]

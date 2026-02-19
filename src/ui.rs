@@ -814,11 +814,13 @@ pub fn ui_system(
     // audio:
     (mut audio_controls, 
      mut audio_assets,
-     mut stop_all_audio_event
+     audio_receiver_listening_set, // INFO: USED IN WASM BUILD DO NOT REMOVE
+     mut stop_all_audio_event,
     ): 
         (
             ResMut<AudioControls>,
             ResMut<Assets<AudioSource>>,
+            Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
             MessageWriter<crate::StopAllAudio>,
         ),
     // random:
@@ -1068,7 +1070,7 @@ pub fn ui_system(
                                             .on_hover_text("open file dialog to select supported audio file")
                                             .clicked(){
 
-                                                #[cfg(not(target_arch = "wasm32"))]
+                                                #[cfg(target_arch = "x86_64")]
                                                 {
                                                     #[allow(clippy::collapsible_if)]
                                                     if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["aac", "flac", "wav", "ogg", "mp3"]).pick_file(){
