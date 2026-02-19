@@ -1,4 +1,4 @@
-use crate::{AudioControls, CameraControlsFollow, PROGRAM_TITLE, sorter};
+use crate::{AudioControls, PROGRAM_TITLE, sorter};
 
 use core::{f64, fmt};
 use std::time::Duration;
@@ -7,7 +7,7 @@ use bevy::{platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Margin, RichText, Spacing, pos2, style::ScrollStyle, vec2},
+    egui::{self, Margin, RichText, Spacing, style::ScrollStyle, vec2},
 };
 
 use bevy_panorbit_camera::PanOrbitCamera;
@@ -60,11 +60,7 @@ pub struct NumberRegex {
 
 impl Default for NumberRegex {
     fn default() -> Self {
-        // matches integers, floats, scientific notation
         Self {
-            // re: Regex::new(r"-?\d+(?:\.\d+)?(?:[eE]-?\d+)?").expect("valid regex"),
-            // no scientific notations included:
-            // re: Regex::new(r"-?\d+(?:\.\d+)?").expect("valid regex"),
             // positive or minus, d.d, or .d, or d.
             re: Regex::new(r"-?(?:\d+\.\d*|\.\d+|\d+)").expect("valid regex"),
         }
@@ -89,7 +85,6 @@ impl fmt::Display for ParsedWarning {
     }
 }
 
-// Cube stuff. Maybe better if not in this file?
 #[derive(Resource)]
 pub struct CubeAssets {
     pub mesh: Mesh3d,
@@ -110,20 +105,17 @@ pub struct ParsedValue {
     pub parsed_warning: ParsedWarning,
     pub cube_handle: Entity,
     pub rng_color: MeshMaterial3d<StandardMaterial>,
-    pub sorted_position: usize, // final_position
-    // pub start_position: usize,
+    pub sorted_position: usize, 
 }
 
 #[derive(Resource, Default)]
 pub struct ParsedValues {
     pub vals: Vec<ParsedValue>,
     pub end_index: usize, // marks the position of visible and invisible cubes
-    // updated_sorted_positions: bool,
 }
 
 #[derive(Default)]
 pub struct NumString {
-    // requires_restring: bool,
     cleaned_string: bool,
     val: String,
 }
@@ -133,45 +125,42 @@ pub struct CopyTimer {
     pub copy_timer: Timer,
 }
 
-#[allow(dead_code)]
-fn tests() {
-    // test_detect_precision_loss
-    let regex_matches = [
-        // positives:
-        "1.1",
-        ".1",
-        "1",
-        "0.0",
-        ".0",
-        "0",
-        // negatives:
-        "-1.1",
-        "-.1",
-        "-1",
-        "-0.0",
-        "-.0",
-        "-0",
-        // extras:
-        "0000001.1",
-        "0000001",
-        "000000100000000",
-        "1.0000000000000000",
-        // precision loss: this should NOT match
-        "1.00000000000000000000001",
-    ];
-    regex_matches.iter().for_each(|original| {
-        detect_precision_loss(original, original.parse::<f64>().unwrap());
-    });
-}
+// #[allow(dead_code)]
+// fn tests() {
+//     // test_detect_precision_loss
+//     let regex_matches = [
+//         // positives:
+//         "1.1",
+//         ".1",
+//         "1",
+//         "0.0",
+//         ".0",
+//         "0",
+//         // negatives:
+//         "-1.1",
+//         "-.1",
+//         "-1",
+//         "-0.0",
+//         "-.0",
+//         "-0",
+//         // extras:
+//         "0000001.1",
+//         "0000001",
+//         "000000100000000",
+//         "1.0000000000000000",
+//         // precision loss: this should NOT match
+//         "1.00000000000000000000001",
+//     ];
+//     regex_matches.iter().for_each(|original| {
+//         detect_precision_loss(original, original.parse::<f64>().unwrap());
+//     });
+// }
 
 pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, text: &mut String, random: &mut ResMut<Random>){
     text.clear();
-    // let range_helper = (max - min) + min;
     let range_helper = max - min;
-    log::info!("range_helper: {range_helper}");
 
     for index in 0..amount{
-        // text.push_str((format!("{:.2}", random.rng.f64() * range_helper)).trim_end_matches("0").trim_end_matches("."));
         text.push_str((format!("{:.2}", min + random.rng.f64() * range_helper )).trim_end_matches("0").trim_end_matches("."));
         if index != amount -1 {
             text.push_str(", ");
@@ -182,7 +171,6 @@ pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, text: &mut
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_random_parsed_values(
     mut commands: Commands,
-    // meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut random: ResMut<Random>,
     mut user_text: ResMut<UserText>,
@@ -196,8 +184,6 @@ pub fn spawn_random_parsed_values(
 
     rng_values_controls: Res<crate::RNGValuesControls>,
     rng_color_controls: Res<crate::RNGColorControls>,
-    // mut update_list: ResMut<UpdateList>,
-    // update_cubes_event: MessageWriter<UpdateCubes>,
     mut parsed_values: ResMut<ParsedValues>,
     mut cubes_query: Query<(
         &mut Transform,
@@ -205,24 +191,15 @@ pub fn spawn_random_parsed_values(
         &mut Visibility,
         &mut crate::CubeData,
     )>,
-    (mut camera_query, 
-     camera_controls_auto_rotate_get,
-     camera_controls_follow_get,
-     ): (
-     Query<&mut PanOrbitCamera>, 
-     Res<State<crate::CameraControlsAutoRotate>>,
-     Res<State<crate::CameraControlsFollow>>,
-     ),
-     scanned_cube: ResMut<crate::ScannedCube>,
-     camera_controls_follow_selected: Local<bool>,
+    mut camera_query: Query<&mut PanOrbitCamera>,
+
+    scanned_cube: ResMut<crate::ScannedCube>,
+    camera_controls_follow_selected: Local<bool>,
 
     mut cube_scale_controls: ResMut<crate::CubeScaleControls>,
     sort_state_get: Res<State<sorter::SortState>>,
 ) {
-    // generate_random_string_nums(5, -100.0, 100.0, &mut user_text.val, &mut random);
     generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, &mut user_text.val, &mut random);
-
-    // Just doing this for now: uncomment the above in release!
     // user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
     update_parsed_values(
         number_regex, 
@@ -233,8 +210,6 @@ pub fn spawn_random_parsed_values(
         &mut parsed_values, 
         &mut cubes_query, 
         &mut camera_query,
-        camera_controls_auto_rotate_get,
-        camera_controls_follow_get,
         &mut random, 
         &mut materials, 
         rng_color_controls.rng_cubes_enabled,
@@ -260,8 +235,6 @@ fn update_parsed_values(
         &mut crate::CubeData,
     )>,
     camera_query: &mut Query<&mut PanOrbitCamera>,
-    camera_controls_auto_rotate_get: Res<State<crate::CameraControlsAutoRotate>>,
-    camera_controls_follow_get: Res<State<crate::CameraControlsFollow>>,
     random: &mut ResMut<Random>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     rng_color_controls_enabled: bool,
@@ -272,7 +245,7 @@ fn update_parsed_values(
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
-    log::info!("--");
+    // log::info!("--");
     number_regex
         .re
         .find_iter(&user_text.val)
@@ -295,7 +268,7 @@ fn update_parsed_values(
                         *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::PrecisionLoss);
                     }
                     else if n.is_nan(){
-                        // log::error!("number is NaN: {}", s);
+                        log::error!("number is NaN: {}", s);
                         parsed_warning = ParsedWarning::Error;
                         *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
                         converted_val = 0.0;
@@ -316,8 +289,8 @@ fn update_parsed_values(
                         cube_scale_controls,
                     );
                 },
-                Err(_err) => {
-                    // log::error!("failed to parse: {} with err {}", s, err);
+                Err(err) => {
+                    log::error!("failed to parse: {} with err {}", s, err);
                     *worse_parse_problem = set_worse_parse_problem(&worse_parse_problem, ParsedWarning::Error);
                     add_parsed_value(
                         parsed_values, 
@@ -338,7 +311,6 @@ fn update_parsed_values(
             }
             index += 1;
         });
-    // let visible_cube_count_changed = parsed_values.end_index != index;
     parsed_values.end_index = index;
  
     // DO NOT PUT THIS IN SECOND LOOP: this loops from end_index to end, not beginning to
@@ -348,10 +320,10 @@ fn update_parsed_values(
     // also be invisible). cube before this is the last visible one.
     // check if the block is contained within the total number of blocks.
     //
-    log::info!("{} < {}: {}", parsed_values.end_index, parsed_values.vals.len(), parsed_values.end_index < parsed_values.vals.len());
+    // log::info!("{} < {}: {}", parsed_values.end_index, parsed_values.vals.len(), parsed_values.end_index < parsed_values.vals.len());
     //
     if parsed_values.end_index < parsed_values.vals.len() {
-        log::info!("making cubes >= index {} invisible", parsed_values.end_index);
+        // log::info!("making cubes >= index {} invisible", parsed_values.end_index);
         for parsed_value in &parsed_values.vals[parsed_values.end_index..]{
             if let Ok((_, _, mut visibility, _)) = cubes_query.get_mut(parsed_value.cube_handle){
                 if *visibility == Visibility::Hidden{
@@ -362,7 +334,7 @@ fn update_parsed_values(
                     break;
                 }
                 *visibility = Visibility::Hidden;
-                log::info!("make cube {} invisible", parsed_value.converted_value);
+                // log::info!("make cube {} invisible", parsed_value.converted_value);
             }
         }
     }
@@ -382,26 +354,17 @@ fn update_parsed_values(
     );
 
 
-    // positional heights
-
-
-    // parsed_values.updated_sorted_positions = false;
-
     // INFO: update sorted positions regardless of whether we want positional_heights or not.
     // Because: all sorting algorithms use sorted_position instead of converted_value to sort
-    // because it converted_value of the SAME value has NO gurantee of being put in the same 
+    // because it converted_value of the SAME value has NO grantee of being put in the same 
     // position as the sorted_position dictates (this is because same sort algorithms are 
     // NOT stable (e.g., if two elements are equal their relative order is not preserved)). 
     // This leads to boxes which are visually taller/shorter being in the wrong order
-    // If we sort by sorted_position, then we dont't have to deal with this.
+    // If we sort by sorted_position, then we don't have to deal with this.
     // 
     // ALSO: for hovering over elements: i want to see their final position on hover data even if
     // positional_heights is not used.
     update_sorted_positions(parsed_values);
-
-    // if cube_scale_controls.positional_heights{
-    //     update_sorted_positions(parsed_values);
-    // }
 
     // Update 
     update_parsed_values_second_loop(parsed_values, cube_scale_controls, cubes_query, commands, cube_width);
@@ -421,8 +384,6 @@ fn update_sorted_positions(parsed_values: &mut ParsedValues){
     for (final_position, current_position) in sorted_indices.iter().enumerate(){
         parsed_values.vals[*current_position].sorted_position = final_position;
     }
-
-    // parsed_values.updated_sorted_positions = true;
 }
 
 
@@ -440,9 +401,7 @@ fn update_parsed_values_second_loop(
     cube_width: f32,
 ){
     // Logic that can only occur AFTER regex loop.
-    //
     // If cube_scale_controls.width_scale_enable, set widths and horizontal positions of the cubes up to end_index
-    //
     // If cube_scale_controls.positional_heights, set the heights and vertical position of cubes up
     // to end_index.
 
@@ -551,7 +510,7 @@ fn add_parsed_value(
         }
         parsed_value.parsed_warning = parsed_warning;
         parsed_value.converted_value = converted_value;
-        log::info!("updating cube/value at index {}", index);
+        // log::info!("updating cube/value at index {}", index);
     } else {
         let rng_color = crate::spawn_and_get_random_color_handle(materials, random);
         parsed_values.vals.push(ParsedValue {
@@ -572,15 +531,13 @@ fn add_parsed_value(
                 index, 
                 parsed_warning, 
                 converted_value, 
-                // materials, 
                 rng_color_controls_enabled, 
                 rng_color, 
                 cube_scale_controls
             ),
             sorted_position: 0, // this gets changed later
-            // ..Default::default()
         });
-        log::info!("creating new cube/value at index {}", index);
+        // log::info!("creating new cube/value at index {}", index);
     }
 }
 
@@ -591,20 +548,15 @@ fn spawn_a_cube(
     index: usize, 
     parsed_warning: ParsedWarning, 
     converted_value: f64, 
-    // materials: &mut ResMut<Assets<StandardMaterial>>, 
     rng_color_controls_enabled: bool, 
     rng_color: MeshMaterial3d<StandardMaterial>,
     cube_scale_controls: & ResMut<crate::CubeScaleControls>
 ) -> Entity{
-    // INFO about cube horizontal size and positioning:
+    // INFO: about cube horizontal size and positioning:
     // Must just use the default horizontal size and position here, If
     // cube_scale_controls.width_scale must be used, it used after the regex loop after total cube
     // count is known.
-    // let size = Vec3{ // disabling this cus cube_width is just one anyway...
-    //     x: CUBE_WIDTH,
-    //     y: 1.0,
-    //     z: 1.0,
-    // };
+
     let mut transform = Transform::from_translation(Vec3::ZERO).with_scale(Vec3::ONE);
     transform.translation.x = transform.scale.x * (index as f32); 
 
@@ -625,7 +577,6 @@ fn spawn_a_cube(
             index
         }
     )).observe(crate::detect_cube_clicked)
-    // })
     .id()
 }
 
@@ -651,8 +602,6 @@ fn control_cube_widths(
         &mut crate::CubeData,
     )>,
     camera_query: &mut Query<&mut PanOrbitCamera>,
-    // camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
-    // camera_controls_follow_get: crate::CameraControlsFollow,
     scanned_cube: &ResMut<crate::ScannedCube>,
     camera_controls_follow_selected: &Local<bool>,
     sort_state_get: &Res<State<sorter::SortState>>,
@@ -666,7 +615,6 @@ fn control_cube_widths(
             set_width_and_horizontal_position(index, &mut transform, cube_width);
         }
     }
-    // Center camera:
     center_camera(
         cube_width, 
         end_index, 
@@ -682,8 +630,6 @@ fn center_camera(
     cube_width: f32,
     end_index: usize,
     camera_query: &mut Query<&mut PanOrbitCamera>,
-    // camera_controls_auto_rotate_get: crate::CameraControlsAutoRotate,
-    // camera_controls_follow_get: crate::CameraControlsFollow,
     scanned_cube: &ResMut<crate::ScannedCube>,
     camera_controls_follow_selected: &Local<bool>,
     cubes_query: &Query<(
@@ -738,9 +684,7 @@ fn control_cube_heights(
     let end_index = parsed_values.end_index;
 
     if cube_scale_controls.positional_heights{
-        // if !parsed_values.updated_sorted_positions{
         update_sorted_positions(parsed_values);
-        // }
         for parsed_value in &mut parsed_values.vals[..end_index] {
             if let Ok((mut transform, _, _, _)) = cubes_query.get_mut(parsed_value.cube_handle) {
                 set_position_height_and_vertical_position(parsed_value.sorted_position, &mut transform, cube_scale_controls);
@@ -808,7 +752,6 @@ pub struct UserText{
 #[allow(clippy::too_many_arguments)]
 pub fn ui_system(
     (mut commands, mut contexts, keyboard_input): (Commands, EguiContexts, Res<ButtonInput<KeyCode>>),
-    // TODO: why get materials here and materials in cubes_query? 
     mut materials: ResMut<Assets<StandardMaterial>>,
 
     // text:
@@ -840,7 +783,7 @@ pub fn ui_system(
     (cube_assets,
      mut cubes_query,
      hovered_cube,
-     mut scanned_cube,
+     scanned_cube,
     ):
     (
         Res<CubeAssets>, 
@@ -859,33 +802,23 @@ pub fn ui_system(
      mut camera_controls_auto_rotate,
      mut camera_controls_follow_selected,
      mut camera_controls_auto_rotate_set,
-     camera_controls_auto_rotate_get,
      mut camera_controls_follow_set,
-     camera_controls_follow_get,
      ): (
      Query<&mut PanOrbitCamera>, 
      Local<bool>,
      Local<bool>,
      ResMut<NextState<crate::CameraControlsAutoRotate>>,
-     Res<State<crate::CameraControlsAutoRotate>>,
      ResMut<NextState<crate::CameraControlsFollow>>,
-     Res<State<crate::CameraControlsFollow>>,
      ),
-
-    // music_controller: Query<&AudioSink, With<DefaultAudio>>,
 
     // audio:
     (mut audio_controls, 
      mut audio_assets,
-     audio_receiver_listening_get,
-     audio_receiver_listening_set,
      mut stop_all_audio_event
     ): 
         (
             ResMut<AudioControls>,
             ResMut<Assets<AudioSource>>,
-            Option<Res<State<crate::WasmAudioReceiverListening>>>,
-            Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
             MessageWriter<crate::StopAllAudio>,
         ),
     // random:
@@ -918,8 +851,6 @@ pub fn ui_system(
     ),
 ) -> Result {
     let is_sorting = *sort_state_get.get() == sorter::SortState::Sorting;
-
-    // if *sort_state == sorter::SortState::NotSorting{}
 
     let ctx = contexts.ctx_mut()?;
 
@@ -984,13 +915,11 @@ pub fn ui_system(
                             if ui.add(egui::Button::new("Sort!").fill(egui::Color32::from_rgb(48, 64, 43)))
                                 .on_hover_text("click to begin sorting")
                                 .clicked(){
-                                    log::info!("Begin sort!");
                                     sort_state_set.set(sorter::SortState::Sorting);
                             }
                         } else if ui.add(egui::Button::new("Stop!").fill(egui::Color32::from_rgb(83, 47, 52)))
                             .on_hover_text("click to stop sorting")
                             .clicked(){
-                                log::info!("Stop sort!");
                                 sort_state_set.set(sorter::SortState::NotSorting);
                         }
 
@@ -1029,7 +958,6 @@ pub fn ui_system(
                 ui.horizontal(|ui|{
                     ui.label("Sort speed 󰔛 ");
                     ui.spacing_mut().slider_width = ui.available_width() - ui.spacing().interact_size.x - ui.spacing().item_spacing.x - 1.0;
-                    // let step_timer = &mut increment_timer.increment_timer;
                     if ui.add(
                         egui::Slider::new(&mut increment_timer.duration_f64, 0.0..=1.0)
                         .step_by(0.01)
@@ -1043,16 +971,6 @@ pub fn ui_system(
                             increment_timer.increment_timer.set_duration(
                                 Duration::from_secs_f64(duration)
                             );
-                            log::info!("increment speed changed {}", increment_timer.duration_f64);
-                    }
-                });
-
-                ui.vertical_centered_justified(|ui|{
-                    if ui.button("Increment (debug)")
-                        .on_hover_text("debug: increment the sort by 1 step")
-                        .clicked() {
-                            log::info!("not implemented")
-                            // sorter::increment_sorting();
                     }
                 });
 
@@ -1068,11 +986,6 @@ pub fn ui_system(
                         if ui.button("Reset ")
                             .on_hover_text("reset the camera to original position")
                             .clicked(){
-                                // remove following scanned cube if that is true
-                                // *camera_controls_follow_selected = false;
-                                // camera_controls_follow_set.set(crate::CameraControlsFollow::NotFollowing);
-                                // scanned_cube.entity = None;
-
                                 center_camera(
                                     get_cube_size_from_width_scale(parsed_values.end_index, &cube_scale_controls), 
                                     parsed_values.end_index, 
@@ -1082,14 +995,12 @@ pub fn ui_system(
                                     &cubes_query,
                                     &sort_state_get
                                 );
-                                // also reset rotation?
                                 let mut pan_orbit = camera_query.single_mut().unwrap();
                                 pan_orbit.target_yaw = 0.0;
                                 pan_orbit.target_pitch = 0.0;
                         }
                     });
                     cols[1].vertical_centered_justified(|ui|{
-                        // CameraControlsAutoRotate::AutoRotate
                         if ui.checkbox(&mut camera_controls_auto_rotate, "Rotate 󱦙")
                             .on_hover_text("continuously rotate camera")
                             .changed(){
@@ -1108,14 +1019,6 @@ pub fn ui_system(
                                     camera_controls_follow_set.set(crate::CameraControlsFollow::Following);
                                 } else {
                                     camera_controls_follow_set.set(crate::CameraControlsFollow::NotFollowing);
-                                    // center_camera(
-                                    //     get_cube_size_from_width_scale(parsed_values.end_index, &cube_scale_controls), 
-                                    //     parsed_values.end_index, 
-                                    //     &mut camera_query, 
-                                    //     &scanned_cube,
-                                    //     &camera_controls_follow_selected,
-                                    //     &cubes_query
-                                    // );
                                 }
                         }
                     });
@@ -1175,8 +1078,6 @@ pub fn ui_system(
                                                         }
                                                     }
                                                 }
-                                                // just adding rust_analyzer to cfg so code doesn't appear
-                                                // disabled in IDE.
                                                 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
                                                 {
                                                     use web_sys::{HtmlInputElement, wasm_bindgen::JsCast};
@@ -1203,7 +1104,6 @@ pub fn ui_system(
                                             if ui.button("Default")
                                                 .on_hover_text("reset selected audio to default")
                                                     .clicked(){
-                                                        // set to default
                                                         if let Some(audio_handle) = &audio_controls.audio_source_handle{
                                                             audio_assets.remove(audio_handle);
                                                         }
@@ -1215,7 +1115,6 @@ pub fn ui_system(
                                 });
                                 ui.vertical_centered_justified(|ui|{
                                     let file_name = audio_controls.selected_file_name.as_ref().unwrap_or(&audio_controls.default_file_name);
-                                    // change color of button
                                     if ui.add(egui::Button::new(file_name)
                                         .wrap_mode(egui::TextWrapMode::Truncate)
                                         .fill(egui::Color32::from_rgb(0, 0, 0)))
@@ -1377,8 +1276,6 @@ pub fn ui_system(
                                     &cube_scale_controls, 
                                     &mut cubes_query, 
                                     &mut camera_query, 
-                                    // *camera_controls_auto_rotate_get.get(),
-                                    // *camera_controls_follow_get.get(),
                                     &scanned_cube,
                                     &camera_controls_follow_selected,
                                     &sort_state_get,
@@ -1396,8 +1293,6 @@ pub fn ui_system(
                                     &cube_scale_controls, 
                                     &mut cubes_query, 
                                     &mut camera_query, 
-                                    // *camera_controls_auto_rotate_get.get(),
-                                    // *camera_controls_follow_get.get(),
                                     &scanned_cube,
                                     &camera_controls_follow_selected,
                                     &sort_state_get,
@@ -1495,7 +1390,6 @@ pub fn ui_system(
                             }
 
                             if !is_sorting && text_edit_widget.changed(){
-                                log::info!("text widget changed");
                                 if !*generated_rng_values{
                                     // if rng values were generated, already clean.
                                     // if text change without rng values generated, mark as dirty.
@@ -1519,8 +1413,6 @@ pub fn ui_system(
                                     &mut parsed_values,
                                     &mut cubes_query,
                                     &mut camera_query,
-                                    camera_controls_auto_rotate_get,
-                                    camera_controls_follow_get,
                                     &mut random,
                                     &mut materials,
                                     rng_color_controls.rng_cubes_enabled,
@@ -1546,29 +1438,25 @@ pub fn ui_system(
     }
 
     let window_response = window_area.unwrap().response;
-    let mut pointer_pos = ctx.pointer_latest_pos().unwrap_or_default();
+    let pointer_pos = ctx.pointer_latest_pos().unwrap_or_default();
     let window_contains_pointer = window_response.rect.contains(pointer_pos) || window_response.dragged();
     
 
     let mut pan_orbit = camera_query.single_mut().unwrap();
-    if ctx.is_using_pointer(){
-        pan_orbit.enabled = false;
-    }else{
-        pan_orbit.enabled = true;
-    }
+    pan_orbit.enabled = !ctx.is_using_pointer();
 
     let control_pressed = keyboard_input.pressed(KeyCode::ControlLeft) || keyboard_input.pressed(KeyCode::ControlRight);
     if window_contains_pointer || control_pressed{
-        // disable zooming in camera
+        // disable camera zooming
         pan_orbit.zoom_sensitivity = 0.0;
     }else{
-        // set to default sensitivity
+        // enable camera zooming; set to default sensitivity
         pan_orbit.zoom_sensitivity = 1.0;
     }
 
     // draw egui frame over hovered cube:
-    if !window_contains_pointer && hovered_cube.display{
-        pointer_pos.x += 0.0; // frame offset
+    if !window_contains_pointer && let Some(hover_cube_id) = hovered_cube.id{
+        // pointer_pos.x += 0.0; // frame offset
         egui::Area::new(egui::Id::new("cube_hover_area"))
             .fixed_pos(pointer_pos)
             .interactable(false)
@@ -1578,8 +1466,7 @@ pub fn ui_system(
                     .corner_radius(10.0)
                     .inner_margin(egui::Margin::same(15))
                     .show(ui, |ui|{
-                        if let Some(cube_id) = hovered_cube.id 
-                            && let Ok((_, _, _, cube_data)) = cubes_query.get(cube_id){
+                        if let Ok((_, _, _, cube_data)) = cubes_query.get(hover_cube_id){
                                 let parsed_value = &parsed_values.vals[cube_data.index];
                                 ui.add(
                                     egui::Label::new(
@@ -1624,10 +1511,9 @@ pub fn ui_system(
 fn detect_precision_loss(original: &str, parsed: f64) -> bool {
     let num_string = parsed.to_string();
     let new_string = string_trim_zeros(original);
-    // log::info!("{original} turned to {new_string} == {parsed}");
-    if new_string != num_string {
-        log::info!("\tno match!")
-    }
+    // if new_string != num_string {
+    //     log::info!("\tprecision loss detected!")
+    // }
     new_string != num_string
 }
 
@@ -1669,11 +1555,9 @@ fn string_trim_zeros(s: &str) -> String {
 
 pub fn increase_font(font_scale: &mut FontScale) {
     font_scale.scale = f32::min(font_scale.max, font_scale.scale + font_scale.scale_step);
-    // font_scale.scale += font_scale.scale_step;
 }
 pub fn decrease_font(font_scale: &mut FontScale) {
     font_scale.scale = f32::max(font_scale.min, font_scale.scale - font_scale.scale_step);
-    // log::info!("scale size: {}", font_scale.scale);
 }
 
 fn clamp_font_scale(screen_width: f32, font_scale: &mut FontScale){
@@ -1696,13 +1580,10 @@ fn scale_ui(style: &mut egui::Style, scale: f32) {
     // go to definition of egui::Style for these defaults
     style.text_styles = [
         (Heading, FontId::new(30.0 * scale, Proportional)),
-        // (Name("Heading2".into()), FontId::new(25.0 * scale, Proportional)),
-        // (Name("Context".into()), FontId::new(23.0 * scale, Proportional)),
         (Body, FontId::new(18.0 * scale, Proportional)),
         (Monospace, FontId::new(14.0 * scale, Proportional)),
         (Button, FontId::new(14.0 * scale, Proportional)),
         (Small, FontId::new(10.0 * scale, Proportional)),
-        // ((Name("symbol_font".into())), FontId::new(14.0 * scale, egui::FontFamily::Name("symbol_font".into())))
         (
             (Name("symbol_font".into())),
             FontId::new(25.0 * scale, Proportional),
@@ -1732,12 +1613,6 @@ fn scale_ui(style: &mut egui::Style, scale: f32) {
             bar_width: 6.0,
             ..Default::default()
         },
-        //
-        // window_margin: Margin::same(6 * scale as i8),
-        // default_area_size: vec2(600.0, 400.0) * scale,
-        // menu_width: 400.0 * scale,
-        // menu_spacing: 2.0 * scale,
-        // combo_height: 200.0 * scale,
         ..Default::default()
     };
 }

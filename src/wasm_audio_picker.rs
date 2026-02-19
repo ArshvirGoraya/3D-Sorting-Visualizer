@@ -1,4 +1,4 @@
-// This module should only be included under #cfg[target_arch = "wasm32"] since its only meant for
+// INFO: This module should only be included under #cfg[target_arch = "wasm32"] since its only meant for
 // the web/browser.
 
 use bevy::{
@@ -13,7 +13,7 @@ use bevy::{
     state::state::NextState,
 };
 use web_sys::{
-    Document, FileReader, HtmlInputElement, Window,
+    Document, FileReader, HtmlInputElement, Window, console,
     js_sys::{self, ArrayBuffer, Uint8Array},
     wasm_bindgen::{JsCast, JsValue, prelude::Closure},
 };
@@ -28,7 +28,6 @@ pub struct LoadedFile {
 }
 
 pub enum FileEvent {
-    // Must send Vec<u8>, not JsValue or Uint8Array (bevy cannot use those like those as resources).
     FileLoaded(LoadedFile),
     FileNotSelected,
     Error(String),
@@ -40,6 +39,8 @@ pub struct BrowserAudioFileChannel {
 }
 
 pub fn spawn_browser_audio_handlers(mut commands: Commands) {
+    // INFO: system runs at startup on wasm builds
+
     let input_element: HtmlInputElement = web_sys::window()
         .expect("window should exist")
         .document()
@@ -55,9 +56,11 @@ pub fn spawn_browser_audio_handlers(mut commands: Commands) {
 
     // this outer function cannot be async. Could not be attached to set_onchange() if it were.
     let input_onchange_closure = Closure::<dyn FnMut(_)>::new(move |_event: web_sys::Event| {
-        let mut sender_clone = sender.clone(); // have to clone it here as well or will
-        // become a FnOnce
-        // arg can be event: web_sys::Event
+        console::log_1(&"running closure".into());
+
+        // have to clone it here as well or will become a FnOnce. arg can be event: web_sys::Event
+        let mut sender_clone = sender.clone();
+
         let file = input_element_clone
             .files()
             .expect("filelist should exist")
@@ -67,57 +70,54 @@ pub fn spawn_browser_audio_handlers(mut commands: Commands) {
             let array_buffer_promise = file.array_buffer();
             let file_name = file.name();
 
-            // adds block to browser event loop (will swtich to this and back until done)
+            // adds block to browser event loop (will switch to this and back until done)
             wasm_bindgen_futures::spawn_local(async move {
-                // Awaits the promise
+                console::log_1(&"local thread created: awaiting file list to update".into());
+
+                // awaits: checks to see if done yet (wont continue from this line until it is)
                 let array_buffer_in_js_value_result =
                     wasm_bindgen_futures::JsFuture::from(array_buffer_promise).await;
+                console::log_1(&"local thread stopped: file list updated".into());
 
                 match array_buffer_in_js_value_result {
                     Ok(array_buffer_in_js_value) => {
-                        // array_buffer_in_js_value.
-
                         if let Err(error) =
                             sender_clone.try_send(FileEvent::FileLoaded(LoadedFile {
                                 file_name,
                                 bytes: Uint8Array::new(&array_buffer_in_js_value).to_vec(),
                             }))
                         {
+                            // Failed to send file buffer...
                             log::warn!("sender failed to send file {}", file.name());
-                            // try to stop listening?
                         }
                     }
                     Err(err) => {
                         if let Err(error) =
                             sender_clone.try_send(FileEvent::Error(format!("{err:?}")))
                         {
+                            // Failed to send error message...
                             log::warn!("sender failed to send error {error:?}");
-                            // try to stop listening?
                         }
                     }
                 }
             });
         } else {
             if let Err(error) = sender_clone.try_send(FileEvent::FileNotSelected) {
-                // turns of listening to receiver system (as do the above sender events)
+                // Failed to get file from picker...
                 log::warn!("sender failed to send no file selected event");
-                // try to stop listening?
             }
         }
     });
 
+    // On file list change (when file is selected), run the above closure
+    // INFO: the closure runs AFTER the file is selected, not when the input button is clicked!
+    // The thread that starts is the sender sending file data to the receiver and then the thread
+    // ends.
     input_element.set_onchange(Some(input_onchange_closure.as_ref().unchecked_ref()));
-
-    let test_closure = Closure::<dyn FnMut(_)>::new(move |_event: web_sys::Event| {
-        log::info!("on close event!");
-    });
-
-    input_element.set_onclose(Some(test_closure.as_ref().unchecked_ref()));
 
     input_onchange_closure.forget(); // do not delete the closure after this function scope ends!
     // (keep alive for app's lifetime.)
 
-    // commands.insert_resource(BrowserInputElement { input_element });
     commands.insert_resource(BrowserAudioFileChannel { receiver });
 }
 
@@ -128,11 +128,10 @@ pub fn audio_select_listener(
     mut audio_receiver_listening_set: ResMut<NextState<crate::WasmAudioReceiverListening>>,
     mut mouse_event: MessageReader<MouseMotion>,
 ) {
-    // only runs if in_state(WasmAudioReceiverListening::Listening)
-    log::info!("Listener Ran!");
+    // INFO: only runs if in_state(WasmAudioReceiverListening::Listening)
 
-    // this receiver is bounded to channel that can only hold 1 data at a time.
-    // Will only ever receive a single piece of that data, never more.
+    // INFO: this receiver is bounded to channel that can only hold 1 data at a time.
+    // Will only ever receive a single piece of that data (in this case the entire file's byte), never more.
     if let Ok(file_event_option) = audio_file_channel.receiver.try_next() {
         log::info!("Listener Received something!");
         if let Some(file_event) = file_event_option {
@@ -167,6 +166,6 @@ pub fn audio_select_listener(
         // INFO: stopping the listener is not actually necessary. Can keep listening forever, just
         // stopping to reduce computation.
         audio_receiver_listening_set.set(crate::WasmAudioReceiverListening::NotListening);
-        log::info!("Listener Stopped!");
+        // log::info!("Listener Stopped!");
     }
 }

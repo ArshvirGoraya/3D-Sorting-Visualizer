@@ -1,12 +1,7 @@
-use std::ops::{Range, RangeBounds};
-
 use bevy::{
     asset::Assets,
     color::Color,
     ecs::{
-        entity::Entity,
-        event::Event,
-        message::{Message, MessageReader, MessageWriter},
         query::With,
         resource::Resource,
         system::{Commands, Query, Res, ResMut},
@@ -14,15 +9,14 @@ use bevy::{
     },
     pbr::{MeshMaterial3d, StandardMaterial},
     platform::collections::HashMap,
-    reflect::{List, Set},
-    state::state::{NextState, States},
+    state::state::NextState,
     time::Time,
     transform::components::Transform,
 };
 
 use crate::{
     AudioControls, sorter,
-    ui::{CubeAssets, ParsedValue, ParsedValues, StringInfo, UserText},
+    ui::{CubeAssets, ParsedValues, StringInfo, UserText},
 };
 
 #[derive(Default, Hash, Eq, PartialEq, Clone, Copy)]
@@ -109,17 +103,18 @@ pub struct SortState {
     next_step: SortStep,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn increment_sorting(
-    mut commands: Commands,
-    mut sort_state: Option<ResMut<SortState>>,
-    mut parsed_values: ResMut<ParsedValues>,
-    mut cubes_query: Query<(
+    commands: Commands,
+    sort_state: Option<ResMut<SortState>>,
+    parsed_values: ResMut<ParsedValues>,
+    cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    mut user_text: ResMut<UserText>,
-    mut sort_select_set: ResMut<NextState<sorter::SortState>>,
+    user_text: ResMut<UserText>,
+    sort_select_set: ResMut<NextState<sorter::SortState>>,
     quick_sort_colors: Res<QuickSortColors>,
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
@@ -127,14 +122,14 @@ pub fn increment_sorting(
     audio_controls: Res<AudioControls>,
     scanned_cube: ResMut<crate::ScannedCube>,
 ) {
-    // this system runs when in sorting state and in quick sort state.
+    // INFO: this system runs when in sorting state and in quick sort state.
     // this system calls other functions, all of which can be systems themselves which trigger on
     // events, but I want to avoid them running in parallel at all cost (which bevy may do), so just calling them one
     // by one here.
     if let Some(sort_state) = sort_state {
         // sort already started, go to next step
         // each of these functions change the next_step to be something else.
-        // compare: get out of the SortingState when sort is complete which stops this system from running
+        // compare system: gets out of the SortingState when sort is complete which stops this system from running
 
         // only call the next step once increment timer is complete
         increment_timer.increment_timer.tick(time.delta());
@@ -188,27 +183,21 @@ pub fn increment_sorting(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn setup_range(
     mut commands: Commands,
-    // parsed_values: Res<ParsedValues>,
     parsed_values: Res<ParsedValues>,
-    mut sort_state: Option<ResMut<SortState>>,
-    mut cubes_query: Query<(
+    sort_state: Option<ResMut<SortState>>,
+    cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    // cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
     quick_sort_colors: Res<QuickSortColors>,
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
-    // mut next_event: MessageWriter<Compare>,
 ) {
-    // Only inserts if not already added:
-    // commands.init_resource::<QuickSortColors>();
-    println!("Quick Sorting...");
-
     if let Some(mut sort_state) = sort_state {
         let previous_array = sort_state.current_array;
         sort_state.current_array = *sort_state.sub_arrays.last_mut().unwrap();
@@ -278,25 +267,25 @@ pub fn increment_j(
     sort_state: &mut ResMut<SortState>,
     quick_sort_colors: &Res<QuickSortColors>,
     parsed_values: &Res<ParsedValues>,
-    mut cubes_query: &mut Query<(
+    cubes_query: &mut Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    mut commands: &mut Commands,
+    commands: &mut Commands,
     audio_controls: &Res<AudioControls>,
-    mut scanned_cube: &mut ResMut<crate::ScannedCube>,
+    scanned_cube: &mut ResMut<crate::ScannedCube>,
 ) {
     sort_state.j += 1;
     if sort_state.j != sort_state.pivot + 1 {
-        // j may be pivot + 1: This is the condition used for detecting when a subarray is finished.
+        // INFO: j may be pivot + 1: This is the condition used for detecting when a subarray is finished.
         scanned_cube.entity = Some(parsed_values.vals[sort_state.j].cube_handle);
         color_cube(
             sort_state.j,
             SortColor::J,
-            &quick_sort_colors,
-            &parsed_values,
-            &mut cubes_query,
+            quick_sort_colors,
+            parsed_values,
+            cubes_query,
         );
         crate::play_audio(
             commands,
@@ -307,13 +296,13 @@ pub fn increment_j(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compare(
     mut cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    // mut cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
     mut sort_state: ResMut<SortState>,
     parsed_values: Res<ParsedValues>,
     quick_sort_colors: Res<QuickSortColors>,
@@ -352,8 +341,9 @@ pub fn compare(
         );
     }
     if sort_state.j == sort_state.pivot + 1 {
-        // when pivot has been reached, j and i swap and j increments 1. That is when new subarrays
-        // are creted. j must be 1 larger than pivot.
+        // INFO: when pivot has been reached, j and i swap and j increments by 1. That is when new subarrays
+        // are created.
+        // INFO: j must be 1 larger than pivot.
         // pivot has been reached, create new subarrays or complete.
 
         // log::info!("pivot overreached last swap complete: {}", sort_state.j);
@@ -385,10 +375,9 @@ pub fn compare(
         }
         return;
     }
-    //
-    // let pivot_value = &parsed_values.vals[sort_state.pivot].converted_value;
-    // let j_value = &parsed_values.vals[sort_state.j].converted_value;
-
+    // INFO: sort by sorted_position instead of the actual value to avoid cubes that have the same
+    // value being put in different positions than their sorted position dictates (relevant when
+    // hovering over cubes to see their final position and especially when using positional heights)
     let pivot_value = &parsed_values.vals[sort_state.pivot].sorted_position;
     let j_value = &parsed_values.vals[sort_state.j].sorted_position;
 
@@ -415,7 +404,7 @@ pub fn compare(
             return;
         }
 
-        // NOTE: if swapping, j must be incremented after swap. We don't increment j in here though.
+        // NOTE: if swapping, j must be incremented after swap. In that case, we don't increment j in here yet.
         // We wait for swap system to complete and then it re-calls this system and is then
         // incremented above once swap is complete.
         sort_state.swapped_cubes = Some((sort_state.i as usize, sort_state.j));
@@ -461,6 +450,7 @@ pub fn complete(
 ) {
     // INFO: will run at startup: runs when Quicksort is the selected algorithm
     // (which is the default) and OnEnter for NotSorting (which is the default)
+    // The if statement is false on startup so wont do anything
     if let Some(sort_state) = sort_state
         && let Some(cube_assets) = cube_assets
     {
@@ -495,12 +485,12 @@ pub fn swap(
     // log::info!("\n\t\t=-=-=Swapping=-=-=");
 
     // log::info!(
-    //     "geting parsed value at: {} and {}",
+    //     "getting parsed value at: {} and {}",
     //     sort_state.i as usize,
     //     sort_state.j
     // );
 
-    let [mut i_data, mut j_data] = parsed_values
+    let [i_data, j_data] = parsed_values
         .vals
         .get_disjoint_mut([sort_state.i as usize, sort_state.j])
         .unwrap();
@@ -527,12 +517,12 @@ pub fn swap(
     // );
 
     let [
-        (mut transform_i, mut material_i, mut cube_data_i),
-        (mut transform_j, mut material_j, mut cube_data_j),
+        (mut transform_i, _, mut cube_data_i),
+        (mut transform_j, _, mut cube_data_j),
     ] = cubes_query
         .get_many_mut([i_data.cube_handle, j_data.cube_handle])
         .unwrap();
-    // Swap positions:
+    // Swap cube positions:
     std::mem::swap(
         &mut transform_i.translation.x,
         &mut transform_j.translation.x,
@@ -582,7 +572,6 @@ pub fn swap(
         parsed_values,
         shift_left,
         text_shift_amount,
-        &mut user_text,
     );
 
     sort_state.next_step = SortStep::Compare;
@@ -593,7 +582,6 @@ pub fn update_text_indices(
     mut parsed_values: ResMut<ParsedValues>,
     shift_left: bool,
     text_shift_amount: usize,
-    user_text: &mut ResMut<UserText>,
 ) {
     if text_shift_amount == 0 {
         return;
@@ -606,7 +594,7 @@ pub fn update_text_indices(
 
     if left + 1 == right {
         // log::info!(
-        //     "no need to updated inbetween indices since left+1 == right: {}+1 = {}",
+        //     "no need to updated in between indices since left+1 == right: {}+1 = {}",
         //     left,
         //     right
         // );
@@ -637,7 +625,7 @@ pub fn swap_text(
     j_match_string: &mut StringInfo,
     i_raw_string: &mut StringInfo,
     j_raw_string: &mut StringInfo,
-    mut user_text: &mut ResMut<UserText>,
+    user_text: &mut ResMut<UserText>,
 ) -> (bool, usize) {
     let mut text_shift_amount: usize = 0;
     let mut shift_left = false;
@@ -647,7 +635,7 @@ pub fn swap_text(
     // UNSAFE: rust has no way to verify if UTF8 will be valid
     // But we are not changing any characters, just re-arranging them by fixed-length, so
     // shouldn't be a problem AS LONG AS THE CHARACTERS BEING SWAPPED DO NOT OVERLAP (which
-    // they dont)
+    // they don't)
     let utf8_text = unsafe { user_text.val.as_bytes_mut() };
 
     if i_match_string_length == j_match_string_length {
@@ -766,6 +754,7 @@ pub fn swap_text(
     (shift_left, text_shift_amount)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn swap_string_info(
     i_match_string: &mut StringInfo,
     j_match_string: &mut StringInfo,
@@ -785,7 +774,7 @@ pub fn swap_string_info(
     i_match_string.start_index = new_j_match_string_position;
     i_match_string.end_index = i_match_string.start_index + j_match_string_length;
     j_match_string.end_index = j_match_string.start_index + i_match_string_length;
-    // // raw string and match string end at the same exact place
+    // raw string and match string end at the same exact place
     i_raw_string.end_index = i_match_string.end_index;
     j_raw_string.end_index = j_match_string.end_index;
     i_raw_string.start_index = i_match_string.start_index - i_raw_string_part_length;
@@ -802,7 +791,6 @@ fn color_cube(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    // mut cubes_query: &mut Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
 ) {
     let (_, mut cube_material, _) = cubes_query
         .get_mut(parsed_values.vals[cube_index].cube_handle)

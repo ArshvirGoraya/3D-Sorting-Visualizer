@@ -1,17 +1,13 @@
 pub mod quick_sort;
-// use crate::sorter::quick_sort;
 
 use bevy::prelude::*;
-use core::{fmt, time::Duration};
-
-use crate::ui::ParsedValues;
+use core::fmt;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum SortState {
     #[default]
     NotSorting,
     Sorting,
-    // Paused,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]

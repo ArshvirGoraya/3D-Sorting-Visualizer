@@ -41,3 +41,8 @@ Tonemapping
 BloomPrefilter
 prefilter
 interactable
+Pickable
+subarray
+subarrays
+onchange
+filelist
