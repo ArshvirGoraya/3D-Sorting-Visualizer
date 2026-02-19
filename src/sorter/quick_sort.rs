@@ -100,7 +100,6 @@ impl FromWorld for QuickSortColors {
 
 #[derive(Resource)]
 pub struct SortState {
-    started: bool,
     sub_arrays: Vec<(usize, usize)>,
     current_array: (usize, usize),
     pivot: usize,
@@ -242,7 +241,6 @@ pub fn setup_range(
     } else {
         let current_array = (0, parsed_values.end_index);
         commands.insert_resource(SortState {
-            started: true, // TODO: not needed?
             sub_arrays: [current_array].to_vec(),
             current_array,
             pivot: current_array.1 - 1,

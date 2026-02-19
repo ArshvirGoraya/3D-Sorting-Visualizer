@@ -594,20 +594,6 @@ fn auto_rotate_camera(mut camera_query: Query<&mut PanOrbitCamera>) {
 }
 
 fn spawn_3d_camera(mut commands: Commands) {
-    // let problem_values = ProblemValues::new();
-    // for key in problem_values.map.keys(){
-    //     log::info!("{}", key)
-    // }
-    // log::info!("all keys printed");
-
-    // todo: replace with own camera
-    // add normal keyboard controls
-    // add own mouse controls: right click should also work
-    // add touch controls: left-right is faster than up-down in this solution... Strange.
-    // game pad controls: unnecessary but add if easy
-    // track pad: zooms
-    // also: do not zoom when ctrl is pressed: that is for zooming in and out UI
-    // do not zoom when pinching in within ui: in that case scale the UI instead?
     commands.spawn((
         MeshPickingCamera::default(),
         PanOrbitCamera {

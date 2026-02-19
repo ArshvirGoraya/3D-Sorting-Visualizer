@@ -980,7 +980,6 @@ pub fn ui_system(
 
                 ui.columns(2, |cols|{
                     cols[0].vertical_centered_justified(|ui|{
-                        // TODO: if already sorting, change this to stop!
                         if !is_sorting{
                             if ui.add(egui::Button::new("Sort!").fill(egui::Color32::from_rgb(48, 64, 43)))
                                 .on_hover_text("click to begin sorting")
@@ -1017,8 +1016,6 @@ pub fn ui_system(
                                         if ui.selectable_value(&mut sort_select_get.get().clone(), algorithm, algorithm.to_string()).clicked(){
                                             sort_select_set.set(algorithm);
                                         }
-                                        // TODO: .clicked() here will tell you which value has been
-                                        // selected!
                                     }
                                 });
                         });
@@ -1183,22 +1180,6 @@ pub fn ui_system(
                                                 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
                                                 {
                                                     use web_sys::{HtmlInputElement, wasm_bindgen::JsCast};
-                                                    // let audio_receiver_state = audio_receiver_listening_get.expect("audio receiver state should exist");
-                                                    // INFO: never disable this: previously, was disabled when audio
-                                                    // receiver was listening for a file selection.
-                                                    // There is no way to stop the receiver if cancel is selected
-                                                    // in the file dialog (as there is not reliable way to detect 
-                                                    // file dialog is cancelled). So, if cancelled, this would just stay
-                                                    // disabled. Which we don't want. No bad consequences to leaving
-                                                    // this enabled while receiving files (only bad thing is
-                                                    // receiver is still running even tho file selection is
-                                                    // cancelled, but that's not that expensive, and receiver will
-                                                    // stop once a file is ever selected).
-                                                    // TODO: could stop the receiver if any other kind of input is
-                                                    // detected (camera input, button click, font scale, anything)
-                                                    // ui.add_enabled_ui(*audio_receiver_state == crate::WasmAudioReceiverListening::NotListening, |ui|{
-                                                    //
-                                                    // audio_controls
                                                     let input_element = web_sys::window()
                                                         .expect("window should exist")
                                                         .document()
@@ -1525,6 +1506,9 @@ pub fn ui_system(
                                 // parsed, and parsing only new stuff and deleting any removed stuff.
                                 // Could carry over to spawning cubes where not all cubes are respawned: instead only
                                 // new cubes are added?
+                                // TODO: instead of doing things within the regex loop, can do
+                                // everything afterwards: removes the need for the second loop and
+                                // allows using CubeData component for everything instead of ParsedValues.
                                 num_strings.cleaned_string = false;
                                 update_parsed_values(
                                     number_regex,
@@ -1594,8 +1578,6 @@ pub fn ui_system(
                     .corner_radius(10.0)
                     .inner_margin(egui::Margin::same(15))
                     .show(ui, |ui|{
-                        // TODO: store the below used data right in cube_data instead of
-                        // parsed_values?
                         if let Some(cube_id) = hovered_cube.id 
                             && let Ok((_, _, _, cube_data)) = cubes_query.get(cube_id){
                                 let parsed_value = &parsed_values.vals[cube_data.index];

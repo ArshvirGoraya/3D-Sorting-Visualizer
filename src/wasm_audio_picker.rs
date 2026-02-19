@@ -5,9 +5,11 @@ use bevy::{
     asset::Assets,
     audio::AudioSource,
     ecs::{
+        message::MessageReader,
         resource::Resource,
         system::{Commands, ResMut},
     },
+    input::mouse::{MouseMotion, MouseWheel},
     state::state::NextState,
 };
 use web_sys::{
@@ -124,6 +126,7 @@ pub fn audio_select_listener(
     mut audio_assets: ResMut<Assets<AudioSource>>,
     mut audio_file_channel: ResMut<BrowserAudioFileChannel>,
     mut audio_receiver_listening_set: ResMut<NextState<crate::WasmAudioReceiverListening>>,
+    mut mouse_event: MessageReader<MouseMotion>,
 ) {
     // only runs if in_state(WasmAudioReceiverListening::Listening)
     log::info!("Listener Ran!");
@@ -154,5 +157,16 @@ pub fn audio_select_listener(
             // stop listening once file_event is received.
             audio_receiver_listening_set.set(crate::WasmAudioReceiverListening::NotListening);
         }
+    }
+
+    if !mouse_event.is_empty() {
+        // INFO: stop listening when a mouse event is detected
+        // if "cancel" is clicked, no file is chosen, but listener doesn't stop.
+        // so need a way to stop it.
+        // Arbitrarily, listening for mouse events is chosen to stop it.
+        // INFO: stopping the listener is not actually necessary. Can keep listening forever, just
+        // stopping to reduce computation.
+        audio_receiver_listening_set.set(crate::WasmAudioReceiverListening::NotListening);
+        log::info!("Listener Stopped!");
     }
 }
