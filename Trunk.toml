@@ -5,6 +5,6 @@ trunk-version = "^0.21.14"  # Trunk version at the start of this project.
 
 [build]
 target = "index.html"  # The index HTML file to drive the bundling process.
-minify = "on_release"  # Control minification: can be one of: never, on_release, always
 dist = "docs"  # The folder name can be used by GitHub Pages (if not using GitHub Actions)
 public_url = "/"  # Where assets are placed on the website
+# minify = "on_release"  # never, on_release, always. Errors RequiredTokenNotFound(Identifier) [token=Some(KeywordDefault)] (duie to unsupported wasm-bindgen ES6+ code?)

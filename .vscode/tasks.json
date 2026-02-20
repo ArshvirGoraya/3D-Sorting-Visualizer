@@ -9,7 +9,8 @@
     {
       "label": "Trunk Build",
       "type": "shell", // shell or process
-      "command": "trunk build --release --public-url /3D-Sorting-Visualizer/",
+      // "command": "trunk build --release --public-url /3D-Sorting-Visualizer/",
+      "command": "trunk build --release --cargo-profile release-wasm32 --public-url /3D-Sorting-Visualizer/",
       "group": "build",
       "presentation": {
         "reveal": "always", // always reveal terminal
@@ -21,10 +22,6 @@
       "type": "shell", // shell or process
       "command": "scripts\\gzip_wasm_size.ps1",
       "group": "build",
-      // "presentation": {
-      //   "reveal": "always", // always reveal terminal
-      //   "panel": "new" // always create new terminal
-      // }
     },
     {
       "label": "Trunk Build & GZip",

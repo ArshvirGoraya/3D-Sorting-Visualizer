@@ -65,16 +65,26 @@ bevy = { version = "0.17.3", default-features = false, features = [
 ] }
 
 [profile.dev]
-# Very little optimizations on dev builds
+# Very little optimizations on dev builds for fastest compiles
+# All these settings also apply to all dependencies unless overwritten: [profile.dev.packages."*"]
 opt-level = 0
-debug = true  # not using a debugger currently so no need to enable this
+debug = false  # not using a debugger currently so no need to enable this
+strip = false
+lto = "off"
+panic = "unwind"
 codegen-units = 16
 
-[profile.dev.package."*"]
-opt-level = 3
-
 [profile.release]
+opt-level = 3  # wasm compilation: sets to "z" with rust flag (see .cargo/cargo.toml) ("opt-level=z")
+debug = false
+strip = true  # wasm compilation: sets to "debuginfo": cannot strip for wasm compilation ("link-arg=--strip-debug")
 lto = "fat"
+panic = "abort"
 codegen-units = 1
-# opt-level = "s" # set in index.html instead just for wasm builds
-# strip = "debuginfo" # may not want to do this for all builds
+
+[profile.release-wasm32]
+# used by trunk: trunk build --release --cargo-profile release-wasm32
+inherits = "release"
+opt-level = "z"  # different from x86 (opt-level = 3)
+strip = "debuginfo"  # different from x86 (strip = true)
+panic = "unwind"  # gives me smaller wasm than panic = "abort"
