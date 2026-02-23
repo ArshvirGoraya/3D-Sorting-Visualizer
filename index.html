@@ -2,7 +2,7 @@
   <head>
     <!-- https://trunk-rs.github.io/trunk/guide/assets/index.html -->
     <link data-trunk rel="copy-dir" href="./assets/" />
-    <link data-trunk rel="scss" href="index.scss" />
+    <link data-trunk rel="css" href="index.css" />
     <link data-trunk rel="rust" data-wasm-opt="z" />
   </head>
   <style>
@@ -11,11 +11,13 @@
       outline: none;
     }
     body{
-      margin: 10px;
+      margin: 1px;
       background-color: 2b2c2f;
     }
   </style>
   <body>
+    <div class="loader"></div>
+    <p class="loader-text">Loading...</p>
     <input type="file" id="audio_picker" accept=".ogg,.flac,.wav,.mp3,.aac" style="display: none;"/>
   </body>
 </html>
