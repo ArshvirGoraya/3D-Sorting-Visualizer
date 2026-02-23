@@ -75,9 +75,9 @@ panic = "unwind"
 codegen-units = 16
 
 [profile.release]
-opt-level = 3  # wasm compilation: sets to "z" with rust flag (see .cargo/cargo.toml) ("opt-level=z")
+opt-level = 3  # different from wasm: "z"
 debug = false
-strip = true  # wasm compilation: sets to "debuginfo": cannot strip for wasm compilation ("link-arg=--strip-debug")
+strip = true  # different from wasm: "debuginfo": cannot strip for wasm compilation
 lto = "fat"
 panic = "abort"
 codegen-units = 1
