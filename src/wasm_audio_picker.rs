@@ -5,11 +5,9 @@ use bevy::{
     asset::Assets,
     audio::AudioSource,
     ecs::{
-        message::MessageReader,
         resource::Resource,
         system::{Commands, ResMut},
     },
-    input::mouse::MouseMotion,
     state::state::NextState,
 };
 use web_sys::{

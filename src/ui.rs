@@ -33,24 +33,23 @@ pub struct FontScale {
     scale_step: f32,
     max: f32,
     min: f32,
-    min_window_width: f32,
-    max_window_width: f32,
-    default_window_width: f32,
+    desired_screen_percentage: f32,
 }
 impl Default for FontScale {
     fn default() -> Self {
         Self {
             scale: 1.0,
             scale_step: 0.1,
-            max: 2.0,
-            min: 0.5,
+            max: 5.0,
+            min: 0.1,
             // these get set every frame (relative to the screen size which may change during
             // update)
-            min_window_width: 0.0,
-            max_window_width: 0.0,
-            default_window_width: 0.0,
+            desired_screen_percentage: 0.20,
         }
     }
+}
+impl FontScale{
+    const BASE_WIDTH: f32 = 380.0; // the base width necessary at scale 1 (with all collapsible's expanded)
 }
 
 #[derive(Resource)]
@@ -860,17 +859,23 @@ pub fn ui_system(
         // INFO: can't put this in a startup system as it requires EguiPrimaryContextPass.
         *font_added = true;
         setup_font(ctx);
-        let scale = font_scale.scale;
-        ctx.all_styles_mut(move |style| {
-            scale_ui(style, scale);
-        });
     }
 
     let scroll_height = ctx.content_rect().height() * 0.85;
-
-    // Width of the window scales with font:
-    clamp_font_scale(ctx.content_rect().width(), &mut font_scale);
-    let width = font_scale.default_window_width * font_scale.scale;
+ 
+    // Find how much base width must scale to fit the desired screen width.
+    let screen_width = ctx.content_rect().width();
+    let desired_width = screen_width * font_scale.desired_screen_percentage;
+    let required_scaling = desired_width / FontScale::BASE_WIDTH;
+    // Scale the width to fit desired percentage of the screen (in this case we scale the font
+    // scale by the percentage and then scale the width by the font scale (to have both the
+    // user-defined font scale and screen defined font scale into one + it scales the fonts by
+    // screen size as well))
+    let scale = font_scale.scale * required_scaling;
+    let width = FontScale::BASE_WIDTH * scale;
+    ctx.all_styles_mut(move |style| {
+        scale_ui(style, scale);
+    });
 
     let mut first_button_size: egui::Vec2 = Default::default();
 
@@ -1432,13 +1437,6 @@ pub fn ui_system(
 
     });
 
-    if font_scale.is_changed() {
-        let scale = font_scale.scale;
-        ctx.all_styles_mut(move |style| {
-            scale_ui(style, scale);
-        });
-    }
-
     let window_response = window_area.unwrap().response;
     let pointer_pos = ctx.pointer_latest_pos().unwrap_or_default();
     let window_contains_pointer = window_response.rect.contains(pointer_pos) || window_response.dragged();
@@ -1560,18 +1558,6 @@ pub fn increase_font(font_scale: &mut FontScale) {
 }
 pub fn decrease_font(font_scale: &mut FontScale) {
     font_scale.scale = f32::max(font_scale.min, font_scale.scale - font_scale.scale_step);
-}
-
-fn clamp_font_scale(screen_width: f32, font_scale: &mut FontScale){
-    font_scale.max_window_width = screen_width * 0.97;
-    font_scale.min_window_width = screen_width * 0.20;
-    font_scale.default_window_width = screen_width * 0.30;
-
-    // what is the font_scale min/max allowed to be such that when default_width is multiplied with
-    // it, it doesn't go over/under the min/max window width
-    font_scale.min = font_scale.min_window_width / font_scale.default_window_width;
-    font_scale.max = font_scale.max_window_width / font_scale.default_window_width;
-    font_scale.scale = font_scale.scale.clamp(font_scale.min, font_scale.max);
 }
 
 fn scale_ui(style: &mut egui::Style, scale: f32) {

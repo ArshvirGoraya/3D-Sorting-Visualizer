@@ -9,7 +9,9 @@
     {
       "label": "Trunk Build",
       "type": "shell", // shell or process
-      // "command": "trunk build --release --public-url /3D-Sorting-Visualizer/",
+      // For release build on Local Server:
+      // "command": "trunk build --release --cargo-profile release-wasm32",
+      // For release build on Github:
       "command": "trunk build --release --cargo-profile release-wasm32 --public-url /3D-Sorting-Visualizer/",
       "group": "build",
       "presentation": {
