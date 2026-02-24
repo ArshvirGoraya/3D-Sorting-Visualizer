@@ -43,6 +43,9 @@ bevy_egui = { version = "0.38.1", features = [
   "log_input_messages"
 ] }
 
+[build-dependencies]
+winresource = "0.1.30"  # just for windows
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bevy = { version = "0.17.3", default-features = false, features = [
   "web",
