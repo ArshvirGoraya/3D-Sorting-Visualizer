@@ -25,6 +25,7 @@
       <!-- loading_screen div removed by bevy on startup -->
       <div class="loader"></div>
       <p class="loader_text">Loading...</p>
+      <p class="loader_text javascript_disabled" style="display: none">JavaScript disabled: app will not start!</p>
     </div>
     <input
       type="file"
@@ -32,5 +33,17 @@
       accept=".ogg,.flac,.wav,.mp3,.aac"
       style="display: none"
     />
+    <noscript>
+      <style>
+      .loader_text{
+        display: none !important;
+      }
+      .javascript_disabled{
+        display: block !important;
+        color: #Ff0000;
+        text-wrap: nowrap;
+      }
+      </style>
+    </noscript>
   </body>
 </html>

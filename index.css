@@ -24,7 +24,7 @@
   left: 50%;
   top: 50%;
   /* shift this percentage its own size to be below .loader */
-  transform: translate(-35%, 80%);
+  transform: translate(-50%, 80%);
 }
 .loader:before,
 .loader:after {

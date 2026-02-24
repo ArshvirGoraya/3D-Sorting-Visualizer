@@ -9,10 +9,10 @@
     {
       "label": "Trunk Build",
       "type": "shell", // shell or process
-      // For release build on Local Server:
-      // "command": "trunk build --release --cargo-profile release-wasm32 --filehash false --no-sri false",
+      // For release build on Local Server: dont set "--no-sri false" if want to update the resulting files in a live-server for testing
+      "command": "trunk build --release --cargo-profile release-wasm32 --filehash false",
       // For release build on Github:
-      "command": "trunk build --release --cargo-profile release-wasm32 --filehash false --no-sri false --public-url /3D-Sorting-Visualizer/",
+      // "command": "trunk build --release --cargo-profile release-wasm32 --filehash false --no-sri false --public-url /3D-Sorting-Visualizer/",
       "group": "build",
       "presentation": {
         "reveal": "always", // always reveal terminal
