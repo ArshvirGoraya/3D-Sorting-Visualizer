@@ -189,7 +189,7 @@ fn main() {
         app.add_systems(
             Startup,
             (
-                wasm_remove_loading_screen,
+                // wasm_remove_loading_screen,
                 wasm_audio_picker::spawn_browser_audio_handlers,
             ),
         );

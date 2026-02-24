@@ -856,9 +856,14 @@ pub fn ui_system(
     let ctx = contexts.ctx_mut()?;
 
     if !*font_added{
-        // INFO: can't put this in a startup system as it requires EguiPrimaryContextPass.
         *font_added = true;
+        // INFO: can't put this in a startup system as it requires EguiPrimaryContextPass.
         setup_font(ctx);
+
+        // removing loading screen on Startup doesn't work as many things are still loading then
+        // better to remove it first time ui is run.
+        #[cfg(any(target_arch = "wasm32", rust_analyzer))]
+        crate::wasm_remove_loading_screen();
     }
 
     let scroll_height = ctx.content_rect().height() * 0.85;
