@@ -112,6 +112,13 @@ pub struct SelectedAudio;
 #[derive(Message)]
 pub struct StopAllAudio;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
+pub enum AddedWindowIcon {
+    #[default]
+    Added,
+    NotAdded,
+}
+
 fn main() {
     let mut app = App::new();
     app.add_plugins(
@@ -192,6 +199,10 @@ fn main() {
                 .run_if(in_state(WasmAudioReceiverListening::Listening)),
         );
     }
+    #[cfg(target_arch = "x86_64")]
+    {
+        app.add_systems(Startup, set_window_icon);
+    }
 
     // app.add_systems(Startup, tests);
     app.add_systems(
@@ -247,6 +258,28 @@ fn main() {
         );
 
     app.run();
+}
+
+#[cfg(target_arch = "x86_64")]
+fn set_window_icon(
+    // https://bevy-cheatbook.github.io/window/icon.html
+    // https://github.com/bevyengine/bevy/discussions/21250
+    window_entities: Query<Entity, With<Window>>,
+) {
+    let image = image::open("embedded_assets/favicon/favicon_32.png")
+        .expect("favicon.png does not exist!")
+        .into_rgba8();
+    let (width, height) = image.dimensions();
+    let rgba = image.into_raw();
+    let icon = winit::window::Icon::from_rgba(rgba, width, height)
+        .expect("could not create icon from rgba");
+
+    bevy::winit::WINIT_WINDOWS.with_borrow(|windows| {
+        for window_entity in window_entities {
+            let window = windows.get_window(window_entity).unwrap();
+            window.set_window_icon(Some(icon.clone()));
+        }
+    });
 }
 
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]

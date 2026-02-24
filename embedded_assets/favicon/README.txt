@@ -1,0 +1,6 @@
+- Photoshop used to design the icon png.
+	- The size of the png is the biggest size inside the .ico file (256x256).
+- Magick used to convert the designed .png to a .ico (used in web/wasm builds)
+	- `magick convert favicon.png -define icon:auto-resize=16,32,48,64,128,256 favicon.ico`
+- Magick used to create a smaller icon for the window icon (used in windows/x86 builds)
+	- `magick convert favicon.png -resize 32x32 favicon_32.png`

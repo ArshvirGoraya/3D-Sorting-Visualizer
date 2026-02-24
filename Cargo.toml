@@ -64,6 +64,8 @@ web-sys = { version = "0.3.85", features = [
 bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_window",
 ] }
+image = "0.25.9"  # same as what bevy uses (used cargo tree to see which version bevy uses first)
+winit = "0.30.12"  # same as what bevy uses
 
 [profile.dev]
 # Very little optimizations on dev builds for fastest compiles
