@@ -4,6 +4,9 @@ mod ui;
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
 mod wasm_audio_picker;
 
+#[cfg(any(target_arch = "wasm32", rust_analyzer))]
+use web_sys::wasm_bindgen::JsCast; // required for dyn_into
+
 use bevy::{
     asset::AssetMetaCheck,
     audio::{PlaybackMode, Volume},
@@ -174,7 +177,21 @@ fn main() {
     .init_state::<CameraControlsAutoRotate>();
 
     #[cfg(any(target_arch = "wasm32", rust_analyzer))]
-    app.init_state::<WasmAudioReceiverListening>();
+    {
+        app.init_state::<WasmAudioReceiverListening>();
+        app.add_systems(
+            Startup,
+            (
+                wasm_remove_loading_screen,
+                wasm_audio_picker::spawn_browser_audio_handlers,
+            ),
+        );
+        app.add_systems(
+            Update,
+            wasm_audio_picker::audio_select_listener
+                .run_if(in_state(WasmAudioReceiverListening::Listening)),
+        );
+    }
 
     // app.add_systems(Startup, tests);
     app.add_systems(
@@ -188,15 +205,7 @@ fn main() {
         )
             .chain(),
     );
-    #[cfg(any(target_arch = "wasm32", rust_analyzer))]
-    app.add_systems(Startup, wasm_audio_picker::spawn_browser_audio_handlers);
 
-    #[cfg(any(target_arch = "wasm32", rust_analyzer))]
-    app.add_systems(
-        Update,
-        wasm_audio_picker::audio_select_listener
-            .run_if(in_state(WasmAudioReceiverListening::Listening)),
-    );
     app.add_systems(Update, font_scale_inputs)
         .add_systems(
             Update,
@@ -238,6 +247,21 @@ fn main() {
         );
 
     app.run();
+}
+
+#[cfg(any(target_arch = "wasm32", rust_analyzer))]
+fn wasm_remove_loading_screen() {
+    let loading_screen_element: web_sys::HtmlDivElement = web_sys::window()
+        .expect("window should exist")
+        .document()
+        .expect("document should exist")
+        .get_element_by_id("loading_screen")
+        .expect("element with id \"loading_screen\" should exist")
+        .dyn_into::<web_sys::HtmlDivElement>() // must convert with dyn_into instead of just .into()
+        .expect("loading_screen must be a div element");
+
+    // can also call set_hidden(), but remove is fine.
+    loading_screen_element.remove();
 }
 
 // fn tests() {

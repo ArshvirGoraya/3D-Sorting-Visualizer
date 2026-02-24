@@ -56,3 +56,4 @@ rustdocflags
 rustflags
 Zshare
 Zthreads
+filehash

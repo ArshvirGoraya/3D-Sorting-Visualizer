@@ -1,12 +1,75 @@
 <html>
   <head>
     <!-- https://trunk-rs.github.io/trunk/guide/assets/index.html -->
+
+    <!-- https://developer.chrome.com/blog/web-audio-autoplay/#moving-forward -->
+    <!-- https://github.com/NiklasEi/bevy_game_template/blob/1f3e70f3446ba315d41185dfd67c5e4ac0559d18/index.html#L14 -->
+    <!-- Ensures audio runs in bevy app (needed due to autoplay rules in browsers) -->
+    <script>// https://developer.chrome.com/blog/web-audio-autoplay/#moving-forward
+
+(function () {
+  // An array of all contexts to resume on the page
+  const audioContextList = [];
+
+  // An array of various user interaction events we should listen for
+  const userInputEventNames = [
+    'click',
+    'contextmenu',
+    'auxclick',
+    'dblclick',
+    'mousedown',
+    'mouseup',
+    'pointerup',
+    'touchend',
+    'keydown',
+    'keyup',
+  ];
+
+  // A proxy object to intercept AudioContexts and
+  // add them to the array for tracking and resuming later
+  self.AudioContext = new Proxy(self.AudioContext, {
+    construct(target, args) {
+      const result = new target(...args);
+      audioContextList.push(result);
+      return result;
+    },
+  });
+
+  // To resume all AudioContexts being tracked
+  function resumeAllContexts(event) {
+    let count = 0;
+
+    audioContextList.forEach(context => {
+      if (context.state !== 'running') {
+        context.resume();
+      } else {
+        count++;
+      }
+    });
+
+    // If all the AudioContexts have now resumed then we
+    // unbind all the event listeners from the page to prevent
+    // unnecessary resume attempts
+    if (count == audioContextList.length) {
+      userInputEventNames.forEach(eventName => {
+        document.removeEventListener(eventName, resumeAllContexts);
+      });
+    }
+  }
+
+  // We bind the resume function for each user interaction
+  // event on the page
+  userInputEventNames.forEach(eventName => {
+    document.addEventListener(eventName, resumeAllContexts);
+  });
+})();
+</script>
     
-    <link rel="stylesheet" href="/3D-Sorting-Visualizer/index-b76b46b024aa148b.css" integrity="sha384-1MfJJgSrKQfCykq3ezJFKeEK3OOSJvX5jsxmwuuf6fsm1oPCNi3oKJ6AWU0mhr8p"/>
+    <link rel="stylesheet" href="/3D-Sorting-Visualizer/index.css" integrity="sha384-11Jtp9Xp27MiwoDRb41hbW/SDkxf3LvYUP5LXRubg/D+kB9nvkudjgRSHokcYkmk"/>
     
 <script type="module">
-import init, * as bindings from '/3D-Sorting-Visualizer/rust_3d_sorting-e9e62bbdb332834c.js';
-const wasm = await init({ module_or_path: '/3D-Sorting-Visualizer/rust_3d_sorting-e9e62bbdb332834c_bg.wasm' });
+import init, * as bindings from '/3D-Sorting-Visualizer/rust_3d_sorting.js';
+const wasm = await init({ module_or_path: '/3D-Sorting-Visualizer/rust_3d_sorting_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -15,20 +78,28 @@ window.wasmBindings = bindings;
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 </script>
-  <link rel="modulepreload" href="/3D-Sorting-Visualizer/rust_3d_sorting-e9e62bbdb332834c.js" crossorigin="anonymous" integrity="sha384-nGmV30MY/C50DjVVKTOQTmIT2jOLu+UeVBQfECmmIksC15TpZ+frOJiuftaPHdG/"><link rel="preload" href="/3D-Sorting-Visualizer/rust_3d_sorting-e9e62bbdb332834c_bg.wasm" crossorigin="anonymous" integrity="sha384-fJoH+3tCJFpaEexy8d+i4AplqwuOCmYFFZ02/3vTnRIVzg8ZgVdVmdBEqSw8zqfo" as="fetch" type="application/wasm"></head>
+  <link rel="modulepreload" href="/3D-Sorting-Visualizer/rust_3d_sorting.js" crossorigin="anonymous" integrity="sha384-fclovyyXc75VWDMH8f41l4YpzgCL0oY7JDTO+J6yfeDwGLGIBtL/gL4cCInyGTPo"><link rel="preload" href="/3D-Sorting-Visualizer/rust_3d_sorting_bg.wasm" crossorigin="anonymous" integrity="sha384-uCEbdmSqPBfWHesEL8u6aiZIC49IQvIRU1HL1hNg/SXTepRcQCs/mIYmgYSHd1cc" as="fetch" type="application/wasm"></head>
   <style>
     /* maybe remove when embedding in canvas that is NOT fullscreen on browser? */
     canvas {
       outline: none;
     }
-    body{
+    body {
       margin: 1px;
       background-color: 2b2c2f;
     }
   </style>
   <body>
-    <div class="loader"></div>
-    <p class="loader-text">Loading...</p>
-    <input type="file" id="audio_picker" accept=".ogg,.flac,.wav,.mp3,.aac" style="display: none;"/>
+    <div class="loading_screen" id="loading_screen">
+      <!-- loading_screen div removed by bevy on startup -->
+      <div class="loader"></div>
+      <p class="loader_text">Loading...</p>
+    </div>
+    <input
+      type="file"
+      id="audio_picker"
+      accept=".ogg,.flac,.wav,.mp3,.aac"
+      style="display: none"
+    />
   </body>
 </html>

@@ -1,20 +1,23 @@
 /* Taken From: https://css-loaders.com/3d/ */
 /* Add to HTML: <div class="loader"></div> */
+
+
+.loading_screen{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+
 .loader {
-  z-index: -1;
   --s: 20px;
   --_d: calc(0.353 * var(--s));
   width: calc(var(--s) + var(--_d));
   aspect-ratio: 1;
-  position: absolute;
   display: grid;
-  left: 50%;
-  top: 50%;
   /* shift half its own size */
   transform: translate(-50%, -50%);
 }
-.loader-text {
-  z-index: -1;
+.loader_text {
   position: absolute;
   color: #fff;
   font-size: x-large;
