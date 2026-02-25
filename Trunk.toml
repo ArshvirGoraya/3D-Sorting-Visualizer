@@ -10,4 +10,4 @@ dist = "docs"  # The folder name can be used by GitHub Pages (if not using GitHu
 public_url = "/"  # Where assets are placed on the website
 # minify = "on_release"  # never, on_release, always. Errors RequiredTokenNotFound(Identifier) [token=Some(KeywordDefault)] (due to unsupported wasm-bindgen ES6+ code?)
 filehash = true  # file hashing
-no_sri = true  # integrity checks
+no_sri = true  # integrity checks disable
