@@ -92,6 +92,7 @@ pub struct CubeScaleControls {
 #[derive(Resource, Default)]
 pub struct HoveredCube {
     id: Option<Entity>,
+    using_touch: bool,
 }
 
 #[derive(Component)]
@@ -385,6 +386,8 @@ fn detect_cube_hover_enter(
     if let Some(e) = event_hover_enter.read().last()
         && let Ok(cube_id) = cube_query.get(e.entity)
     {
+        hovered_cube.using_touch =
+            e.pointer_id != bevy::picking::backend::prelude::PointerId::Mouse;
         hovered_cube.id = Some(cube_id);
     }
 }

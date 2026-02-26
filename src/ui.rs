@@ -1461,9 +1461,14 @@ pub fn ui_system(
 
     // draw egui frame over hovered cube:
     if !window_contains_pointer && let Some(hover_cube_id) = hovered_cube.id{
-        // pointer_pos.x += 0.0; // frame offset
+        let mut pos = pointer_pos;
+        if hovered_cube.using_touch{
+            // position top right if touching over cube (instead of hovering with a mouse)
+            pos.y = 0.0;
+            pos.x = screen_width;
+        }
         egui::Area::new(egui::Id::new("cube_hover_area"))
-            .fixed_pos(pointer_pos)
+            .fixed_pos(pos)
             .interactable(false)
             .show(ctx, |ui|{
                 egui::Frame::default()
