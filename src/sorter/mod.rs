@@ -14,18 +14,21 @@ pub enum SortState {
 pub enum Algorithms {
     #[default]
     QuickSort,
-    MergeSort,
+    // MergeSort,
 }
 impl fmt::Display for Algorithms {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Algorithms::QuickSort => write!(f, "Quick Sort"),
-            Algorithms::MergeSort => write!(f, "Merge Sort"),
+            // Algorithms::MergeSort => write!(f, "Merge Sort"),
         }
     }
 }
 impl Algorithms {
-    pub const ALL: [Algorithms; 2] = [Algorithms::QuickSort, Algorithms::MergeSort];
+    pub const ALL: [Algorithms; 1] = [
+        Algorithms::QuickSort,
+        // Algorithms::MergeSort
+    ];
 }
 
 #[derive(Resource)]
