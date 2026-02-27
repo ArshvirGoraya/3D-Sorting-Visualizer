@@ -645,7 +645,7 @@ fn center_camera(
         && let Ok((cube_transform, _, _, _)) = cubes_query.get(scanned_cube)
         && *sort_state_get.get() == sorter::SortState::Sorting
     {
-        crate::center_camera_on_cube(cube_transform, camera_query);
+        crate::center_camera_on_cube(cube_transform, camera_query, true);
     }else{
         crate::center_camera_on_all_cubes(camera_query, cube_width, end_index);
     }

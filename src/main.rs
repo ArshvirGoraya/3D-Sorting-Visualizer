@@ -335,7 +335,11 @@ pub fn keep_cube_centered(
     // INFO: runs if in state: Sorting, and Following.
     if let Some(scanned_cube) = scanned_cube.entity {
         // INFO: the scanned_cube is set when sorting (when algorithm scans through all the cubes).
-        center_camera_on_cube(transform.get(scanned_cube).unwrap(), &mut camera_query);
+        center_camera_on_cube(
+            transform.get(scanned_cube).unwrap(),
+            &mut camera_query,
+            true,
+        );
     }
 }
 
@@ -345,7 +349,11 @@ pub fn detect_cube_clicked(
     mut camera_query: Query<&mut PanOrbitCamera>,
 ) {
     // INFO: This system is attached to cubes when they are spawned
-    center_camera_on_cube(transform.get(event.entity).unwrap(), &mut camera_query);
+    center_camera_on_cube(
+        transform.get(event.entity).unwrap(),
+        &mut camera_query,
+        true,
+    );
     event.propagate(false);
 }
 
@@ -384,9 +392,13 @@ pub fn center_camera_on_all_cubes(
 pub fn center_camera_on_cube(
     cube_transform: &Transform,
     camera_query: &mut Query<&mut PanOrbitCamera>,
+    fixed_y: bool,
 ) {
     let mut cube_center = cube_transform.translation;
     cube_center.x += cube_transform.scale.x / 2.0;
+    if fixed_y {
+        cube_center.y = 0.0;
+    }
 
     let mut pan_orbit = camera_query.single_mut().unwrap();
     pan_orbit.target_focus = cube_center;
