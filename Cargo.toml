@@ -92,6 +92,7 @@ codegen-units = 1
 [profile.release-wasm32]
 # used by trunk: trunk build --release --cargo-profile release-wasm32
 inherits = "release"
-opt-level = "z"  # different from x86 (opt-level = 3)
+# opt-level = "z"  # different from x86 (opt-level = 3)
+opt-level = 3
 strip = "debuginfo"  # different from x86 (strip = true)
 panic = "unwind"  # gives me smaller wasm than panic = "abort"
