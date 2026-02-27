@@ -5,7 +5,21 @@ mod ui;
 mod wasm_audio_picker;
 
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
-use web_sys::wasm_bindgen::JsCast; // required for dyn_into
+use wasm_bindgen::prelude::*; // requires for all '#[wasm_bindgen]' usage
+#[cfg(any(target_arch = "wasm32", rust_analyzer))]
+use web_sys::wasm_bindgen::JsCast; // // required for dyn_into
+
+#[cfg(any(target_arch = "wasm32", rust_analyzer))]
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_name = isMobileDevice)]
+    fn is_mobile_device_js() -> bool;
+}
+#[cfg(any(target_arch = "wasm32", rust_analyzer))]
+pub fn is_mobile() -> bool {
+    // unsafe { is_mobile_device_js() }
+    is_mobile_device_js()
+}
 
 use bevy::{
     asset::AssetMetaCheck,

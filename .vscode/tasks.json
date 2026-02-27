@@ -7,6 +7,57 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Local Release Build",
+      "type": "shell",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "index to root",
+        "Trunk Build Local",
+        "esbuild minify css",
+        "esbuild bundle js",
+        "rm root index"
+      ],
+      "group": "build"
+    },
+    {
+      "label": "Github Release Build",
+      "type": "shell",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "index to root",
+        "Trunk Build Release",
+        "esbuild minify css",
+        "esbuild bundle js",
+        "rm root index"
+      ],
+      "group": "build"
+    },
+    {
+      "label": "Dev Build",
+      "type": "shell",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "index to root",
+        "Trunk Build Dev",
+        "esbuild minify css",
+        "esbuild bundle js",
+        "rm root index"
+      ],
+      "group": "build"
+    },
+    {
+      "label": "gzip size (wasm)",
+      "type": "shell",
+      "command": "scripts\\gzip_wasm_size.ps1",
+      "group": "build",
+    },
+    {
+      "label": "serve",
+      "type": "shell",
+      "command": "live-server",
+      "group": "none",
+    },
+    {
       "label": "Trunk Build Release",
       "type": "shell", // shell or process
       // For release build on Github:
@@ -27,20 +78,39 @@
       }
     },
     {
-      "label": "gzip size (wasm)",
-      "type": "shell", // shell or process
-      "command": "scripts\\gzip_wasm_size.ps1",
+      "label": "Trunk Build Dev",
+      "type": "shell",
+      "command": "trunk build --filehash false",
       "group": "build",
+      "presentation": {
+        "reveal": "always",
+      }
     },
     {
-      "label": "Trunk Build Release & GZip",
+      "label": "index to root",
+      // trunk needs index.html to be in the same directory as cargo.toml in order to build correctly.
+      // copies index.html from source to root (where cargo.toml is)
       "type": "shell",
-      "dependsOrder": "sequence",
-      "dependsOn": [
-        "Trunk Build Release",
-        "gzip size (wasm)"
-      ],
+      "command": "cp src/index.html index.html",
       "group": "build"
-    }
+    },
+    {
+      "label": "rm root index",
+      "type": "shell",
+      "command": "rm index.html",
+      "group": "build"
+    },
+    {
+      "label": "esbuild minify css",
+      "type": "shell",
+      "command": "npx esbuild src/index.css --minify --outfile=docs/index.css --allow-overwrite",
+      "group": "build"
+    },
+    {
+      "label": "esbuild bundle js",
+      "type": "shell",
+      "command": "npx esbuild src/main.js --minify --bundle --format=esm --outfile=docs/main.js --allow-overwrite",
+      "group": "build"
+    },
   ]
 }

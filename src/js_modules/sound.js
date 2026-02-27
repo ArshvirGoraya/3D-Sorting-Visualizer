@@ -1,6 +1,8 @@
 // https://developer.chrome.com/blog/web-audio-autoplay/#moving-forward
+// https://github.com/NiklasEi/bevy_game_template/blob/1f3e70f3446ba315d41185dfd67c5e4ac0559d18/index.html#L14
+// Ensures audio runs in bevy app (needed due to autoplay rules in browsers) 
 
-(function () {
+(function() {
   // An array of all contexts to resume on the page
   const audioContextList = [];
 

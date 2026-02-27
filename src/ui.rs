@@ -760,12 +760,15 @@ pub fn ui_system(
      mut font_scale, 
      mut font_added, 
      mut text_is_dirty,
-     mut text_just_cleaned): 
+     mut text_just_cleaned,
+     mut wasm_on_mobile, // impacts if text is editeable
+     ): 
     (ResMut<UserText>, 
      Res<NumberRegex>, 
      ResMut<bevy_egui::EguiClipboard>, 
      ResMut<FontScale>, 
      Local<bool>, 
+     Local<bool>,
      Local<bool>,
      Local<bool>
      ),
@@ -864,6 +867,15 @@ pub fn ui_system(
         // better to remove it first time ui is run.
         #[cfg(any(target_arch = "wasm32", rust_analyzer))]
         crate::wasm_remove_loading_screen();
+
+        // Can find out if in mobile on startup, but putting it here since its only necessary in
+        // this system (for now).
+        #[cfg(any(target_arch = "wasm32", rust_analyzer))]
+        {
+            if crate::is_mobile(){
+                *wasm_on_mobile = true;
+            }
+        }
     }
 
     let scroll_height = ctx.content_rect().height() * 0.85;
@@ -1389,10 +1401,13 @@ pub fn ui_system(
 
                     ui.allocate_ui(vec2(ui.available_width(), 200.0), |ui|{
                         egui::ScrollArea::vertical().auto_shrink([false, true]).show(ui, |ui|{
-                            let mut text_edit_widget = ui.add_enabled(!is_sorting, egui::TextEdit::multiline(&mut user_text.val)
+                            let text_edit_widget_enabled = !is_sorting && !*wasm_on_mobile;
+
+                            let mut text_edit_widget = ui.add_enabled(text_edit_widget_enabled, egui::TextEdit::multiline(&mut user_text.val)
                                 .hint_text("numbers here")
                                 .desired_width(ui.available_width()))
                                 .on_hover_text("supports positive and negative ints and floats with the following regex expression: r\"-?\\d+(?:\\.\\d+)?\"");
+
                             if *generated_rng_values{
                                 text_edit_widget.mark_changed();
                             }
@@ -1437,7 +1452,27 @@ pub fn ui_system(
                             *generated_rng_values = false;
                         });
                     });
-        });
+                    #[cfg(any(target_arch = "wasm32", rust_analyzer))]
+                    {
+                        if *wasm_on_mobile{
+                            if ui.add(
+                                egui::Label::new(
+                                    RichText::new("Cannot use above TextEdit on mobile. Generate random values instead.")
+                                    .color(get_parse_warning_color(&ParsedWarning::PrecisionLoss).0)
+                                    .underline()
+                                ).wrap_mode(egui::TextWrapMode::Wrap)
+                            )
+                            .on_hover_cursor(egui::CursorIcon::PointingHand)
+                            .on_hover_text("Click to see issue why TextEdit cannot be used on mobile builds.")
+                            .clicked(){
+                                ui.ctx().open_url(egui::OpenUrl {
+                                    new_tab: true,
+                                    url: "https://github.com/vladbat00/bevy_egui/issues/246".to_string(),
+                                });
+                            };
+                        }
+                    }
+            });
         });
 
     });
