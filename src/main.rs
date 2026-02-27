@@ -477,7 +477,7 @@ fn change_audio_source(
 }
 
 fn spawn_audio_sources(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let default_volume = 1.0;
+    let default_volume = 0.2;
 
     // load file and add to audio_assets
     let default_handle: Handle<bevy::audio::AudioSource> =
