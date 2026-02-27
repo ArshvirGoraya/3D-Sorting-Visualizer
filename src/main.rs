@@ -116,7 +116,8 @@ pub struct CubeData {
 
 #[derive(Resource, Default)]
 pub struct ScannedCube {
-    entity: Option<Entity>,
+    transform: Option<Transform>,
+    // entity: Option<Entity>,
 }
 
 #[derive(Component)]
@@ -328,18 +329,13 @@ fn wasm_remove_loading_screen() {
 // }
 
 pub fn keep_cube_centered(
-    transform: Query<&Transform, With<CubeData>>,
     scanned_cube: Res<ScannedCube>,
     mut camera_query: Query<&mut PanOrbitCamera>,
 ) {
     // INFO: runs if in state: Sorting, and Following.
-    if let Some(scanned_cube) = scanned_cube.entity {
+    if let Some(scanned_cube_transform) = scanned_cube.transform {
         // INFO: the scanned_cube is set when sorting (when algorithm scans through all the cubes).
-        center_camera_on_cube(
-            transform.get(scanned_cube).unwrap(),
-            &mut camera_query,
-            true,
-        );
+        center_camera_on_cube(&scanned_cube_transform, &mut camera_query, true);
     }
 }
 

@@ -204,7 +204,14 @@ pub fn setup_range(
         sort_state.pivot = sort_state.current_array.1 - 1;
         sort_state.j = sort_state.current_array.0;
         sort_state.i = (sort_state.current_array.0 as isize) - 1;
-        scanned_cube.entity = Some(parsed_values.vals[sort_state.j].cube_handle);
+
+        scanned_cube.transform = Some(
+            *cubes_query
+                .get(parsed_values.vals[sort_state.j].cube_handle)
+                .unwrap()
+                .0,
+        );
+
         // log::info!(
         //     "
         //     current array: ({}, {})
@@ -238,7 +245,14 @@ pub fn setup_range(
             swapped_cubes: None,
             next_step: SortStep::Compare,
         });
-        scanned_cube.entity = Some(parsed_values.vals[current_array.0].cube_handle);
+
+        scanned_cube.transform = Some(
+            *cubes_query
+                .get(parsed_values.vals[current_array.0].cube_handle)
+                .unwrap()
+                .0,
+        );
+
         // log::info!(
         //     "
         //     current array: ({}, {})
@@ -279,7 +293,14 @@ pub fn increment_j(
     sort_state.j += 1;
     if sort_state.j != sort_state.pivot + 1 {
         // INFO: j may be pivot + 1: This is the condition used for detecting when a subarray is finished.
-        scanned_cube.entity = Some(parsed_values.vals[sort_state.j].cube_handle);
+
+        scanned_cube.transform = Some(
+            *cubes_query
+                .get(parsed_values.vals[sort_state.j].cube_handle)
+                .unwrap()
+                .0,
+        );
+
         color_cube(
             sort_state.j,
             SortColor::J,
@@ -327,8 +348,6 @@ pub fn compare(
             &parsed_values,
             &mut cubes_query,
         );
-        sort_state.swapped_cubes = None;
-
         // j must increment after swapping.
         increment_j(
             &mut sort_state,
@@ -339,6 +358,9 @@ pub fn compare(
             &audio_controls,
             &mut scanned_cube,
         );
+        sort_state.swapped_cubes = None;
+        // should wait a step after this for visualization.
+        return;
     }
     if sort_state.j == sort_state.pivot + 1 {
         // INFO: when pivot has been reached, j and i swap and j increments by 1. That is when new subarrays

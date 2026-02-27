@@ -348,7 +348,6 @@ fn update_parsed_values(
         camera_query,
         scanned_cube,
         camera_controls_follow_selected,
-        cubes_query,
         sort_state_get,
     );
 
@@ -620,7 +619,6 @@ fn control_cube_widths(
         camera_query, 
         scanned_cube, 
         camera_controls_follow_selected, 
-        cubes_query,
         sort_state_get,
     );
 }
@@ -631,21 +629,14 @@ fn center_camera(
     camera_query: &mut Query<&mut PanOrbitCamera>,
     scanned_cube: &ResMut<crate::ScannedCube>,
     camera_controls_follow_selected: &Local<bool>,
-    cubes_query: &Query<(
-        &mut Transform,
-        &mut MeshMaterial3d<StandardMaterial>,
-        &mut Visibility,
-        &mut crate::CubeData,
-    )>,
     sort_state_get: &Res<State<sorter::SortState>>,
 ){
     if 
         **camera_controls_follow_selected
-        && let Some(scanned_cube) = scanned_cube.entity
-        && let Ok((cube_transform, _, _, _)) = cubes_query.get(scanned_cube)
+        && let Some(scanned_cube_transform) = scanned_cube.transform
         && *sort_state_get.get() == sorter::SortState::Sorting
     {
-        crate::center_camera_on_cube(cube_transform, camera_query, true);
+        crate::center_camera_on_cube(&scanned_cube_transform, camera_query, true);
     }else{
         crate::center_camera_on_all_cubes(camera_query, cube_width, end_index);
     }
@@ -761,7 +752,7 @@ pub fn ui_system(
      mut font_added, 
      mut text_is_dirty,
      mut text_just_cleaned,
-     mut wasm_on_mobile, // impacts if text is editeable
+     mut wasm_on_mobile, // INFO: used in wasm. impacts if text is editeable
      ): 
     (ResMut<UserText>, 
      Res<NumberRegex>, 
@@ -1016,7 +1007,6 @@ pub fn ui_system(
                                     &mut camera_query, 
                                     &scanned_cube,
                                     &camera_controls_follow_selected,
-                                    &cubes_query,
                                     &sort_state_get
                                 );
                                 let mut pan_orbit = camera_query.single_mut().unwrap();
