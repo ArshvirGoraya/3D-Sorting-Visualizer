@@ -602,7 +602,7 @@ fn spawn_cube_assets(
 fn auto_rotate_camera(mut camera_query: Query<&mut PanOrbitCamera>) {
     // INFO: only runs in auto rotate state
     let mut pan_orbit = camera_query.single_mut().unwrap();
-    pan_orbit.target_yaw += 0.04;
+    pan_orbit.target_yaw += 0.02;
 }
 
 fn spawn_3d_camera(mut commands: Commands) {
@@ -619,7 +619,7 @@ fn spawn_3d_camera(mut commands: Commands) {
             ..Default::default()
         },
         Tonemapping::None, // more accurate colors
-        Transform::from_xyz(0.0, 0.0, 100.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(0.0, 0.0, 35.0).looking_at(Vec3::ZERO, Vec3::Y),
         Bloom {
             // INFO: Add bloom for glowing effect on cubes with parse problems
             intensity: 0.1,
