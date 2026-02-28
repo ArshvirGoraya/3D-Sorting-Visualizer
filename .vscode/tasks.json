@@ -15,6 +15,7 @@
         "Trunk Build Local",
         "esbuild minify css",
         "esbuild bundle js",
+        "esbuild minify bundled js",
         "rm root index"
       ],
       "group": "build"
@@ -28,6 +29,7 @@
         "Trunk Build Release",
         "esbuild minify css",
         "esbuild bundle js",
+        "esbuild minify bundled js",
         "rm root index"
       ],
       "group": "build"
@@ -39,7 +41,6 @@
       "dependsOn": [
         "index to root",
         "Trunk Build Dev",
-        "esbuild minify css",
         "esbuild bundle js",
         "rm root index"
       ],
@@ -52,9 +53,9 @@
       "group": "build",
     },
     {
-      "label": "serve",
+      "label": "live-server",
       "type": "shell",
-      "command": "live-server",
+      "command": "live-server ./docs --browser=\"$(cat scripts/browser_path.txt)\"",
       "group": "none",
     },
     {
@@ -109,7 +110,13 @@
     {
       "label": "esbuild bundle js",
       "type": "shell",
-      "command": "npx esbuild src/main.js --minify --bundle --format=esm --outfile=docs/main.js --allow-overwrite",
+      "command": "npx esbuild src/main.js --bundle --format=esm --outfile=docs/main.js --allow-overwrite",
+      "group": "build"
+    },
+    {
+      "label": "esbuild minify bundled js",
+      "type": "shell",
+      "command": "npx esbuild docs/main.js --minify --outfile=docs/main.js --allow-overwrite",
       "group": "build"
     },
   ]

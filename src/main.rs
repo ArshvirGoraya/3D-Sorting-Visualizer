@@ -141,6 +141,7 @@ fn main() {
         DefaultPlugins
             .set(WindowPlugin {
                 primary_window: Some(Window {
+                    // canvas
                     title: PROGRAM_TITLE.to_string(),
                     window_theme: Some(bevy::window::WindowTheme::Dark),
                     recognize_doubletap_gesture: true,
@@ -202,13 +203,7 @@ fn main() {
     #[cfg(any(target_arch = "wasm32", rust_analyzer))]
     {
         app.init_state::<WasmAudioReceiverListening>();
-        app.add_systems(
-            Startup,
-            (
-                // wasm_remove_loading_screen,
-                wasm_audio_picker::spawn_browser_audio_handlers,
-            ),
-        );
+        app.add_systems(Startup, wasm_audio_picker::spawn_browser_audio_handlers);
         app.add_systems(
             Update,
             wasm_audio_picker::audio_select_listener
@@ -296,21 +291,6 @@ fn set_window_icon(
             window.set_window_icon(Some(icon.clone()));
         }
     });
-}
-
-#[cfg(any(target_arch = "wasm32", rust_analyzer))]
-fn wasm_remove_loading_screen() {
-    let loading_screen_element: web_sys::HtmlDivElement = web_sys::window()
-        .expect("window should exist")
-        .document()
-        .expect("document should exist")
-        .get_element_by_id("loading_screen")
-        .expect("element with id \"loading_screen\" should exist")
-        .dyn_into::<web_sys::HtmlDivElement>() // must convert with dyn_into instead of just .into()
-        .expect("loading_screen must be a div element");
-
-    // can also call set_hidden(), but remove is fine.
-    loading_screen_element.remove();
 }
 
 // fn tests() {

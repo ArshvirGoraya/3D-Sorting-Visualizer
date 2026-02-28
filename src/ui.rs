@@ -854,11 +854,6 @@ pub fn ui_system(
         // INFO: can't put this in a startup system as it requires EguiPrimaryContextPass.
         setup_font(ctx);
 
-        // removing loading screen on Startup doesn't work as many things are still loading then
-        // better to remove it first time ui is run.
-        #[cfg(any(target_arch = "wasm32", rust_analyzer))]
-        crate::wasm_remove_loading_screen();
-
         // Can find out if in mobile on startup, but putting it here since its only necessary in
         // this system (for now).
         #[cfg(any(target_arch = "wasm32", rust_analyzer))]
