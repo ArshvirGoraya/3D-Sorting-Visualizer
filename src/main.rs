@@ -266,6 +266,18 @@ fn main() {
         .add_systems(
             OnEnter(sorter::SortState::NotSorting),
             sorter::quick_sort::complete.run_if(in_state(sorter::Algorithms::QuickSort)),
+        )
+        // Merge Sort:
+        .init_resource::<sorter::merge_sort::SortColors>()
+        .add_systems(
+            Update,
+            sorter::merge_sort::increment_sorting
+                .run_if(in_state(sorter::SortState::Sorting))
+                .run_if(in_state(sorter::Algorithms::MergeSort)),
+        )
+        .add_systems(
+            OnEnter(sorter::SortState::NotSorting),
+            sorter::merge_sort::complete.run_if(in_state(sorter::Algorithms::MergeSort)),
         );
 
     app.run();

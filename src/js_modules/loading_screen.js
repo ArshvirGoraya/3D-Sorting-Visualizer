@@ -8,7 +8,7 @@ let animation_frame = 0;
 
 function animationFrame() {
   animation_frame += 1;
-  console.log("animation frame: ", animation_frame)
+  // console.log("animation frame: ", animation_frame)
   if (animation_frame >= animation_frame_until_loaded) {
     document.getElementById("loading_screen").style.display = "none";
   } else {
