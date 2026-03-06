@@ -90,13 +90,13 @@ pub struct CubeAssets {
     pub materials: HashMap<ParsedWarning, MeshMaterial3d<StandardMaterial>>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct StringInfo {
     pub start_index: usize,
     pub end_index: usize,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct ParsedValue {
     pub raw_string: StringInfo,
     pub matched_string: StringInfo,

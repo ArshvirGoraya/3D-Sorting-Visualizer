@@ -82,6 +82,9 @@ pub fn swap(
         &mut user_text,
     );
     update_text_indices(i, j, parsed_values, shift_left, text_shift_amount);
+
+    // TODO remove this line:
+    log::info!("{}", user_text.val);
 }
 
 pub fn swap_text(
