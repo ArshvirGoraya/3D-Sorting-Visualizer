@@ -233,11 +233,11 @@ pub fn increase_width(
             .join(", ")
     );
 
-    if sort_state.width >= parsed_values.vals.len() - 1 {
+    if sort_state.width >= parsed_values.end_index - 1 {
         log::info!(
-            "width >= parsed_values.vals.len() - 1: {} >= {}",
+            "width >= parsed_values.end_index - 1: {} >= {}",
             sort_state.width,
-            parsed_values.vals.len() - 1
+            parsed_values.end_index - 1
         );
         // overwrite_values(
         //     commands,
@@ -324,7 +324,7 @@ pub fn shift_halves(
 
         let first_half_start = sort_state.halves_start_idx.1 + sort_state.width;
         let second_half_start = first_half_start + sort_state.width;
-        if second_half_start >= parsed_values.vals.len() {
+        if second_half_start >= parsed_values.end_index {
             // No need to merge as there is no second half.
             // Finished with this sweep: Increase width.
             sort_state.next_step = SortStep::IncreaseWidth;
@@ -400,10 +400,10 @@ pub fn color_range(
     // log::info!(
     //     "coloring as selected: {}..={}",
     //     range.0,
-    //     range.1.min(parsed_values.vals.len() - 1)
+    //     range.1.min(parsed_values.end_index - 1)
     // );
 
-    for i in range.0..=range.1.min(parsed_values.vals.len() - 1) {
+    for i in range.0..=range.1.min(parsed_values.end_index - 1) {
         set_cube_as_within_range(
             parsed_values.vals[i].cube_handle,
             &sort_colors,
@@ -676,9 +676,9 @@ pub fn compare_left_right(
             .collect::<Vec<_>>()
             .join(", "),
         sort_state.left_right_idx.1,
-        (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.vals.len()),
+        (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index),
         parsed_values.vals[sort_state.left_right_idx.1
-            ..(sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.vals.len())]
+            ..(sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)]
             .iter()
             .map(|parsed_value| parsed_value.converted_value.to_string())
             .collect::<Vec<_>>()
@@ -697,7 +697,7 @@ pub fn compare_left_right(
         );
         sort_state.left_right_idx.1 += 1;
     } else if sort_state.left_right_idx.1
-        == (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.vals.len())
+        == (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)
     {
         // j half is fully scanned. Put I's ParsedValue in K Vector.
         i_j_index = sort_state.left_right_idx.0;
@@ -795,7 +795,7 @@ pub fn compare_left_right(
     );
 
     sort_state.sweep_index += 1;
-    if sort_state.k.len() == (sort_state.width * 2).min(parsed_values.vals.len()) {
+    if sort_state.k.len() == (sort_state.width * 2).min(parsed_values.end_index) {
         // INFO: checking if k is filled: is filled when has enough values to fill out the next
         // width (if current width = 1, then k is filled when the two halves of width 1 combine to
         // crate k of width 2. if width = 2, then they combine to create 4. if 4, they combine to
