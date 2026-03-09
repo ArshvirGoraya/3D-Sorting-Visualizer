@@ -125,7 +125,7 @@ pub fn increment_sorting(
     )>,
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
-    user_text: ResMut<UserText>,
+    mut user_text: ResMut<UserText>,
     materials: ResMut<Assets<StandardMaterial>>,
 ) {
     if let Some(sort_state) = sort_state {
@@ -179,8 +179,13 @@ pub fn increment_sorting(
               // }
         }
     } else {
+        // INFO: add 2 spaces to string as ", " is added at the beginning of strings that move from
+        // first position to somewhere else and those 2 extra indices are needed during the
+        // algorithm.
+        user_text.val.push_str("  ");
+
         log::info!(
-            "-> current text: {}",
+            "\n-=-=-=-=-=-=\nstarting text: {}",
             parsed_values.vals[..parsed_values.end_index]
                 .iter()
                 .map(|x| { x.converted_value.to_string() })
@@ -223,53 +228,22 @@ pub fn increase_width(
 ) {
     sort_state.sweep_index = 0;
     sort_state.width *= 2;
-    log::info!("width after *2: {}", sort_state.width);
-    log::info!(
-        "-> current text: {}",
-        parsed_values.vals[..parsed_values.end_index]
-            .iter()
-            .map(|x| { x.converted_value.to_string() })
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    // log::info!("width after *2: {}", sort_state.width);
+    // log::info!(
+    //     "-> current text: {}",
+    //     parsed_values.vals[..parsed_values.end_index]
+    //         .iter()
+    //         .map(|x| { x.converted_value.to_string() })
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
 
     if sort_state.width >= parsed_values.end_index - 1 {
-        log::info!(
-            "width >= parsed_values.end_index - 1: {} >= {}",
-            sort_state.width,
-            parsed_values.end_index - 1
-        );
-        // overwrite_values(
-        //     commands,
-        //     &mut sort_state,
-        //     &mut parsed_values,
-        //     user_text,
-        //     &mut cubes_query,
-        //     &cube_assets,
-        //     &rng_color_controls,
-        // );
-        // color_halves(
-        //     // uncolors previous halves only.
-        //     Some(sort_state.halves_start_idx),
-        //     None,
-        //     sort_state.width,
-        //     parsed_values.into(),
-        //     sort_colors,
-        //     cube_assets,
-        //     cubes_query,
-        //     rng_color_controls,
-        // );
-
         sort_select_set.set(sorter::SortState::NotSorting);
     } else {
         // let previous_halves = sort_state.halves_start_idx;
         sort_state.halves_start_idx = (0, sort_state.width);
         sort_state.left_right_idx = sort_state.halves_start_idx;
-        // log::info!(
-        //     "new halves start: ({}, {})",
-        //     sort_state.halves_start_idx.0,
-        //     sort_state.halves_start_idx.1
-        // );
 
         color_range(
             (
@@ -332,25 +306,8 @@ pub fn shift_halves(
         }
         // let previous_halves = sort_state.halves_start_idx;
         sort_state.halves_start_idx = (first_half_start, second_half_start);
-        // log::info!(
-        //     "new halves start: ({}, {})",
-        //     sort_state.halves_start_idx.0,
-        //     sort_state.halves_start_idx.1
-        // );
-        //
         sort_state.left_right_idx = sort_state.halves_start_idx; // copied
-        //
-        // color_halves(
-        //     // uncolors the previous halves and colors the new halves
-        //     Some(previous_halves),
-        //     Some(sort_state.halves_start_idx),
-        //     sort_state.width,
-        //     parsed_values.into(),
-        //     sort_colors,
-        //     cube_assets,
-        //     cubes_query,
-        //     rng_color_controls,
-        // );
+
         color_range(
             (
                 sort_state.left_right_idx.0,
@@ -371,19 +328,7 @@ pub fn shift_halves(
             k: Vec::new(),
             sweep_index: 0,
         });
-        // log::info!("new halves start: ({}, {})", 0, 1);
         color_range((0, 1), sort_colors, &parsed_values.into(), cubes_query);
-        // color_halves(
-        //     // colors new halves only
-        //     None,
-        //     Some((0, 1)),
-        //     1,
-        //     parsed_values.into(),
-        //     sort_colors,
-        //     cube_assets,
-        //     cubes_query,
-        //     rng_color_controls,
-        // );
     }
 }
 
@@ -397,12 +342,6 @@ pub fn color_range(
         &mut crate::CubeData,
     )>,
 ) {
-    // log::info!(
-    //     "coloring as selected: {}..={}",
-    //     range.0,
-    //     range.1.min(parsed_values.end_index - 1)
-    // );
-
     for i in range.0..=range.1.min(parsed_values.end_index - 1) {
         set_cube_as_within_range(
             parsed_values.vals[i].cube_handle,
@@ -446,54 +385,6 @@ fn color_cube(
     *cube_material = sort_colors.materials.get(&sort_color).unwrap().clone();
 }
 
-// pub fn color_halves(
-//     previous_halves: Option<(usize, usize)>,
-//     new_halves: Option<(usize, usize)>,
-//     width: usize,
-//     parsed_values: Res<ParsedValues>,
-//     sort_colors: Res<SortColors>,
-//     cube_assets: Res<CubeAssets>,
-//     mut cubes_query: Query<(
-//         &mut Transform,
-//         &mut MeshMaterial3d<StandardMaterial>,
-//         &mut crate::CubeData,
-//     )>,
-//     rng_color_controls: Res<crate::RNGColorControls>,
-//     // materials: &mut ResMut<Assets<StandardMaterial>>,
-// ) {
-//     let range = (
-//         previous_halves.unwrap_or(new_halves.unwrap()).0, // starts at previous_range_ start if exists or new_range_start.
-//         (new_halves.unwrap_or(previous_halves.unwrap()).1 + width)
-//             .min(parsed_values.vals.len() - 1), // ends at new_range_end if
-//                                                           // exists or previous_range_end.
-//     );
-//     let uncolor_previous_range = previous_halves.is_some();
-//
-//     for i in range.0..=range.1 {
-//         let parsed_value = &parsed_values.vals[i];
-//         let (mut cube_transform, mut cube_material, _) =
-//             cubes_query.get_mut(parsed_value.cube_handle).unwrap();
-//         if uncolor_previous_range && i <= previous_halves.unwrap().1 {
-//             cube_transform.scale.z = DEFAULT_Z;
-//             *cube_material = crate::ui::get_cube_material(
-//                 rng_color_controls.rng_cubes_enabled,
-//                 parsed_value.parsed_warning,
-//                 &cube_assets,
-//                 parsed_value.rng_color.clone(),
-//             );
-//         } else {
-//             cube_transform.scale.z = SELECTION_Z;
-//             *cube_material = sort_colors
-//                 .materials
-//                 .get(&SortColor::Range)
-//                 .unwrap()
-//                 .clone();
-//         }
-//         // let mat = materials.get_mut(&cube_material.0).unwrap();
-//         // mat.base_color.set_alpha(new_alpha);
-//     }
-// }
-
 pub fn complete(mut commands: Commands, sort_state: Option<Res<SortState>>) {
     if sort_state.is_none() {
         return;
@@ -535,7 +426,7 @@ pub fn overwrite_values(
             .join(", ")
     );
 
-    for k_value in &sort_state.k {
+    for k_value in sort_state.k.iter_mut() {
         let mut left_string_end_match = 0;
         if k_value.virtual_k_index > 0 {
             left_string_end_match = parsed_values
@@ -549,14 +440,7 @@ pub fn overwrite_values(
         // Get the parsed_value that must be replaced by cloned parsed_value:
         let mut parsed_value = parsed_values.vals.get_mut(k_value.virtual_k_index).unwrap();
 
-        log::info!(
-            "->replacing index [{}]{} with index [{}]{}",
-            k_value.virtual_k_index,
-            parsed_value.converted_value,
-            k_value.original_index,
-            k_value.parsed_value_clone.converted_value
-        );
-
+        // Replace with copied value.
         parsed_value.converted_value = k_value.parsed_value_clone.converted_value;
         parsed_value.sorted_position = k_value.parsed_value_clone.sorted_position;
         parsed_value.parsed_warning = k_value.parsed_value_clone.parsed_warning;
@@ -571,25 +455,18 @@ pub fn overwrite_values(
             (mut transform_p, mut cube_mat_p, mut cube_data_p),
             (transform_k, _, _),
         ] = cubes_query
-            .get_many_mut([parsed_value.cube_handle, k_value.k_handle])
+            .get_many_mut([k_value.parsed_value_clone.cube_handle, k_value.k_handle])
             .unwrap();
         // Size and Position
-
-        // log::info!(
-        //     "setting cube at [{}] to k cube [{}]",
-        //     cube_data_p.index,
-        //     k_value.virtual_k_index,
-        // );
-
         transform_p.translation = transform_k.translation;
         transform_p.scale = transform_k.scale;
 
         // Material:
         *cube_mat_p = crate::ui::get_cube_material(
             rng_color_controls.rng_cubes_enabled,
-            parsed_value.parsed_warning,
+            k_value.parsed_value_clone.parsed_warning,
             cube_assets,
-            parsed_value.rng_color.clone(),
+            k_value.parsed_value_clone.rng_color.clone(),
         );
 
         // Cube index (can also set it to cube_data_k.index but thats the same value as
@@ -600,18 +477,49 @@ pub fn overwrite_values(
         commands.entity(k_value.k_handle).despawn();
 
         //////////////////////////////////////////////////////////////////////////
+        // Actually replacing or just putting in the same position?
+        if k_value.original_index == k_value.virtual_k_index {
+            // INFO: No reason overwrite the value with itself.
+            // Just change the cube material/z scale like above.
+            continue;
+        }
+
+        //////////////////////////////////////////////////////////////////////////
         // Change raw_string and matched_string
 
-        // TODO: if string moving from first to somewhere that isn't first, add a ", " to its
-        // beginning.
-        // TODO: if string moving from not-first to first, remove the ", " from its beginning.
-
-        let end_length = k_value.parsed_value_clone.raw_string.end_index
+        let mut end_length = k_value.parsed_value_clone.raw_string.end_index
             - k_value.parsed_value_clone.raw_string.start_index;
-        let match_length = k_value.parsed_value_clone.matched_string.start_index
+        let mut match_length = k_value.parsed_value_clone.matched_string.start_index
             - k_value.parsed_value_clone.raw_string.start_index;
 
         parsed_value.raw_string.start_index = left_string_end_match;
+
+        let moving_from_first_position = k_value.parsed_value_clone.raw_string.start_index == 0;
+        let moving_into_first_position = parsed_value.raw_string.start_index == 0;
+
+        if moving_from_first_position {
+            // add a ", " in front of the text.
+            log::info!("moving from first: \"{}\"", k_value.raw_string_text);
+            // let first_character = k_value.raw_string_text.as_bytes().first().unwrap();
+
+            if !k_value.raw_string_text.starts_with(",") {
+                k_value.raw_string_text = String::from(", ") + &k_value.raw_string_text;
+                match_length += 2;
+                end_length += 2;
+            }
+
+            log::info!("=> modified moving text: \"{}\"", k_value.raw_string_text)
+        } else if moving_into_first_position {
+            log::info!("moving to first: \"{}\"", k_value.raw_string_text);
+            // remove ", " in front of the text if there.
+            if k_value.raw_string_text.starts_with(", ") {
+                k_value.raw_string_text = k_value.raw_string_text[2..].to_string();
+                match_length -= 2;
+                end_length -= 2;
+            }
+            log::info!("=> modified moving text: \"{}\"", k_value.raw_string_text);
+        }
+
         parsed_value.raw_string.end_index = parsed_value.raw_string.start_index + end_length;
         parsed_value.matched_string.end_index = parsed_value.raw_string.end_index;
         parsed_value.matched_string.start_index =
@@ -629,24 +537,16 @@ pub fn overwrite_values(
     }
 
     // log::info!(
-    //     "\nparsed section after overwrite:[{}]",
-    //     parsed_values.vals[sort_state.k[0].virtual_k_index
-    //         ..=sort_state.k[sort_state.k.len() - 1].virtual_k_index]
+    //     "\n\nparsed values after overwrite values:[{}]\n",
+    //     parsed_values
+    //         .vals
     //         .iter()
     //         .map(|parsed_value| parsed_value.converted_value.to_string())
     //         .collect::<Vec<_>>()
     //         .join(", "),
     // );
 
-    log::info!(
-        "\nparsed values after overwrite values:[{}]",
-        parsed_values
-            .vals
-            .iter()
-            .map(|parsed_value| parsed_value.converted_value.to_string())
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
+    log::info!("\n\ntext after overwriting: {}\n", user_text.val);
 
     sort_state.k.clear();
 }
@@ -666,24 +566,24 @@ pub fn compare_left_right(
 ) {
     // Choose what I/J to add to K.
 
-    log::info!(
-        "i half: [{}..{}][{}], j half: [{}..{}][{}]",
-        sort_state.left_right_idx.0,
-        sort_state.halves_start_idx.1,
-        parsed_values.vals[sort_state.left_right_idx.0..sort_state.halves_start_idx.1]
-            .iter()
-            .map(|parsed_value| parsed_value.converted_value.to_string())
-            .collect::<Vec<_>>()
-            .join(", "),
-        sort_state.left_right_idx.1,
-        (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index),
-        parsed_values.vals[sort_state.left_right_idx.1
-            ..(sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)]
-            .iter()
-            .map(|parsed_value| parsed_value.converted_value.to_string())
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
+    // log::info!(
+    //     "i half: [{}..{}][{}], j half: [{}..{}][{}]",
+    //     sort_state.left_right_idx.0,
+    //     sort_state.halves_start_idx.1,
+    //     parsed_values.vals[sort_state.left_right_idx.0..sort_state.halves_start_idx.1]
+    //         .iter()
+    //         .map(|parsed_value| parsed_value.converted_value.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", "),
+    //     sort_state.left_right_idx.1,
+    //     (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index),
+    //     parsed_values.vals[sort_state.left_right_idx.1
+    //         ..(sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)]
+    //         .iter()
+    //         .map(|parsed_value| parsed_value.converted_value.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", "),
+    // );
 
     let virtual_k_index = sort_state.sweep_index; // the index that must be overwrited by i/j.
     let i_j_index; // The index of the ghost cube (i/j) that will be copied into the k index.
@@ -691,10 +591,10 @@ pub fn compare_left_right(
     if sort_state.left_right_idx.0 == sort_state.halves_start_idx.1 {
         // I half is fully scanned. Put J's ParsedValue in K Vector.
         i_j_index = sort_state.left_right_idx.1;
-        log::info!(
-            "only j remains add j: {}",
-            parsed_values.vals[sort_state.left_right_idx.1].converted_value
-        );
+        // log::info!(
+        //     "only j remains add j: {}",
+        //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
+        // );
         sort_state.left_right_idx.1 += 1;
     } else if sort_state.left_right_idx.1
         == (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)
@@ -702,10 +602,10 @@ pub fn compare_left_right(
         // j half is fully scanned. Put I's ParsedValue in K Vector.
         i_j_index = sort_state.left_right_idx.0;
 
-        log::info!(
-            "only i remains add i: {}",
-            parsed_values.vals[sort_state.left_right_idx.0].converted_value
-        );
+        // log::info!(
+        //     "only i remains add i: {}",
+        //     parsed_values.vals[sort_state.left_right_idx.0].converted_value
+        // );
 
         sort_state.left_right_idx.0 += 1;
     } else {
@@ -715,36 +615,28 @@ pub fn compare_left_right(
             // j is smaller. Put J's ParsedValue in K Vector.
             i_j_index = sort_state.left_right_idx.1;
 
-            log::info!(
-                "{} > {}. J is smaller. add j: {}",
-                parsed_values.vals[sort_state.left_right_idx.0].converted_value,
-                parsed_values.vals[sort_state.left_right_idx.1].converted_value,
-                parsed_values.vals[sort_state.left_right_idx.1].converted_value
-            );
+            // log::info!(
+            //     "{} > {}. J is smaller. add j: {}",
+            //     parsed_values.vals[sort_state.left_right_idx.0].converted_value,
+            //     parsed_values.vals[sort_state.left_right_idx.1].converted_value,
+            //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
+            // );
 
             sort_state.left_right_idx.1 += 1;
         } else {
             // i is smaller. Put I's ParsedValue in K Vector.
             i_j_index = sort_state.left_right_idx.0;
 
-            log::info!(
-                "{} > {}. i is smaller. add i: {}",
-                parsed_values.vals[sort_state.left_right_idx.0].converted_value,
-                parsed_values.vals[sort_state.left_right_idx.1].converted_value,
-                parsed_values.vals[sort_state.left_right_idx.1].converted_value
-            );
+            // log::info!(
+            //     "{} > {}. i is smaller. add i: {}",
+            //     parsed_values.vals[sort_state.left_right_idx.0].converted_value,
+            //     parsed_values.vals[sort_state.left_right_idx.1].converted_value,
+            //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
+            // );
 
             sort_state.left_right_idx.0 += 1;
         }
     }
-
-    // log::info!(
-    //     "replace index [{}]{} with index [{}]{}",
-    //     virtual_k_index,
-    //     parsed_values.vals[virtual_k_index].converted_value,
-    //     i_j_index,
-    //     parsed_values.vals[i_j_index].converted_value,
-    // );
 
     // Color the ghost cube at i/j position to mark it as covered.
     color_cube(
@@ -784,15 +676,15 @@ pub fn compare_left_right(
         original_index: i_j_index,
     });
 
-    log::info!(
-        "K: [{}]",
-        sort_state
-            .k
-            .iter()
-            .map(|k_value| k_value.parsed_value_clone.converted_value.to_string())
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
+    // log::info!(
+    //     "K: [{}]",
+    //     sort_state
+    //         .k
+    //         .iter()
+    //         .map(|k_value| k_value.parsed_value_clone.converted_value.to_string())
+    //         .collect::<Vec<_>>()
+    //         .join(", "),
+    // );
 
     sort_state.sweep_index += 1;
     if sort_state.k.len() == (sort_state.width * 2).min(parsed_values.end_index) {
