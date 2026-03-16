@@ -41,8 +41,13 @@ pub struct KValue {
     k_handle: Entity,
     raw_string_text: String,
     virtual_k_index: usize,
-    // TODO: remove this:
     original_index: usize,
+}
+
+#[derive(Clone)]
+pub struct OverWrittenI {
+    parsed_value: ParsedValue,
+    raw_text: String,
 }
 
 #[derive(Resource, Clone)]
@@ -52,8 +57,11 @@ pub struct SortState {
     // and swapped)
     width: usize,
     next_step: SortStep,
-    k: Vec<KValue>,
+    // k: Vec<KValue>,
+    k: usize,
+    k_length: usize,
     sweep_index: usize,
+    overwritten_i: Option<OverWrittenI>,
 }
 
 #[derive(Default, Hash, Eq, PartialEq, Clone, Copy)]
@@ -168,11 +176,12 @@ pub fn increment_sorting(
                 compare_left_right(
                     commands,
                     sort_state,
-                    parsed_values.into(),
+                    parsed_values,
                     sort_colors,
                     cubes_query,
                     cube_assets,
-                    user_text.into(),
+                    user_text,
+                    rng_color_controls,
                 );
             } // SortStep::Swap => {
               //     swap(sort_state, parsed_values, cubes_query, user_text);
@@ -228,7 +237,9 @@ pub fn increase_width(
 ) {
     sort_state.sweep_index = 0;
     sort_state.width *= 2;
-    // log::info!("width after *2: {}", sort_state.width);
+    sort_state.k_length = (sort_state.width * 2).min(parsed_values.end_index);
+
+    log::info!("width after *2: {}", sort_state.width);
     // log::info!(
     //     "-> current text: {}",
     //     parsed_values.vals[..parsed_values.end_index]
@@ -254,17 +265,6 @@ pub fn increase_width(
             &parsed_values.into(),
             cubes_query,
         );
-        // color_halves(
-        //     // uncolors the previous halves and colors the new halves
-        //     Some(previous_halves),
-        //     Some(sort_state.halves_start_idx),
-        //     sort_state.width,
-        //     parsed_values.into(),
-        //     sort_colors,
-        //     cube_assets,
-        //     cubes_query,
-        //     rng_color_controls,
-        // );
 
         sort_state.next_step = SortStep::Compare;
     }
@@ -286,15 +286,16 @@ pub fn shift_halves(
     user_text: ResMut<UserText>,
 ) {
     if let Some(mut sort_state) = sort_state {
-        overwrite_values(
-            commands,
-            &mut sort_state,
-            &mut parsed_values,
-            user_text,
-            &mut cubes_query,
-            &cube_assets,
-            &rng_color_controls,
-        );
+        // sort_state.over_written_value = None;
+        // overwrite_values(
+        //     commands,
+        //     &mut sort_state,
+        //     &mut parsed_values,
+        //     user_text,
+        //     &mut cubes_query,
+        //     &cube_assets,
+        //     &rng_color_controls,
+        // );
 
         let first_half_start = sort_state.halves_start_idx.1 + sort_state.width;
         let second_half_start = first_half_start + sort_state.width;
@@ -325,8 +326,10 @@ pub fn shift_halves(
             next_step: SortStep::Compare,
             halves_start_idx: (0, 1),
             left_right_idx: (0, 1),
-            k: Vec::new(),
+            k: 0,
+            k_length: 2.min(parsed_values.end_index),
             sweep_index: 0,
+            overwritten_i: None,
         });
         color_range((0, 1), sort_colors, &parsed_values.into(), cubes_query);
     }
@@ -363,7 +366,7 @@ pub fn set_cube_as_within_range(
     )>,
 ) {
     let (mut cube_transform, mut cube_material, _) = cubes_query.get_mut(cube_handle).unwrap();
-    cube_transform.scale.z = SELECTION_Z;
+    // cube_transform.scale.z = SELECTION_Z;
     *cube_material = sort_colors.materials.get(&sort_color).unwrap().clone();
 }
 
@@ -393,168 +396,210 @@ pub fn complete(mut commands: Commands, sort_state: Option<Res<SortState>>) {
     commands.remove_resource::<SortState>();
 }
 
-pub fn overwrite_values(
-    mut commands: Commands,
-    sort_state: &mut ResMut<SortState>,
+// pub fn store_overwrited_value(
+//     overwriting_i: Option<bool>,
+//     mut parsed_values: &mut ResMut<ParsedValues>,
+//     mut sort_state: &mut ResMut<SortState>,
+//     mut user_text: &mut ResMut<UserText>,
+// ) {
+//     if let Some(overwriting_i) = overwriting_i {
+//         // INFO: if this is not SOME, then just overwriting without saving due to one half already
+//         // being complete.
+//         let mut overwriting_index = sort_state.left_right_idx.1;
+//         if overwriting_i {
+//             overwriting_index = sort_state.left_right_idx.0;
+//             log::info!(
+//                 "overwriting i. saving i value: {}",
+//                 parsed_values.vals[overwriting_index].converted_value
+//             )
+//         } else {
+//             log::info!(
+//                 "overwriting j. saving j value: {}",
+//                 parsed_values.vals[overwriting_index].converted_value
+//             )
+//         }
+//         let overwritten_parsed_value = parsed_values.vals[overwriting_index].clone();
+//         let raw_text = user_text.val[overwritten_parsed_value.raw_string.start_index
+//             ..overwritten_parsed_value.raw_string.end_index]
+//             .to_string();
+//         if let Some(over_written_value) = &mut sort_state.over_written_value {
+//             over_written_value.is_i = overwriting_i;
+//             over_written_value.parsed_value = overwritten_parsed_value;
+//             over_written_value.raw_text = raw_text;
+//         } else {
+//             sort_state.overwritten_value = Some(OverWrittenValue {
+//                 is_i: overwriting_i,
+//                 parsed_value: overwritten_parsed_value,
+//                 raw_text,
+//             });
+//         }
+//     }
+// }
+
+pub fn overwrite_value(
+    moving_i: bool,
+    moving_index: usize,
     mut parsed_values: &mut ResMut<ParsedValues>,
+    mut sort_state: &mut ResMut<SortState>,
     mut user_text: ResMut<UserText>,
-    cubes_query: &mut Query<(
+    mut cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    cube_assets: &Res<CubeAssets>,
-    rng_color_controls: &Res<crate::RNGColorControls>,
+    cube_assets: Res<CubeAssets>,
+    rng_color_controls: Res<crate::RNGColorControls>,
 ) {
-    // TODO: if going into the same index, just make the cube normal size/color no need to do
-    // anything with text stuff.
+    let target_index = sort_state.sweep_index;
 
-    log::info!(
-        "overwrite: \n\tparsed section:\t[{}]
-        k array:\t[{}]",
-        parsed_values.vals[sort_state.k[0].virtual_k_index
-            ..=sort_state.k[sort_state.k.len() - 1].virtual_k_index]
-            .iter()
-            .map(|parsed_value| parsed_value.converted_value.to_string())
-            .collect::<Vec<_>>()
-            .join(", "),
-        sort_state
-            .k
-            .iter()
-            .map(|k_value| k_value.parsed_value_clone.converted_value.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
-
-    for k_value in sort_state.k.iter_mut() {
-        let mut left_string_end_match = 0;
-        if k_value.virtual_k_index > 0 {
-            left_string_end_match = parsed_values
+    if moving_index == target_index {
+        // TODO: is this valid?
+        log::info!("moving index and target index are the same. do nothing.");
+        // Don't need to overwrite anything if the same index.
+        return;
+    }
+    // Store where left string ends for text replacement:
+    let left_string_end = {
+        if target_index > 0 {
+            parsed_values
                 .vals
-                .get(k_value.virtual_k_index - 1)
+                .get(target_index - 1)
                 .unwrap()
                 .raw_string
-                .end_index;
+                .end_index
+        } else {
+            0
         }
+    };
+    //////////////////////////////////////////////////////////////////////////
+    let mut moving_overwritten_i = false;
+    let mut target_parsed_value; // necessary to have a lasting &mut target_val
+    let mut target_val: &mut ParsedValue;
+    let mut moving_val: &mut ParsedValue;
+    let mut moving_text;
 
-        // Get the parsed_value that must be replaced by cloned parsed_value:
-        let mut parsed_value = parsed_values.vals.get_mut(k_value.virtual_k_index).unwrap();
-
-        // Replace with copied value.
-        parsed_value.converted_value = k_value.parsed_value_clone.converted_value;
-        parsed_value.sorted_position = k_value.parsed_value_clone.sorted_position;
-        parsed_value.parsed_warning = k_value.parsed_value_clone.parsed_warning;
-        parsed_value.rng_color = k_value.parsed_value_clone.rng_color.clone();
-        parsed_value.cube_handle = k_value.parsed_value_clone.cube_handle;
-
-        //////////////////////////////////////////////////////////////////////////
-        // Visually, the cube at parsed_value_index is transparent and potentially not at the location of
-        // target_index (which the k_value.k_handle cube is in). Visually set it so that it looks normal and where it should be.
-
-        let [
-            (mut transform_p, mut cube_mat_p, mut cube_data_p),
-            (transform_k, _, _),
-        ] = cubes_query
-            .get_many_mut([k_value.parsed_value_clone.cube_handle, k_value.k_handle])
+    if moving_i && let Some(overwritten_i) = &mut sort_state.overwritten_i {
+        moving_overwritten_i = true;
+        target_parsed_value = parsed_values.vals.get_mut(target_index).unwrap();
+        target_val = &mut target_parsed_value;
+        moving_val = &mut overwritten_i.parsed_value;
+        moving_text = overwritten_i.raw_text.clone();
+    } else {
+        [target_val, moving_val] = parsed_values
+            .vals
+            .get_disjoint_mut([target_index, moving_index])
             .unwrap();
-        // Size and Position
-        transform_p.translation = transform_k.translation;
-        transform_p.scale = transform_k.scale;
-
-        // Material:
-        *cube_mat_p = crate::ui::get_cube_material(
-            rng_color_controls.rng_cubes_enabled,
-            k_value.parsed_value_clone.parsed_warning,
-            cube_assets,
-            k_value.parsed_value_clone.rng_color.clone(),
-        );
-
-        // Cube index (can also set it to cube_data_k.index but thats the same value as
-        // virtual_k_value)
-        cube_data_p.index = k_value.virtual_k_index;
-
-        // K cube no longer needed:
-        commands.entity(k_value.k_handle).despawn();
-
-        //////////////////////////////////////////////////////////////////////////
-        // Actually replacing or just putting in the same position?
-        if k_value.original_index == k_value.virtual_k_index {
-            // INFO: No reason overwrite the value with itself.
-            // Just change the cube material/z scale like above.
-            continue;
-        }
-
-        //////////////////////////////////////////////////////////////////////////
-        // Change raw_string and matched_string
-
-        let mut end_length = k_value.parsed_value_clone.raw_string.end_index
-            - k_value.parsed_value_clone.raw_string.start_index;
-        let mut match_length = k_value.parsed_value_clone.matched_string.start_index
-            - k_value.parsed_value_clone.raw_string.start_index;
-
-        parsed_value.raw_string.start_index = left_string_end_match;
-
-        let moving_from_first_position = k_value.parsed_value_clone.raw_string.start_index == 0;
-        let moving_into_first_position = parsed_value.raw_string.start_index == 0;
-
-        if moving_from_first_position {
-            // add a ", " in front of the text.
-            log::info!("moving from first: \"{}\"", k_value.raw_string_text);
-            // let first_character = k_value.raw_string_text.as_bytes().first().unwrap();
-
-            if !k_value.raw_string_text.starts_with(",") {
-                k_value.raw_string_text = String::from(", ") + &k_value.raw_string_text;
-                match_length += 2;
-                end_length += 2;
-            }
-
-            log::info!("=> modified moving text: \"{}\"", k_value.raw_string_text)
-        } else if moving_into_first_position {
-            log::info!("moving to first: \"{}\"", k_value.raw_string_text);
-            // remove ", " in front of the text if there.
-            if k_value.raw_string_text.starts_with(", ") {
-                k_value.raw_string_text = k_value.raw_string_text[2..].to_string();
-                match_length -= 2;
-                end_length -= 2;
-            }
-            log::info!("=> modified moving text: \"{}\"", k_value.raw_string_text);
-        }
-
-        parsed_value.raw_string.end_index = parsed_value.raw_string.start_index + end_length;
-        parsed_value.matched_string.end_index = parsed_value.raw_string.end_index;
-        parsed_value.matched_string.start_index =
-            parsed_value.raw_string.start_index + match_length;
-
-        //////////////////////////////////////////////////////////////////////////
-        // Update User text
-        unsafe {
-            // safe (slower) version: user_text.val.replace_range
-            let text_bytes = user_text.val.as_bytes_mut();
-            let clone_bytes = k_value.raw_string_text.as_bytes();
-            text_bytes[parsed_value.raw_string.start_index..parsed_value.raw_string.end_index]
-                .copy_from_slice(clone_bytes);
-        }
+        moving_text = user_text.val
+            [moving_val.raw_string.start_index..moving_val.raw_string.end_index]
+            .to_string();
     }
 
-    // log::info!(
-    //     "\n\nparsed values after overwrite values:[{}]\n",
-    //     parsed_values
-    //         .vals
-    //         .iter()
-    //         .map(|parsed_value| parsed_value.converted_value.to_string())
-    //         .collect::<Vec<_>>()
-    //         .join(", "),
-    // );
+    log::info!("moving i: {}", moving_i);
+    log::info!("moving overwritten i: {}", moving_overwritten_i);
 
-    log::info!("\n\ntext after overwriting: {}\n", user_text.val);
+    log::info!(
+        "overwriting target_val: [{}]{} with moving_val: [{}]{}",
+        target_index,
+        target_val.converted_value,
+        moving_index,
+        moving_val.converted_value,
+    );
+    //////////////////////////////////////////////////////////////////////////
+    // INFO: these are overwritten more carefully later: target_val.raw_string, target_val.matched_string
+    target_val.converted_value = moving_val.converted_value;
+    target_val.sorted_position = moving_val.sorted_position;
+    target_val.parsed_warning = moving_val.parsed_warning;
+    target_val.rng_color = moving_val.rng_color.clone();
+    target_val.cube_handle = moving_val.cube_handle;
+    //////////////////////////////////////////////////////////////////////////
+    // Set Visuals.
+    let (mut transform_p, mut cube_mat_p, mut cube_data_p) =
+        cubes_query.get_mut(target_val.cube_handle).unwrap();
 
-    sort_state.k.clear();
+    cube_data_p.index = target_index;
+    transform_p.translation.x = transform_p.scale.x * (target_index as f32);
+    *cube_mat_p = crate::ui::get_cube_material(
+        rng_color_controls.rng_cubes_enabled,
+        target_val.parsed_warning,
+        &cube_assets,
+        target_val.rng_color.clone(),
+    );
+    //////////////////////////////////////////////////////////////////////////
+    overwrite_text(
+        moving_overwritten_i,
+        left_string_end,
+        target_index,
+        moving_index,
+        // parsed_values,
+        target_val,
+        moving_val,
+        moving_text,
+        user_text,
+    );
+
+    if moving_overwritten_i {
+        sort_state.overwritten_i = None;
+    }
+}
+
+pub fn overwrite_text(
+    moving_overwritten_i: bool,
+    left_string_end: usize,
+    target_index: usize,
+    moving_index: usize,
+    // parsed_values: &mut ParsedValues,
+    target_val: &mut ParsedValue,
+    moving_val: &mut ParsedValue,
+    mut moving_text: String,
+    mut user_text: ResMut<UserText>,
+) {
+    // target_val.raw_string.start_index = moving_val.raw_string.start_index;
+    target_val.raw_string.start_index = left_string_end;
+
+    let mut end_length = moving_val.raw_string.end_index - moving_val.raw_string.start_index;
+    let mut matched_length =
+        moving_val.matched_string.start_index - moving_val.raw_string.start_index;
+
+    //////////////////////////////////////////////////////////////////////////
+    // clear target string.
+    let text_bytes = unsafe { user_text.val.as_bytes_mut() };
+    text_bytes[target_val.raw_string.start_index..target_val.raw_string.end_index].fill(b' ');
+
+    // clear moving string text if its not from overwritten_i
+    if !moving_overwritten_i {
+        text_bytes[moving_val.raw_string.start_index..moving_val.raw_string.end_index].fill(b' ');
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // Add or remove ", " from moving string.
+    let moving_to_first = target_index == 0;
+    let moving_from_first = moving_index == 0;
+
+    if moving_to_first && moving_text.starts_with(", ") {
+        moving_text = moving_text[2..].to_string();
+        matched_length -= 2;
+        end_length -= 2;
+    }
+    if moving_from_first {
+        moving_text = String::from(", ") + &moving_text;
+        matched_length += 2;
+        end_length += 2;
+    }
+    target_val.raw_string.end_index = target_val.raw_string.start_index + end_length;
+    target_val.matched_string.start_index = target_val.raw_string.start_index + matched_length;
+    target_val.matched_string.end_index = target_val.raw_string.end_index;
+    // //////////////////////////////////////////////////////////////////////////
+    // Update User text
+    text_bytes[target_val.raw_string.start_index..target_val.raw_string.end_index]
+        .copy_from_slice(moving_text.as_bytes());
+
+    log::info!("user text after update: \n{}", user_text.val)
 }
 
 pub fn compare_left_right(
     mut commands: Commands,
     mut sort_state: ResMut<SortState>,
-    parsed_values: Res<ParsedValues>,
+    mut parsed_values: ResMut<ParsedValues>,
     sort_colors: Res<SortColors>,
     mut cubes_query: Query<(
         &mut Transform,
@@ -562,141 +607,250 @@ pub fn compare_left_right(
         &mut crate::CubeData,
     )>,
     cube_assets: Res<CubeAssets>,
-    user_text: Res<UserText>,
+    user_text: ResMut<UserText>,
+    rng_color_controls: Res<crate::RNGColorControls>,
 ) {
-    // Choose what I/J to add to K.
-
-    // log::info!(
-    //     "i half: [{}..{}][{}], j half: [{}..{}][{}]",
-    //     sort_state.left_right_idx.0,
-    //     sort_state.halves_start_idx.1,
-    //     parsed_values.vals[sort_state.left_right_idx.0..sort_state.halves_start_idx.1]
-    //         .iter()
-    //         .map(|parsed_value| parsed_value.converted_value.to_string())
-    //         .collect::<Vec<_>>()
-    //         .join(", "),
-    //     sort_state.left_right_idx.1,
-    //     (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index),
-    //     parsed_values.vals[sort_state.left_right_idx.1
-    //         ..(sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)]
-    //         .iter()
-    //         .map(|parsed_value| parsed_value.converted_value.to_string())
-    //         .collect::<Vec<_>>()
-    //         .join(", "),
-    // );
-
+    // Overwrite parsed_value/k index with I/J. Store overwritten value for next comparison.
     let virtual_k_index = sort_state.sweep_index; // the index that must be overwrited by i/j.
-    let i_j_index; // The index of the ghost cube (i/j) that will be copied into the k index.
+
+    // Choose I/J to overwrite:
+    let moving_index;
+    let mut moving_i = false;
 
     if sort_state.left_right_idx.0 == sort_state.halves_start_idx.1 {
         // I half is fully scanned. Put J's ParsedValue in K Vector.
-        i_j_index = sort_state.left_right_idx.1;
-        // log::info!(
-        //     "only j remains add j: {}",
-        //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
-        // );
+        moving_index = sort_state.left_right_idx.1;
         sort_state.left_right_idx.1 += 1;
     } else if sort_state.left_right_idx.1
         == (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)
     {
         // j half is fully scanned. Put I's ParsedValue in K Vector.
-        i_j_index = sort_state.left_right_idx.0;
-
-        // log::info!(
-        //     "only i remains add i: {}",
-        //     parsed_values.vals[sort_state.left_right_idx.0].converted_value
-        // );
-
+        moving_i = true;
+        moving_index = sort_state.left_right_idx.0;
         sort_state.left_right_idx.0 += 1;
     } else {
-        let i_val = parsed_values.vals[sort_state.left_right_idx.0].sorted_position;
+        // compare I/J with overwritten value.
+        let i_val = {
+            if let Some(over_written_i) = &sort_state.overwritten_i {
+                log::info!(
+                    "overwritten i in comparison: {}",
+                    over_written_i.parsed_value.converted_value
+                );
+                over_written_i.parsed_value.sorted_position
+            } else {
+                log::info!(
+                    "i in comparison: {}",
+                    parsed_values.vals[sort_state.left_right_idx.0].converted_value
+                );
+                parsed_values.vals[sort_state.left_right_idx.0].sorted_position
+            }
+        };
+        log::info!(
+            "j in comparison: {}",
+            parsed_values.vals[sort_state.left_right_idx.1].converted_value
+        );
+
         let j_val = parsed_values.vals[sort_state.left_right_idx.1].sorted_position;
+
         if i_val > j_val {
+            log::info!("j is smaller");
             // j is smaller. Put J's ParsedValue in K Vector.
-            i_j_index = sort_state.left_right_idx.1;
-
-            // log::info!(
-            //     "{} > {}. J is smaller. add j: {}",
-            //     parsed_values.vals[sort_state.left_right_idx.0].converted_value,
-            //     parsed_values.vals[sort_state.left_right_idx.1].converted_value,
-            //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
-            // );
-
+            moving_index = sort_state.left_right_idx.1;
             sort_state.left_right_idx.1 += 1;
+            // store i (about to be overwritten) if not ALREADY stored:
+            if sort_state.overwritten_i.is_none() {
+                let parsed_value = parsed_values.vals[sort_state.left_right_idx.0].clone();
+                log::info!("storing i: {}", parsed_value.converted_value);
+                sort_state.overwritten_i = Some(OverWrittenI {
+                    raw_text: user_text.val
+                        [parsed_value.raw_string.start_index..parsed_value.raw_string.end_index]
+                        .to_string(),
+                    parsed_value,
+                })
+            }
         } else {
+            log::info!("i is smaller");
             // i is smaller. Put I's ParsedValue in K Vector.
-            i_j_index = sort_state.left_right_idx.0;
-
-            // log::info!(
-            //     "{} > {}. i is smaller. add i: {}",
-            //     parsed_values.vals[sort_state.left_right_idx.0].converted_value,
-            //     parsed_values.vals[sort_state.left_right_idx.1].converted_value,
-            //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
-            // );
-
+            moving_i = true;
+            moving_index = sort_state.left_right_idx.0;
             sort_state.left_right_idx.0 += 1;
         }
     }
-
-    // Color the ghost cube at i/j position to mark it as covered.
-    color_cube(
-        i_j_index,
-        SortColor::Covered,
-        &sort_colors,
-        &parsed_values,
-        &mut cubes_query,
+    ////////////////////////////////////////////////////////////////////////////////////
+    // Overwrite K value.
+    overwrite_value(
+        moving_i,
+        moving_index,
+        &mut parsed_values,
+        &mut sort_state,
+        user_text,
+        cubes_query,
+        cube_assets,
+        rng_color_controls,
     );
-    // Get the value of the target cube: will be stored so can be placed at the K index.
-    let parsed_value: ParsedValue = parsed_values.vals[i_j_index].clone();
 
-    // Spawn copy of the chosen i/j cube at the k index.
-    let (target_cube_transform, _, _) = cubes_query.get(parsed_value.cube_handle).unwrap();
-    let mut transform = *target_cube_transform;
-    transform.translation.x = transform.scale.x * (virtual_k_index as f32);
-    transform.scale.z = DEFAULT_Z;
-    let k_handle = commands
-        .spawn((
-            cube_assets.mesh.clone(),
-            sort_colors.materials.get(&SortColor::K).unwrap().clone(),
-            transform,
-            // TODO: ensure this is affected by height and width changes!
-            crate::CubeData {
-                index: virtual_k_index,
-            },
-        ))
-        .id();
-
-    sort_state.k.push(KValue {
-        k_handle,
-        raw_string_text: user_text.val
-            [parsed_value.raw_string.start_index..parsed_value.raw_string.end_index]
-            .to_string(),
-        parsed_value_clone: parsed_value,
-        virtual_k_index,
-        original_index: i_j_index,
-    });
-
-    // log::info!(
-    //     "K: [{}]",
-    //     sort_state
-    //         .k
-    //         .iter()
-    //         .map(|k_value| k_value.parsed_value_clone.converted_value.to_string())
-    //         .collect::<Vec<_>>()
-    //         .join(", "),
-    // );
-
+    ////////////////////////////////////////////////////////////////////////////////////
     sort_state.sweep_index += 1;
-    if sort_state.k.len() == (sort_state.width * 2).min(parsed_values.end_index) {
+    sort_state.k += 1;
+    if sort_state.k == sort_state.k_length {
         // INFO: checking if k is filled: is filled when has enough values to fill out the next
         // width (if current width = 1, then k is filled when the two halves of width 1 combine to
         // crate k of width 2. if width = 2, then they combine to create 4. if 4, they combine to
         // create 8, etc.). The Next width may be larger than all values, so we check it is not
         // larger than that too (in this case, the sorting is finished).
         sort_state.next_step = SortStep::ShiftHalves;
+        // cleanup:
+        sort_state.k = 0;
         // else will just call compare again.
     }
 }
+
+// pub fn compare_left_right(
+//     mut commands: Commands,
+//     mut sort_state: ResMut<SortState>,
+//     parsed_values: Res<ParsedValues>,
+//     sort_colors: Res<SortColors>,
+//     mut cubes_query: Query<(
+//         &mut Transform,
+//         &mut MeshMaterial3d<StandardMaterial>,
+//         &mut crate::CubeData,
+//     )>,
+//     cube_assets: Res<CubeAssets>,
+//     user_text: Res<UserText>,
+// ) {
+//     // Choose what I/J to add to K.
+//
+//     // log::info!(
+//     //     "i half: [{}..{}][{}], j half: [{}..{}][{}]",
+//     //     sort_state.left_right_idx.0,
+//     //     sort_state.halves_start_idx.1,
+//     //     parsed_values.vals[sort_state.left_right_idx.0..sort_state.halves_start_idx.1]
+//     //         .iter()
+//     //         .map(|parsed_value| parsed_value.converted_value.to_string())
+//     //         .collect::<Vec<_>>()
+//     //         .join(", "),
+//     //     sort_state.left_right_idx.1,
+//     //     (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index),
+//     //     parsed_values.vals[sort_state.left_right_idx.1
+//     //         ..(sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)]
+//     //         .iter()
+//     //         .map(|parsed_value| parsed_value.converted_value.to_string())
+//     //         .collect::<Vec<_>>()
+//     //         .join(", "),
+//     // );
+//
+//     let virtual_k_index = sort_state.sweep_index; // the index that must be overwrited by i/j.
+//     let i_j_index; // The index of the ghost cube (i/j) that will be copied into the k index.
+//
+//     if sort_state.left_right_idx.0 == sort_state.halves_start_idx.1 {
+//         // I half is fully scanned. Put J's ParsedValue in K Vector.
+//         i_j_index = sort_state.left_right_idx.1;
+//         // log::info!(
+//         //     "only j remains add j: {}",
+//         //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
+//         // );
+//         sort_state.left_right_idx.1 += 1;
+//     } else if sort_state.left_right_idx.1
+//         == (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)
+//     {
+//         // j half is fully scanned. Put I's ParsedValue in K Vector.
+//         i_j_index = sort_state.left_right_idx.0;
+//
+//         // log::info!(
+//         //     "only i remains add i: {}",
+//         //     parsed_values.vals[sort_state.left_right_idx.0].converted_value
+//         // );
+//
+//         sort_state.left_right_idx.0 += 1;
+//     } else {
+//         let i_val = parsed_values.vals[sort_state.left_right_idx.0].sorted_position;
+//         let j_val = parsed_values.vals[sort_state.left_right_idx.1].sorted_position;
+//         if i_val > j_val {
+//             // j is smaller. Put J's ParsedValue in K Vector.
+//             i_j_index = sort_state.left_right_idx.1;
+//
+//             // log::info!(
+//             //     "{} > {}. J is smaller. add j: {}",
+//             //     parsed_values.vals[sort_state.left_right_idx.0].converted_value,
+//             //     parsed_values.vals[sort_state.left_right_idx.1].converted_value,
+//             //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
+//             // );
+//
+//             sort_state.left_right_idx.1 += 1;
+//         } else {
+//             // i is smaller. Put I's ParsedValue in K Vector.
+//             i_j_index = sort_state.left_right_idx.0;
+//
+//             // log::info!(
+//             //     "{} > {}. i is smaller. add i: {}",
+//             //     parsed_values.vals[sort_state.left_right_idx.0].converted_value,
+//             //     parsed_values.vals[sort_state.left_right_idx.1].converted_value,
+//             //     parsed_values.vals[sort_state.left_right_idx.1].converted_value
+//             // );
+//
+//             sort_state.left_right_idx.0 += 1;
+//         }
+//     }
+//
+//     // Color the ghost cube at i/j position to mark it as covered.
+//     color_cube(
+//         i_j_index,
+//         SortColor::Covered,
+//         &sort_colors,
+//         &parsed_values,
+//         &mut cubes_query,
+//     );
+//     // Get the value of the target cube: will be stored so can be placed at the K index.
+//     let parsed_value: ParsedValue = parsed_values.vals[i_j_index].clone();
+//
+//     // Spawn copy of the chosen i/j cube at the k index.
+//     let (target_cube_transform, _, _) = cubes_query.get(parsed_value.cube_handle).unwrap();
+//     let mut transform = *target_cube_transform;
+//     transform.translation.x = transform.scale.x * (virtual_k_index as f32);
+//     transform.scale.z = DEFAULT_Z;
+//     let k_handle = commands
+//         .spawn((
+//             cube_assets.mesh.clone(),
+//             sort_colors.materials.get(&SortColor::K).unwrap().clone(),
+//             transform,
+//             // TODO: ensure this is affected by height and width changes!
+//             crate::CubeData {
+//                 index: virtual_k_index,
+//             },
+//         ))
+//         .id();
+//
+//     sort_state.k.push(KValue {
+//         k_handle,
+//         raw_string_text: user_text.val
+//             [parsed_value.raw_string.start_index..parsed_value.raw_string.end_index]
+//             .to_string(),
+//         parsed_value_clone: parsed_value,
+//         virtual_k_index,
+//         original_index: i_j_index,
+//     });
+//
+//     // log::info!(
+//     //     "K: [{}]",
+//     //     sort_state
+//     //         .k
+//     //         .iter()
+//     //         .map(|k_value| k_value.parsed_value_clone.converted_value.to_string())
+//     //         .collect::<Vec<_>>()
+//     //         .join(", "),
+//     // );
+//
+//     sort_state.sweep_index += 1;
+//     if sort_state.k.len() == (sort_state.width * 2).min(parsed_values.end_index) {
+//         // INFO: checking if k is filled: is filled when has enough values to fill out the next
+//         // width (if current width = 1, then k is filled when the two halves of width 1 combine to
+//         // crate k of width 2. if width = 2, then they combine to create 4. if 4, they combine to
+//         // create 8, etc.). The Next width may be larger than all values, so we check it is not
+//         // larger than that too (in this case, the sorting is finished).
+//         sort_state.next_step = SortStep::ShiftHalves;
+//         // else will just call compare again.
+//     }
+// }
 
 // fn color_cubes(
 //     cube_indices: Vec<usize>,
