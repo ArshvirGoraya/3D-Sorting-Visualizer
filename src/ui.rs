@@ -200,7 +200,8 @@ pub fn spawn_random_parsed_values(
 ) {
     // TODO remove prefixed string.
     // generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, &mut user_text.val, &mut random);
-    user_text.val = "10, 3, 19, 7, 18, 4, 15, 5, 12, 1, 16, 2".to_string();
+    // user_text.val = "10, 3, 19, 7, 18, 4, 15, 5, 12, 1, 16, 2".to_string();
+    user_text.val = "19, 3, 16, 3, 1, 6, 2, 2, 17, 9, 1".to_string();
     // user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
     update_parsed_values(
         number_regex, 
