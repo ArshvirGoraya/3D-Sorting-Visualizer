@@ -43,7 +43,7 @@ pub struct IncrementTimer {
 pub fn swap(
     i: usize,
     j: usize,
-    mut parsed_values: ResMut<ParsedValues>,
+    parsed_values: &mut ResMut<ParsedValues>,
     mut cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
@@ -235,7 +235,7 @@ pub fn swap_string_info(
 pub fn update_text_indices(
     i: usize,
     j: usize,
-    mut parsed_values: ResMut<ParsedValues>,
+    parsed_values: &mut ResMut<ParsedValues>,
     shift_left: bool,
     text_shift_amount: usize,
 ) {

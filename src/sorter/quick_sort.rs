@@ -501,7 +501,7 @@ pub fn complete(
 
 pub fn swap(
     mut sort_state: ResMut<SortState>,
-    parsed_values: ResMut<ParsedValues>,
+    mut parsed_values: ResMut<ParsedValues>,
     cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
@@ -512,7 +512,7 @@ pub fn swap(
     sorter::swap(
         sort_state.i as usize,
         sort_state.j,
-        parsed_values,
+        &mut parsed_values,
         cubes_query,
         user_text,
     );
