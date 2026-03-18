@@ -252,6 +252,7 @@ fn main() {
 
     // sort systems
     app.init_state::<sorter::SortState>()
+        .init_state::<sorter::PausedState>()
         .add_systems(
             OnExit(sorter::SortState::Sorting),
             center_camera_on_sort_exited.run_if(in_state(CameraControlsFollow::Following)),
@@ -263,6 +264,7 @@ fn main() {
             Update,
             sorter::quick_sort::increment_sorting
                 .run_if(in_state(sorter::SortState::Sorting))
+                .run_if(in_state(sorter::PausedState::NotPaused))
                 .run_if(in_state(sorter::Algorithms::QuickSort)),
         )
         .add_systems(
@@ -275,6 +277,7 @@ fn main() {
             Update,
             sorter::merge_sort::increment_sorting
                 .run_if(in_state(sorter::SortState::Sorting))
+                .run_if(in_state(sorter::PausedState::NotPaused))
                 .run_if(in_state(sorter::Algorithms::MergeSort)),
         )
         .add_systems(

@@ -844,14 +844,21 @@ pub fn ui_system(
      sort_state_get, 
      mut sort_select_set,
      sort_select_get,
+     //
+     mut paused_state_set,
+     paused_state_get
     ): (
         ResMut<NextState<sorter::SortState>>, 
         Res<State<sorter::SortState>>, 
         ResMut<NextState<sorter::Algorithms>>, 
         Res<State<sorter::Algorithms>>, 
+        //
+        ResMut<NextState<sorter::PausedState>>, 
+        Res<State<sorter::PausedState>>, 
     ),
 ) -> Result {
     let is_sorting = *sort_state_get.get() == sorter::SortState::Sorting;
+    let is_paused = *paused_state_get.get() == sorter::PausedState::Paused;
 
     let ctx = contexts.ctx_mut()?;
 
@@ -924,8 +931,11 @@ pub fn ui_system(
                 });
 
                 ui.separator();
+                //
 
-                ui.columns(2, |cols|{
+                
+
+                ui.columns(3, |cols|{
                     cols[0].vertical_centered_justified(|ui|{
                         if !is_sorting{
                             if ui.add(egui::Button::new("Sort!").fill(egui::Color32::from_rgb(48, 64, 43)))
@@ -937,10 +947,26 @@ pub fn ui_system(
                             .on_hover_text("click to stop sorting")
                             .clicked(){
                                 sort_state_set.set(sorter::SortState::NotSorting);
+                                paused_state_set.set(sorter::PausedState::NotPaused);
                         }
 
                     });
-                    cols[1].add_enabled_ui(true, |ui|{
+                    cols[1].vertical_centered_justified(|ui|{
+                        ui.add_enabled_ui(is_sorting, |ui|{
+                            if !is_paused{
+                                if ui.add(egui::Button::new("󰏥").fill(egui::Color32::from_rgb(64, 64, 43)))
+                                    .on_hover_text("click to pause sorting")
+                                        .clicked(){
+                                            paused_state_set.set(sorter::PausedState::Paused);
+                                }
+                            } else if ui.add(egui::Button::new("󰐌").fill(egui::Color32::from_rgb(43, 58, 64)))
+                            .on_hover_text("click to resume sorting")
+                            .clicked(){
+                                paused_state_set.set(sorter::PausedState::NotPaused);
+                            }
+                        });
+                    });
+                    cols[2].add_enabled_ui(true, |ui|{
                         // INFO: Must wrap around a rect for tooltip...
                         // UI will not auto-update vertically when ComboBox is
                         // wrapped, but can use truncate wrapping to not worry about this.

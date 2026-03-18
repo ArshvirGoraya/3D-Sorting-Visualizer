@@ -12,6 +12,12 @@ pub enum SortState {
     NotSorting,
     Sorting,
 }
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
+pub enum PausedState {
+    #[default]
+    NotPaused,
+    Paused,
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum Algorithms {
