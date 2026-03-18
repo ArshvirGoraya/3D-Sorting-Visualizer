@@ -316,7 +316,8 @@ pub fn increment_j(
         crate::play_audio(
             commands,
             audio_controls,
-            sort_state.j,
+            // sort_state.j,
+            parsed_values.vals[sort_state.j].sorted_position,
             parsed_values.end_index,
         );
     }

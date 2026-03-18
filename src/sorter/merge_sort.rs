@@ -18,7 +18,7 @@ use bevy::{
 };
 
 use crate::{
-    sorter,
+    AudioControls, sorter,
     ui::{CubeAssets, ParsedValues, UserText},
 };
 
@@ -66,9 +66,9 @@ impl FromWorld for SortColors {
                     SortColor::Range,
                     MeshMaterial3d(materials.add(StandardMaterial {
                         // Yellow
-                        // base_color: Color::srgb_u8(238, 212, 159),
-                        base_color: Color::srgba_u8(238, 212, 159, 25),
-                        alpha_mode: AlphaMode::Blend,
+                        base_color: Color::srgb_u8(238, 212, 159),
+                        // base_color: Color::srgba_u8(238, 212, 159, 25),
+                        // alpha_mode: AlphaMode::Blend,
                         unlit: true,
                         ..Default::default()
                     })),
@@ -87,10 +87,11 @@ impl FromWorld for SortColors {
                     SortColor::K,
                     MeshMaterial3d(materials.add(StandardMaterial {
                         // Purple:
-                        base_color: Color::srgba_u8(198, 160, 246, 25),
+                        base_color: Color::srgb_u8(198, 160, 246),
+                        // base_color: Color::srgba_u8(198, 160, 246, 25),
                         // Black
                         // base_color: Color::srgb_u8(24, 25, 38),
-                        alpha_mode: AlphaMode::Blend,
+                        // alpha_mode: AlphaMode::Blend,
                         unlit: true,
                         ..Default::default()
                     })),
@@ -117,6 +118,7 @@ pub fn increment_sorting(
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
     user_text: ResMut<UserText>,
+    audio_controls: Res<AudioControls>,
 ) {
     if let Some(sort_state) = sort_state {
         //
@@ -152,6 +154,8 @@ pub fn increment_sorting(
                     cube_assets,
                     user_text,
                     rng_color_controls,
+                    commands,
+                    audio_controls,
                 );
             } // SortStep::Swap => {
               //     swap(sort_state, parsed_values, cubes_query, user_text);
@@ -196,12 +200,6 @@ pub fn increase_width(
         &mut crate::CubeData,
     )>,
     sort_colors: Res<SortColors>,
-    // commands: Commands,
-    // cube_assets: Res<CubeAssets>,
-    // materials: ResMut<Assets<StandardMaterial>>,
-    // cube_assets: Res<CubeAssets>,
-    // rng_color_controls: Res<crate::RNGColorControls>,
-    // user_text: ResMut<UserText>,
 ) {
     sort_state.sweep_index = 0;
     sort_state.width *= 2;
@@ -373,6 +371,8 @@ pub fn compare_left_right(
     cube_assets: Res<CubeAssets>,
     user_text: ResMut<UserText>,
     rng_color_controls: Res<crate::RNGColorControls>,
+    mut commands: Commands,
+    audio_controls: Res<AudioControls>,
 ) {
     // Overwrite parsed_value/k index with I/J. Store overwritten value for next comparison.
     let virtual_k_index = sort_state.sweep_index; // the index that must be overwritten by i/j.
@@ -451,6 +451,8 @@ pub fn compare_left_right(
         rng_color_controls,
         cube_assets,
         sort_colors,
+        &mut commands,
+        &audio_controls,
     );
 
     ////////////////////////////////////////////////////////////////////////////////////
@@ -496,6 +498,8 @@ pub fn swap(
     rng_color_controls: Res<crate::RNGColorControls>,
     cube_assets: Res<CubeAssets>,
     sort_colors: Res<SortColors>,
+    commands: &mut Commands,
+    audio_controls: &Res<AudioControls>,
 ) {
     ////////////////////////////////////////////////////////////////////////////////////
 
@@ -555,6 +559,15 @@ pub fn swap(
             cube_assets,
             &mut cubes_query,
         );
+
+        crate::play_audio(
+            commands,
+            audio_controls,
+            // target_index,
+            parsed_values.vals[target_index].sorted_position,
+            parsed_values.end_index,
+        );
+
         log::info!("{}", user_text.val);
         return;
     } else {
@@ -597,6 +610,14 @@ pub fn swap(
         cube_assets,
         &mut cubes_query,
     );
+    crate::play_audio(
+        commands,
+        audio_controls,
+        // target_index,
+        parsed_values.vals[target_index].sorted_position,
+        parsed_values.end_index,
+    );
+
     // leftward index and rightward index actually matters:
     let mut left_index = moving_index;
     let mut right_index = target_index;
