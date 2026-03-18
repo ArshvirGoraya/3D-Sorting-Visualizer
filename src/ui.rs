@@ -155,12 +155,15 @@ pub struct CopyTimer {
 //     });
 // }
 
-pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, text: &mut String, random: &mut ResMut<Random>){
+pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, max_decimals: usize, text: &mut String, random: &mut ResMut<Random>){
     text.clear();
     let range_helper = max - min;
 
     for index in 0..amount{
-        text.push_str((format!("{:.2}", min + random.rng.f64() * range_helper )).trim_end_matches("0").trim_end_matches("."));
+        text.push_str((
+                format!("{:.1$}", min + random.rng.f64() * range_helper, max_decimals))
+            .trim_end_matches("0")
+            .trim_end_matches("."));
         if index != amount -1 {
             text.push_str(", ");
         }
@@ -199,7 +202,7 @@ pub fn spawn_random_parsed_values(
     sort_state_get: Res<State<sorter::SortState>>,
 ) {
     // TODO remove prefixed string.
-    // generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, &mut user_text.val, &mut random);
+    // generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, rng_values_controls.max_decimals, &mut user_text.val, &mut random);
     // user_text.val = "10, 3, 19, 7, 18, 4, 15, 5, 12, 1, 16, 2".to_string();
     user_text.val = "19, 3, 16, 3, 1, 6, 2, 2, 17, 9, 1".to_string();
     // user_text.val = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.0000000000000001".to_string();
@@ -1157,6 +1160,7 @@ pub fn ui_system(
                                             rng_values_controls.amount, 
                                             rng_values_controls.min, 
                                             rng_values_controls.max, 
+                                            rng_values_controls.max_decimals,
                                             &mut user_text.val, 
                                             &mut random
                                         );
@@ -1195,6 +1199,16 @@ pub fn ui_system(
                                     .changed(){
                                         // set min to be the same as this, if this is smaller than min.
                                         rng_values_controls.min = rng_values_controls.min.min(rng_values_controls.max);
+                                }
+                                if ui.add(
+                                    egui::Slider::new(&mut rng_values_controls.max_decimals, 0..=10)
+                                    .clamping(egui::SliderClamping::Never)
+                                    .min_decimals(1)
+                                    .text("decimals")
+                                )
+                                    .on_hover_text("max amount of decimal places after RNG value")
+                                    .changed(){
+                                        rng_values_controls.max_decimals = rng_values_controls.max_decimals.max(0); // at least 0
                                 }
                             })
                         })

@@ -78,6 +78,7 @@ pub struct RNGValuesControls {
     amount: usize,
     min: f64,
     max: f64,
+    max_decimals: usize,
 }
 impl Default for RNGValuesControls {
     fn default() -> Self {
@@ -85,6 +86,7 @@ impl Default for RNGValuesControls {
             amount: 10,
             min: -50.0,
             max: 50.0,
+            max_decimals: 2,
         }
     }
 }
