@@ -150,6 +150,7 @@ pub fn increment_sorting(
     rng_color_controls: Res<crate::RNGColorControls>,
     user_text: ResMut<UserText>,
     audio_controls: Res<AudioControls>,
+    scanned_cube: ResMut<crate::ScannedCube>,
 ) {
     if let Some(sort_state) = sort_state {
         //
@@ -191,6 +192,7 @@ pub fn increment_sorting(
                     rng_color_controls,
                     commands,
                     audio_controls,
+                    scanned_cube,
                 );
             } // SortStep::Swap => {
               //     swap(sort_state, parsed_values, cubes_query, user_text);
@@ -466,9 +468,17 @@ pub fn compare_left_right(
     rng_color_controls: Res<crate::RNGColorControls>,
     mut commands: Commands,
     audio_controls: Res<AudioControls>,
+    mut scanned_cube: ResMut<crate::ScannedCube>,
 ) {
     // Overwrite parsed_value/k index with I/J. Store overwritten value for next comparison.
     let virtual_k_index = sort_state.sweep_index; // the index that must be overwritten by i/j.
+
+    scanned_cube.transform = Some(
+        *cubes_query
+            .get(parsed_values.vals[virtual_k_index].cube_handle)
+            .unwrap()
+            .0,
+    );
 
     // Choose I/J to overwrite:
     let moving_index;
