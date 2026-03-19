@@ -24,7 +24,7 @@ OS2Version: 4
 OS2_WeightWidthSlopeOnly: 1
 OS2_UseTypoMetrics: 1
 CreationTime: 1554657509
-ModificationTime: 1770233742
+ModificationTime: 1773878926
 PfmFamily: 17
 TTFWeight: 400
 TTFWidth: 5
@@ -4922,7 +4922,7 @@ NameList: AGL For New Fonts
 DisplaySize: -72
 AntiAlias: 0
 FitToEm: 0
-WinInfo: 61516 26 11
+WinInfo: 984048 26 11
 AnchorClass2: "Anchor-0" "'mark' Mark Positioning lookup 0 subtable" "Anchor-1" "'mark' Mark Positioning lookup 1 subtable" "Anchor-2" "'mark' Mark Positioning lookup 2 subtable" "Anchor-3" "'mark' Mark Positioning lookup 3 subtable" "Anchor-4" "'mark' Mark Positioning lookup 4 subtable" "Anchor-5" "'mark' Mark Positioning lookup 5 subtable" "Anchor-6" "'mark' Mark Positioning lookup 6 subtable" "Anchor-7" "'mark' Mark Positioning lookup 7 subtable" "Anchor-8" "'mark' Mark Positioning lookup 8 subtable" "Anchor-9" "'mark' Mark Positioning lookup 9 subtable" "Anchor-10" "'mark' Mark Positioning lookup 10 subtable" "Anchor-11" "'mkmk' Mark to Mark lookup 11 subtable" "Anchor-12" "'mkmk' Mark to Mark lookup 12 subtable" "Anchor-13" "'mkmk' Mark to Mark lookup 13 subtable" "Anchor-14" "'mkmk' Mark to Mark lookup 14 subtable" "Anchor-15" "'mkmk' Mark to Mark lookup 15 subtable" "Anchor-16" "'mkmk' Mark to Mark lookup 16 subtable" "Anchor-17" "'mkmk' Mark to Mark lookup 17 subtable" "Anchor-18" "'mkmk' Mark to Mark lookup 18 subtable"
 BeginChars: 1116007 14725
 
@@ -308294,7 +308294,7 @@ StartChar: fa-arrows_left_right
 Encoding: 61566 61566 4250
 Width: 1640
 GlyphClass: 2
-Flags: WO
+Flags: W
 LayerCount: 4
 Fore
 SplineSet
@@ -345584,7 +345584,7 @@ EndChar
 
 StartChar: fa-pause_circle
 Encoding: 62091 62091 4775
-Width: 1200
+Width: 1893
 GlyphClass: 2
 Flags: W
 LayerCount: 4
@@ -459560,9 +459560,9 @@ EndChar
 
 StartChar: md-play_circle
 Encoding: 984076 984076 6972
-Width: 1200
+Width: 1707
 GlyphClass: 2
-Flags: W
+Flags: WO
 LayerCount: 4
 Fore
 SplineSet

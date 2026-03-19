@@ -933,40 +933,58 @@ pub fn ui_system(
                 ui.separator();
                 //
 
-                
-
-                ui.columns(3, |cols|{
-                    cols[0].vertical_centered_justified(|ui|{
+            
+                ui.horizontal(|ui|{
+                    // Sorting:
+                    let button_size = first_button_size * 0.75;
+                    // let mut sort_button_size = egui::Vec2::new(0.0, 0.0);
+                    ui.horizontal_top(|ui|{
                         if !is_sorting{
-                            if ui.add(egui::Button::new("Sort!").fill(egui::Color32::from_rgb(48, 64, 43)))
+                            if ui.add_sized(
+                                button_size,
+                                egui::Button::new(" Sort! ").fill(egui::Color32::from_rgb(48, 64, 43))
+                            )
                                 .on_hover_text("click to begin sorting")
-                                .clicked(){
-                                    sort_state_set.set(sorter::SortState::Sorting);
-                            }
-                        } else if ui.add(egui::Button::new("Stop!").fill(egui::Color32::from_rgb(83, 47, 52)))
-                            .on_hover_text("click to stop sorting")
-                            .clicked(){
-                                sort_state_set.set(sorter::SortState::NotSorting);
-                                paused_state_set.set(sorter::PausedState::NotPaused);
-                        }
+                                    .clicked(){
+                                        sort_state_set.set(sorter::SortState::Sorting);
 
+                            }
+                        } else if ui.add_sized(
+                            button_size,
+                            egui::Button::new(" Stop! ").fill(egui::Color32::from_rgb(83, 47, 52))
+                        )
+                            .on_hover_text("click to stop sorting")
+                                .clicked(){
+                                    sort_state_set.set(sorter::SortState::NotSorting);
+                                    paused_state_set.set(sorter::PausedState::NotPaused);
+                        }
                     });
-                    cols[1].vertical_centered_justified(|ui|{
+                    // Pausing:
+                    ui.horizontal_top(|ui|{
                         ui.add_enabled_ui(is_sorting, |ui|{
                             if !is_paused{
-                                if ui.add(egui::Button::new("󰏥").fill(egui::Color32::from_rgb(64, 64, 43)))
-                                    .on_hover_text("click to pause sorting")
-                                        .clicked(){
-                                            paused_state_set.set(sorter::PausedState::Paused);
+                                if ui.add_sized(
+                                    button_size, 
+                                    egui::Button::new("󰏥 ")
+                                        .fill(egui::Color32::from_rgb(64, 64, 43)))
+                                        .on_hover_text("click to pause sorting")
+                                        .clicked()
+                                {
+                                    paused_state_set.set(sorter::PausedState::Paused);
                                 }
-                            } else if ui.add(egui::Button::new("󰐌").fill(egui::Color32::from_rgb(43, 58, 64)))
-                            .on_hover_text("click to resume sorting")
-                            .clicked(){
+                            } else if ui.add_sized(
+                                button_size, 
+                                egui::Button::new("󰐌 ")
+                                .fill(egui::Color32::from_rgb(43, 58, 64)))
+                                .on_hover_text("click to resume sorting")
+                                    .clicked()
+                            {
                                 paused_state_set.set(sorter::PausedState::NotPaused);
                             }
                         });
                     });
-                    cols[2].add_enabled_ui(true, |ui|{
+                    ui.horizontal_top(|ui|{
+                        // Selecting:
                         // INFO: Must wrap around a rect for tooltip...
                         // UI will not auto-update vertically when ComboBox is
                         // wrapped, but can use truncate wrapping to not worry about this.
@@ -992,7 +1010,8 @@ pub fn ui_system(
                         });
                         child.interact(rect, "sort_select_hover".into(), egui::Sense::hover())
                             .on_hover_text("select sorting algorithm");
-                        });
+                        //
+                    });
                 });
 
                 ui.style_mut().override_text_style = None;
