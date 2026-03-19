@@ -113,7 +113,7 @@ pub struct HoveredCube {
     using_touch: bool,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Clone, Default)]
 pub struct SortColoredCubes {
     cubes: HashSet<usize>,
 }
