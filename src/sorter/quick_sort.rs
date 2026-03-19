@@ -166,6 +166,8 @@ pub fn increment_sorting(
                     audio_controls,
                     commands,
                     scanned_cube,
+                    cube_assets,
+                    rng_color_controls,
                 );
             }
             SortStep::Swap => {
@@ -337,6 +339,8 @@ pub fn compare(
     audio_controls: Res<AudioControls>,
     mut commands: Commands,
     mut scanned_cube: ResMut<crate::ScannedCube>,
+    cube_assets: Res<CubeAssets>,
+    rng_color_controls: Res<crate::RNGColorControls>,
 ) {
     if let Some((i, j)) = sort_state.swapped_cubes {
         // if just swapped, increment j and color the just swapped cubes the J/"covered" color.
@@ -365,6 +369,16 @@ pub fn compare(
             &mut scanned_cube,
         );
         sort_state.swapped_cubes = None;
+
+        // after swapping i and j: need to color the next i.
+        color_cube(
+            sort_state.i as usize + 1,
+            SortColor::I,
+            &quick_sort_colors,
+            &parsed_values,
+            &mut cubes_query,
+        );
+
         // should wait a step after this for visualization.
         return;
     }
@@ -414,6 +428,31 @@ pub fn compare(
         // if j value is smaller than pivot, swap i and j.
 
         // increment i before swapping
+
+        if sort_state.i > -1 {
+            // uncolor previous i
+            if sort_state.i as usize >= sort_state.current_array.0 {
+                // if i is within the current array, color as "covered"
+                color_cube(
+                    sort_state.i as usize,
+                    SortColor::J,
+                    &quick_sort_colors,
+                    &parsed_values,
+                    &mut cubes_query,
+                );
+            } else {
+                // if i is not within the current array (current_array.0 -1), color as simply
+                // uncolored
+                uncolor_cube(
+                    sort_state.i as usize,
+                    &parsed_values,
+                    &mut cubes_query,
+                    cube_assets,
+                    rng_color_controls,
+                );
+            }
+        }
+
         sort_state.i += 1;
 
         if sort_state.i as usize == sort_state.j {
@@ -569,6 +608,28 @@ fn color_cube(
         .clone();
 }
 
+fn uncolor_cube(
+    cube_index: usize,
+    parsed_values: &Res<ParsedValues>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    cube_assets: Res<CubeAssets>,
+    rng_color_controls: Res<crate::RNGColorControls>,
+) {
+    let parsed_value = &parsed_values.vals[cube_index];
+    let (_, mut cube_material, _) = cubes_query.get_mut(parsed_value.cube_handle).unwrap();
+
+    *cube_material = crate::ui::get_cube_material(
+        rng_color_controls.rng_cubes_enabled,
+        parsed_value.parsed_warning,
+        &cube_assets,
+        parsed_value.rng_color.clone(),
+    );
+}
+
 fn setup_range_color(
     previous_range: (usize, usize),
     current_range: (usize, usize),
@@ -625,5 +686,16 @@ fn setup_range_color(
                 parsed_value.rng_color.clone(),
             );
         }
+    }
+    // Also color I:
+    let new_range_i = current_range.0 as isize - 1;
+    if new_range_i > -1 {
+        let parsed_value = &parsed_values.vals[new_range_i as usize];
+        let (_, mut cube_material, _) = cubes_query.get_mut(parsed_value.cube_handle).unwrap();
+        *cube_material = quick_sort_colors
+            .materials
+            .get(&SortColor::I)
+            .unwrap()
+            .clone();
     }
 }
