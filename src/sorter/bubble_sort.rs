@@ -42,6 +42,8 @@ pub fn increment_sorting(
         &mut crate::CubeData,
     )>,
     user_text: ResMut<UserText>,
+    audio_controls: Res<AudioControls>,
+    scanned_cube: ResMut<crate::ScannedCube>,
 ) {
     if let Some(sort_state) = sort_state {
         increment_timer.increment_timer.tick(time.delta());
@@ -51,7 +53,15 @@ pub fn increment_sorting(
         match sort_state.next_step {
             SortStep::ShiftRight => shift_right(Some(sort_state), commands, parsed_values.into()),
             SortStep::RestartShifting => restart_shifting(sort_state, sort_select_set),
-            SortStep::Compare => compare(sort_state, parsed_values, cubes_query, user_text),
+            SortStep::Compare => compare(
+                sort_state,
+                parsed_values,
+                cubes_query,
+                user_text,
+                commands,
+                audio_controls,
+                scanned_cube,
+            ),
         }
     } else {
         shift_right(None, commands, parsed_values.into())
@@ -124,20 +134,33 @@ pub fn restart_shifting(
 pub fn compare(
     mut sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
-    // audio_controls: Res<AudioControls>,
-    // mut scanned_cube: ResMut<crate::ScannedCube>,
     cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
     user_text: ResMut<UserText>,
+    mut commands: Commands,
+    audio_controls: Res<AudioControls>,
+    mut scanned_cube: ResMut<crate::ScannedCube>,
 ) {
+    crate::play_audio(
+        &mut commands,
+        &audio_controls,
+        parsed_values.vals[sort_state.j].sorted_position,
+        parsed_values.end_index,
+    );
+    scanned_cube.transform = Some(
+        *cubes_query
+            .get(parsed_values.vals[sort_state.j].cube_handle)
+            .unwrap()
+            .0,
+    );
+
     let i = parsed_values.vals[sort_state.i].sorted_position;
     let j = parsed_values.vals[sort_state.j].sorted_position;
 
     if i > j {
-        log::info!("swapping: {} with {}", i, j);
         crate::sorter::swap(
             sort_state.i,
             sort_state.j,
