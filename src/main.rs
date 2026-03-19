@@ -285,6 +285,7 @@ fn main() {
             sorter::merge_sort::complete.run_if(in_state(sorter::Algorithms::MergeSort)),
         )
         // Bubble sort:
+        .init_resource::<sorter::bubble_sort::SortColors>()
         .add_systems(
             Update,
             sorter::bubble_sort::increment_sorting

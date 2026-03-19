@@ -722,7 +722,7 @@ pub fn swap(
         left_index,
         right_index,
         parsed_values,
-        cubes_query,
+        &mut cubes_query,
         user_text,
     );
 }
@@ -819,7 +819,7 @@ pub fn uncolor_cube(
     );
 }
 
-fn color_cube(
+pub fn color_cube(
     cube_index: usize,
     sort_color: SortColor,
     sort_colors: &Res<SortColors>,

@@ -57,7 +57,7 @@ pub fn swap(
     i: usize,
     j: usize,
     parsed_values: &mut ResMut<ParsedValues>,
-    mut cubes_query: Query<(
+    mut cubes_query: &mut Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,

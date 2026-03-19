@@ -542,7 +542,7 @@ pub fn complete(
 pub fn swap(
     mut sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
-    cubes_query: Query<(
+    mut cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
@@ -553,7 +553,7 @@ pub fn swap(
         sort_state.i as usize,
         sort_state.j,
         &mut parsed_values,
-        cubes_query,
+        &mut cubes_query,
         user_text,
     );
     sort_state.next_step = SortStep::Compare;
