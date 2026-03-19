@@ -717,11 +717,25 @@ fn set_cube_colors(
     cube_assets: &Res<CubeAssets>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     random: &mut ResMut<Random>,
+    sort_colored_cubes: &Option<Res<crate::SortColoredCubes>>,
 ) {
 
     // set to random or default depending on rng_color_controls_enabled
     let end_index = parsed_values.end_index;
-    for parsed_value in &mut parsed_values.vals[..end_index] {
+
+    for i in 0..end_index {
+        if let Some(sort_colored_cubes) = sort_colored_cubes &&
+            sort_colored_cubes.cubes.contains(&i)
+        {
+            // if cube is colored by sort algorithm, skip it.
+            continue;
+        }
+
+        let parsed_value = &mut parsed_values.vals[i];
+
+        // TODO:
+        // ignore any cubes that are colored by sorting algorithm
+
         // generate new RNG values?
         if generate_new_random {
             materials.remove(parsed_value.rng_color.clone()); // not needed. bevy will remove it
@@ -782,6 +796,7 @@ pub fn ui_system(
      mut cubes_query,
      hovered_cube,
      scanned_cube,
+     sort_colored_cubes,
     ):
     (
         Res<CubeAssets>, 
@@ -792,7 +807,8 @@ pub fn ui_system(
             &mut crate::CubeData,
         )>,
         Res<crate::HoveredCube>,
-        ResMut<crate::ScannedCube>
+        ResMut<crate::ScannedCube>,
+        Option<Res<crate::SortColoredCubes>>
     ),
 
     // camera:
@@ -1278,7 +1294,8 @@ pub fn ui_system(
                                     &mut cubes_query, 
                                     &cube_assets, 
                                     &mut materials, 
-                                    &mut random
+                                    &mut random,
+                                    &sort_colored_cubes,
                                 );
                         };
                         ui.vertical_centered_justified(|ui|{
@@ -1305,7 +1322,8 @@ pub fn ui_system(
                                             &mut cubes_query, 
                                             &cube_assets, 
                                             &mut materials, 
-                                            &mut random
+                                            &mut random,
+                                            &sort_colored_cubes
                                         );
                                 }
                             });

@@ -278,16 +278,6 @@ pub fn shift_halves(
     cube_assets: Res<CubeAssets>,
 ) {
     if let Some(mut sort_state) = sort_state {
-        // uncolor previous halves:
-
-        // uncolor_range(
-        //     (previous_half_start, first_half_start),
-        //     &parsed_values,
-        //     &rng_color_controls,
-        //     &cube_assets,
-        //     &mut cubes_query,
-        // );
-
         let first_half_start = sort_state.halves_start_idx.1 + sort_state.width;
         let second_half_start = first_half_start + sort_state.width;
         if second_half_start >= parsed_values.end_index {
@@ -621,15 +611,6 @@ pub fn swap(
 
     if moving_index == target_index {
         // log::info!("-> yes. returning");
-
-        // uncolor_cube(
-        //     moving_index,
-        //     parsed_values,
-        //     rng_color_controls,
-        //     cube_assets,
-        //     &mut cubes_query,
-        // );
-
         color_cube(
             moving_index,
             SortColor::Covered,
@@ -683,14 +664,6 @@ pub fn swap(
     // );
 
     ////////////////////////////////////////////////////////////////////////////////////
-    // uncolor_cube(
-    //     moving_index,
-    //     parsed_values,
-    //     rng_color_controls,
-    //     cube_assets,
-    //     &mut cubes_query,
-    // );
-
     color_cube(
         moving_index,
         SortColor::Covered,
@@ -770,28 +743,6 @@ pub fn color_range(
         }
     }
 }
-
-// pub fn uncolor_range(
-//     range: (usize, usize),
-//     parsed_values: &Res<ParsedValues>,
-//     rng_color_controls: &Res<crate::RNGColorControls>,
-//     cube_assets: &Res<CubeAssets>,
-//     cubes_query: &mut Query<(
-//         &mut Transform,
-//         &mut MeshMaterial3d<StandardMaterial>,
-//         &mut crate::CubeData,
-//     )>,
-// ) {
-//     for i in range.0..range.1.min(parsed_values.end_index) {
-//         uncolor_cube(
-//             i,
-//             parsed_values,
-//             rng_color_controls,
-//             cube_assets,
-//             cubes_query,
-//         )
-//     }
-// }
 
 pub fn uncolor_cube(
     cube_index: usize,

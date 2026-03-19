@@ -4,6 +4,8 @@ mod ui;
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
 mod wasm_audio_picker;
 
+use std::collections::HashSet;
+
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
 use wasm_bindgen::prelude::*; // requires for all '#[wasm_bindgen]' usage
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
@@ -109,6 +111,11 @@ pub struct CubeScaleControls {
 pub struct HoveredCube {
     id: Option<Entity>,
     using_touch: bool,
+}
+
+#[derive(Resource, Default)]
+pub struct SortColoredCubes {
+    cubes: HashSet<usize>,
 }
 
 #[derive(Component)]
