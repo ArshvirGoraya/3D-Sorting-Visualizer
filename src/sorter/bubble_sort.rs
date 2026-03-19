@@ -184,9 +184,6 @@ pub fn shift_right(
         let next_element = sort_state.j + 1;
         if next_element == sort_state.bubble_range_start {
             // next element is at a bubble sorted index. Restart from left.
-
-            log::info!("bubbled range reached: {}", next_element);
-
             sort_state.next_step = SortStep::RestartShifting;
             return;
         }
@@ -210,7 +207,7 @@ pub fn restart_shifting(
     mut sort_state: ResMut<SortState>,
     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
     sort_colors: Res<SortColors>,
-    mut parsed_values: ResMut<ParsedValues>,
+    parsed_values: ResMut<ParsedValues>,
     mut cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
@@ -221,12 +218,6 @@ pub fn restart_shifting(
 ) {
     // Another element bubbled up to the end.
     sort_state.bubble_range_start -= 1;
-
-    log::info!(
-        "increasing amount of bubbled elements: now starts at: {}",
-        sort_state.bubble_range_start
-    );
-
     if sort_state.bubble_range_start <= 2 {
         // only 1 non-bubbled element remains: already know it is sorted.
         sort_select_set.set(sorter::SortState::NotSorting);
@@ -255,6 +246,7 @@ pub fn restart_shifting(
     sort_state.next_step = SortStep::Compare;
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compare(
     mut sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
@@ -286,7 +278,6 @@ pub fn compare(
     let j = parsed_values.vals[sort_state.j].sorted_position;
 
     if i > j {
-        // TODO undo these swap colors after the swap?
         color_cube(
             sort_state.i,
             SortColor::Swap,
@@ -342,7 +333,7 @@ pub fn complete(
         &mut crate::CubeData,
     )>,
 ) {
-    if let Some(sort_state) = sort_state
+    if let Some(_sort_state) = sort_state
         && let Some(cube_assets) = cube_assets
     {
         uncolor_range(

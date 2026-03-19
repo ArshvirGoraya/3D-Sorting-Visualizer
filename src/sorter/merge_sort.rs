@@ -193,14 +193,14 @@ pub fn increment_sorting(
               // }
         }
     } else {
-        log::info!(
-            "\n-=-=-=-=-=-=\nstarting text: {}",
-            parsed_values.vals[..parsed_values.end_index]
-                .iter()
-                .map(|x| { x.converted_value.to_string() })
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        // log::info!(
+        //     "\n-=-=-=-=-=-=\nstarting text: {}",
+        //     parsed_values.vals[..parsed_values.end_index]
+        //         .iter()
+        //         .map(|x| { x.converted_value.to_string() })
+        //         .collect::<Vec<_>>()
+        //         .join(", ")
+        // );
 
         shift_halves(
             commands,
@@ -235,15 +235,7 @@ pub fn increase_width(
     sort_state.width *= 2;
     sort_state.k_length = (sort_state.width * 2).min(parsed_values.end_index);
 
-    log::info!("\n=-\n=-width after *2: {}\n=-\n=-", sort_state.width);
-    // log::info!(
-    //     "-> current text: {}",
-    //     parsed_values.vals[..parsed_values.end_index]
-    //         .iter()
-    //         .map(|x| { x.converted_value.to_string() })
-    //         .collect::<Vec<_>>()
-    //         .join(", ")
-    // );
+    // log::info!("\n=-\n=-width after *2: {}\n=-\n=-", sort_state.width);
 
     if sort_state.width > parsed_values.end_index - 1 {
         sort_select_set.set(sorter::SortState::NotSorting);
@@ -312,31 +304,31 @@ pub fn shift_halves(
             // length of k must be reduced to not include values that would, in total, be above end
             // index.
 
-            log::info!(
-                "k would be above end_index: {} + {} = {} > {}",
-                sort_state.halves_start_idx.0,
-                sort_state.k_length,
-                sort_state.halves_start_idx.0 + sort_state.k_length,
-                parsed_values.end_index
-            );
+            // log::info!(
+            //     "k would be above end_index: {} + {} = {} > {}",
+            //     sort_state.halves_start_idx.0,
+            //     sort_state.k_length,
+            //     sort_state.halves_start_idx.0 + sort_state.k_length,
+            //     parsed_values.end_index
+            // );
 
             sort_state.k_length -=
                 (sort_state.halves_start_idx.0 + sort_state.k_length) - parsed_values.end_index;
 
-            log::info!(
-                "to reach end_index {}, k should be: {}",
-                parsed_values.end_index,
-                sort_state.k_length,
-            );
+            // log::info!(
+            //     "to reach end_index {}, k should be: {}",
+            //     parsed_values.end_index,
+            //     sort_state.k_length,
+            // );
         }
 
-        log::info!(
-            "shift width: {}-{} {}-{}",
-            sort_state.left_right_idx.0,
-            sort_state.left_right_idx.1,
-            sort_state.left_right_idx.1,
-            sort_state.left_right_idx.1 + sort_state.width
-        );
+        // log::info!(
+        //     "shift width: {}-{} {}-{}",
+        //     sort_state.left_right_idx.0,
+        //     sort_state.left_right_idx.1,
+        //     sort_state.left_right_idx.1,
+        //     sort_state.left_right_idx.1 + sort_state.width
+        // );
 
         color_range(
             (previous_halves.0, previous_halves.1 + sort_state.width),
@@ -465,13 +457,13 @@ pub fn compare_left_right(
         // I half is fully scanned. Put J's ParsedValue in K Vector.
         moving_index = sort_state.left_right_idx.1;
         sort_state.left_right_idx.1 += 1;
-        log::info!(
-            "i complete. put j: {}. sort_state.k: {} and length: {} and len: {}",
-            moving_index,
-            sort_state.k,
-            sort_state.k_length,
-            parsed_values.end_index
-        );
+        // log::info!(
+        //     "i complete. put j: {}. sort_state.k: {} and length: {} and len: {}",
+        //     moving_index,
+        //     sort_state.k,
+        //     sort_state.k_length,
+        //     parsed_values.end_index
+        // );
     } else if sort_state.left_right_idx.1
         == (sort_state.halves_start_idx.1 + sort_state.width).min(parsed_values.end_index)
     {
@@ -479,38 +471,38 @@ pub fn compare_left_right(
         moving_i = true;
         moving_index = sort_state.left_right_idx.0;
         sort_state.left_right_idx.0 += 1;
-        log::info!("j complete. put i: {}", moving_index);
+        // log::info!("j complete. put i: {}", moving_index);
     } else {
         // compare I/J with overwritten value.
 
         // TODO: Delete this (only for logging):
-        let mut delete_me_i_val = parsed_values.vals[sort_state.left_right_idx.0].converted_value;
+        // let mut delete_me_i_val = parsed_values.vals[sort_state.left_right_idx.0].converted_value;
 
         let i_val = {
             if let Some(over_written_i) = sort_state.overwritten_i.front() {
-                delete_me_i_val = parsed_values.vals[*over_written_i].converted_value;
+                // delete_me_i_val = parsed_values.vals[*over_written_i].converted_value;
                 parsed_values.vals[*over_written_i].sorted_position
             } else {
                 parsed_values.vals[sort_state.left_right_idx.0].sorted_position
             }
         };
 
-        log::info!(
-            "{} > {}: {}",
-            delete_me_i_val,
-            parsed_values.vals[sort_state.left_right_idx.1].converted_value,
-            delete_me_i_val > parsed_values.vals[sort_state.left_right_idx.1].converted_value,
-        );
+        // log::info!(
+        //     "{} > {}: {}",
+        //     delete_me_i_val,
+        //     parsed_values.vals[sort_state.left_right_idx.1].converted_value,
+        //     delete_me_i_val > parsed_values.vals[sort_state.left_right_idx.1].converted_value,
+        // );
 
         let j_val = parsed_values.vals[sort_state.left_right_idx.1].sorted_position;
 
         if i_val > j_val {
-            log::info!("j is smaller");
+            // log::info!("j is smaller");
             // j is smaller. Put J's ParsedValue in K Vector.
             moving_index = sort_state.left_right_idx.1;
             sort_state.left_right_idx.1 += 1;
         } else {
-            log::info!("i is smaller");
+            // log::info!("i is smaller");
             // i is smaller. Put I's ParsedValue in K Vector.
             moving_i = true;
             moving_index = sort_state.left_right_idx.0;
@@ -535,12 +527,12 @@ pub fn compare_left_right(
     ////////////////////////////////////////////////////////////////////////////////////
 
     let mut delete_me_k_visualize = vec![];
-    log::info!("sort_state.k: {}", sort_state.k);
+    // log::info!("sort_state.k: {}", sort_state.k);
     for i in 0..=sort_state.k {
         let index = sort_state.sweep_index - (sort_state.k - i);
         delete_me_k_visualize.push(parsed_values.vals[index].converted_value.to_string());
     }
-    log::info!("k: {}", delete_me_k_visualize.join(", "));
+    // log::info!("k: {}", delete_me_k_visualize.join(", "));
 
     sort_state.sweep_index += 1;
     sort_state.k += 1;
@@ -578,25 +570,26 @@ pub fn swap(
 ) {
     ////////////////////////////////////////////////////////////////////////////////////
 
-    log::info!("\n=================\n");
+    // log::info!("\n=================\n");
 
-    log::info!("1. Using/Moving OverwrittenI?");
+    // log::info!("1. Using/Moving OverwrittenI?");
 
     if moving_i && let Some(i_index) = sort_state.overwritten_i.pop_front() {
-        log::info!("-> yes. removing and using overwrittenI as moving index");
+        // log::info!("-> yes. removing and using overwrittenI as moving index");
         // If overwritten I is being used pop it off.
         moving_index = i_index;
         sort_state.overwritten_i_set.remove(&i_index);
-    } else {
-        log::info!("-> no");
     }
+    // else {
+    //     log::info!("-> no");
+    // }
 
     ////////////////////////////////////////////////////////////////////////////////////
-    log::info!("2. OverwrittenI contains target value?");
+    // log::info!("2. OverwrittenI contains target value?");
 
     if sort_state.overwritten_i_set.contains(&target_index) {
         // if sort_state.overwritten_i_set.contains(&target_index) {
-        log::info!("-> yes. Updating OverwrittenI");
+        // log::info!("-> yes. Updating OverwrittenI");
 
         // If Overwritten I already contains the index we are moving to, change its value to where
         // it will be swapped to: moving_index.
@@ -619,14 +612,15 @@ pub fn swap(
                 break;
             }
         }
-    } else {
-        log::info!("-> no.");
     }
+    // else {
+    //     log::info!("-> no.");
+    // }
 
-    log::info!("3. moving and target is the same");
+    // log::info!("3. moving and target is the same");
 
     if moving_index == target_index {
-        log::info!("-> yes. returning");
+        // log::info!("-> yes. returning");
 
         // uncolor_cube(
         //     moving_index,
@@ -652,16 +646,17 @@ pub fn swap(
             parsed_values.end_index,
         );
 
-        log::info!("{}", user_text.val);
+        // log::info!("{}", user_text.val);
         return;
-    } else {
-        log::info!("-> no. continuing");
     }
+    // else {
+    //     log::info!("-> no. continuing");
+    // }
 
-    log::info!("4. overwriting i half index?");
+    // log::info!("4. overwriting i half index?");
 
     if target_index < sort_state.halves_start_idx.1 {
-        log::info!("-> yes. saving index it will move to in overwritten I");
+        // log::info!("-> yes. saving index it will move to in overwritten I");
         sort_state.overwritten_i_set.insert(moving_index);
         sort_state.overwritten_i.push_back(moving_index);
         color_cube(
@@ -671,20 +666,21 @@ pub fn swap(
             parsed_values,
             &mut cubes_query,
         );
-    } else {
-        log::info!("-> no.");
     }
+    // else {
+    //     log::info!("-> no.");
+    // }
 
-    log::info!(
-        "overwritten_i: {}",
-        sort_state
-            .overwritten_i
-            .iter()
-            // .map(|x| { parsed_values.vals[*x].converted_value.to_string() })
-            .map(|x| { x.to_string() })
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    // log::info!(
+    //     "overwritten_i: {}",
+    //     sort_state
+    //         .overwritten_i
+    //         .iter()
+    //         // .map(|x| { parsed_values.vals[*x].converted_value.to_string() })
+    //         .map(|x| { x.to_string() })
+    //         .collect::<Vec<_>>()
+    //         .join(", ")
+    // );
 
     ////////////////////////////////////////////////////////////////////////////////////
     // uncolor_cube(

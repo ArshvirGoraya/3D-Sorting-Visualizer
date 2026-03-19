@@ -22,10 +22,9 @@ pub enum PausedState {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum Algorithms {
-    // TODO: reset quicksort to default
+    #[default]
     QuickSort,
     MergeSort,
-    #[default]
     BubbleSort,
 }
 impl fmt::Display for Algorithms {
@@ -57,7 +56,7 @@ pub fn swap(
     i: usize,
     j: usize,
     parsed_values: &mut ResMut<ParsedValues>,
-    mut cubes_query: &mut Query<(
+    cubes_query: &mut Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
@@ -97,7 +96,7 @@ pub fn swap(
     update_text_indices(i, j, parsed_values, shift_left, text_shift_amount);
 
     // TODO remove this line:
-    log::info!("{}", user_text.val);
+    // log::info!("{}", user_text.val);
 }
 
 pub fn swap_text(
