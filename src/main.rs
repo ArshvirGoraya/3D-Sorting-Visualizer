@@ -283,6 +283,18 @@ fn main() {
         .add_systems(
             OnEnter(sorter::SortState::NotSorting),
             sorter::merge_sort::complete.run_if(in_state(sorter::Algorithms::MergeSort)),
+        )
+        // Bubble sort:
+        .add_systems(
+            Update,
+            sorter::bubble_sort::increment_sorting
+                .run_if(in_state(sorter::SortState::Sorting))
+                .run_if(in_state(sorter::PausedState::NotPaused))
+                .run_if(in_state(sorter::Algorithms::BubbleSort)),
+        )
+        .add_systems(
+            OnEnter(sorter::SortState::NotSorting),
+            sorter::bubble_sort::complete.run_if(in_state(sorter::Algorithms::BubbleSort)),
         );
 
     app.run();

@@ -1,3 +1,4 @@
+pub mod bubble_sort;
 pub mod merge_sort;
 pub mod quick_sort;
 
@@ -23,19 +24,25 @@ pub enum PausedState {
 pub enum Algorithms {
     // TODO: reset quicksort to default
     QuickSort,
-    #[default]
     MergeSort,
+    #[default]
+    BubbleSort,
 }
 impl fmt::Display for Algorithms {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Algorithms::QuickSort => write!(f, "Quick Sort"),
             Algorithms::MergeSort => write!(f, "Merge Sort"),
+            Algorithms::BubbleSort => write!(f, "Bubble Sort"),
         }
     }
 }
 impl Algorithms {
-    pub const ALL: [Algorithms; 2] = [Algorithms::QuickSort, Algorithms::MergeSort];
+    pub const ALL: [Algorithms; 3] = [
+        Algorithms::QuickSort,
+        Algorithms::MergeSort,
+        Algorithms::BubbleSort,
+    ];
 }
 
 #[derive(Resource)]

@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashSet, VecDeque},
-    ops::{Range, RangeInclusive},
-};
+use std::collections::{HashSet, VecDeque};
 
 use bevy::{
     asset::Assets,
@@ -14,7 +11,6 @@ use bevy::{
     },
     pbr::{MeshMaterial3d, StandardMaterial},
     platform::collections::HashMap,
-    render::alpha::AlphaMode,
     state::state::NextState,
     time::Time,
     transform::components::Transform,
@@ -187,9 +183,7 @@ pub fn increment_sorting(
                     parsed_values,
                     sort_colors,
                     cubes_query,
-                    cube_assets,
                     user_text,
-                    rng_color_controls,
                     commands,
                     audio_controls,
                     scanned_cube,
@@ -199,12 +193,6 @@ pub fn increment_sorting(
               // }
         }
     } else {
-        // INFO: add 2 spaces to string as ", " is added at the beginning of strings that move from
-        // first position to somewhere else and those 2 extra indices are needed during the
-        // algorithm.
-        // NOT needed when swapping.
-        // user_text.val.push_str("  ");
-
         log::info!(
             "\n-=-=-=-=-=-=\nstarting text: {}",
             parsed_values.vals[..parsed_values.end_index]
@@ -288,7 +276,7 @@ pub fn shift_halves(
     mut commands: Commands,
     sort_state: Option<ResMut<SortState>>,
     parsed_values: ResMut<ParsedValues>,
-    mut cubes_query: Query<(
+    cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
@@ -412,7 +400,7 @@ pub fn complete(
     cube_assets: Option<Res<CubeAssets>>,
     parsed_values: Res<ParsedValues>,
     rng_color_controls: Res<crate::RNGColorControls>,
-    mut cubes_query: Query<(
+    cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
@@ -424,17 +412,6 @@ pub fn complete(
         && let Some(cube_assets) = cube_assets
         && let Some(sort_colors) = sort_colors
     {
-        // TODO:
-        // uncolor_range(
-        //     (
-        //         sort_state.halves_start_idx.0,
-        //         sort_state.halves_start_idx.1 + sort_state.width,
-        //     ),
-        //     &parsed_values,
-        //     &rng_color_controls,
-        //     &cube_assets,
-        //     &mut cubes_query,
-        // );
         color_range(
             (
                 sort_state.halves_start_idx.0,
@@ -458,14 +435,12 @@ pub fn compare_left_right(
     mut sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
     sort_colors: Res<SortColors>,
-    mut cubes_query: Query<(
+    cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    cube_assets: Res<CubeAssets>,
     user_text: ResMut<UserText>,
-    rng_color_controls: Res<crate::RNGColorControls>,
     mut commands: Commands,
     audio_controls: Res<AudioControls>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
@@ -552,8 +527,6 @@ pub fn compare_left_right(
         &mut parsed_values,
         cubes_query,
         user_text,
-        rng_color_controls,
-        cube_assets,
         sort_colors,
         &mut commands,
         &audio_controls,
@@ -599,8 +572,6 @@ pub fn swap(
         &mut crate::CubeData,
     )>,
     user_text: ResMut<UserText>,
-    rng_color_controls: Res<crate::RNGColorControls>,
-    cube_assets: Res<CubeAssets>,
     sort_colors: Res<SortColors>,
     commands: &mut Commands,
     audio_controls: &Res<AudioControls>,
@@ -756,6 +727,7 @@ pub fn swap(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn color_range(
     previous_range: (usize, usize),
     current_range: (usize, usize),
