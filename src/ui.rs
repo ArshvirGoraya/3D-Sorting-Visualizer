@@ -939,15 +939,17 @@ pub fn ui_system(
                     // let mut sort_button_size = egui::Vec2::new(0.0, 0.0);
                     ui.horizontal_top(|ui|{
                         if !is_sorting{
-                            if ui.add_sized(
-                                button_size,
-                                egui::Button::new(" Sort! ").fill(egui::Color32::from_rgb(48, 64, 43))
-                            )
-                                .on_hover_text("click to begin sorting")
-                                    .clicked(){
-                                        sort_state_set.set(sorter::SortState::Sorting);
+                            ui.add_enabled_ui(parsed_values.end_index >= 2, |ui|{
+                                if ui.add_sized(
+                                    button_size,
+                                    egui::Button::new(" Sort! ").fill(egui::Color32::from_rgb(48, 64, 43))
+                                )
+                                    .on_hover_text("click to begin sorting")
+                                        .clicked(){
+                                            sort_state_set.set(sorter::SortState::Sorting);
 
-                            }
+                                }
+                            });
                         } else if ui.add_sized(
                             button_size,
                             egui::Button::new(" Stop! ").fill(egui::Color32::from_rgb(83, 47, 52))
