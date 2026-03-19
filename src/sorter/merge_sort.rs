@@ -52,6 +52,7 @@ pub enum SortColor {
     #[default]
     Covered,
     Range,
+    RangeRight,
     K,
 }
 
@@ -67,6 +68,19 @@ impl FromWorld for SortColors {
             materials: HashMap::from([
                 (
                     SortColor::Range,
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        // Yellow (RoseWater)
+                        // base_color: Color::srgb_u8(244, 219, 214),
+                        // Yellow (Flamingo)
+                        base_color: Color::srgb_u8(240, 198, 198),
+                        // base_color: Color::srgba_u8(238, 212, 159, 25),
+                        // alpha_mode: AlphaMode::Blend,
+                        unlit: true,
+                        ..Default::default()
+                    })),
+                ),
+                (
+                    SortColor::RangeRight,
                     MeshMaterial3d(materials.add(StandardMaterial {
                         // Yellow
                         base_color: Color::srgb_u8(238, 212, 159),
@@ -87,6 +101,19 @@ impl FromWorld for SortColors {
                         ..Default::default()
                     })),
                 ),
+                // (
+                //     SortColor::J,
+                //     MeshMaterial3d(materials.add(StandardMaterial {
+                //         // Red
+                //         base_color: Color::srgb_u8(237, 135, 150),
+                //         // Green
+                //         // base_color: Color::srgb_u8(166, 218, 149),
+                //         // base_color: Color::srgba_u8(166, 218, 149, 25),
+                //         // alpha_mode: AlphaMode::Blend,
+                //         unlit: true,
+                //         ..Default::default()
+                //     })),
+                // ),
                 (
                     SortColor::K,
                     MeshMaterial3d(materials.add(StandardMaterial {
@@ -241,6 +268,7 @@ pub fn increase_width(
                 sort_state.left_right_idx.0,
                 sort_state.left_right_idx.1 + sort_state.width,
             ),
+            sort_state.left_right_idx.1,
             false,
             sort_colors,
             &parsed_values.into(),
@@ -326,6 +354,7 @@ pub fn shift_halves(
                 sort_state.left_right_idx.0,
                 sort_state.left_right_idx.1 + sort_state.width,
             ),
+            sort_state.left_right_idx.1,
             false,
             sort_colors,
             &parsed_values.into(),
@@ -350,6 +379,7 @@ pub fn shift_halves(
         color_range(
             (0, 0),
             (0, 1),
+            1,
             false,
             sort_colors,
             &parsed_values.into(),
@@ -409,6 +439,7 @@ pub fn complete(
                 sort_state.halves_start_idx.1 + sort_state.width,
             ),
             (0, 0),
+            0,
             true,
             sort_colors,
             &parsed_values,
@@ -425,7 +456,7 @@ pub fn compare_left_right(
     mut sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
     sort_colors: Res<SortColors>,
-    cubes_query: Query<(
+    mut cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
@@ -442,6 +473,7 @@ pub fn compare_left_right(
     // Choose I/J to overwrite:
     let moving_index;
     let mut moving_i = false;
+
     ////////////////////////////////////////////////////////////////////////////////////
 
     if sort_state.left_right_idx.0 == sort_state.halves_start_idx.1 {
@@ -577,6 +609,7 @@ pub fn swap(
     } else {
         log::info!("-> no");
     }
+
     ////////////////////////////////////////////////////////////////////////////////////
     log::info!("2. OverwrittenI contains target value?");
 
@@ -716,6 +749,7 @@ pub fn swap(
 pub fn color_range(
     previous_range: (usize, usize),
     current_range: (usize, usize),
+    right_range_start: usize,
     forcing_uncolor: bool,
     sort_colors: Res<SortColors>,
     parsed_values: &Res<ParsedValues>,
@@ -732,12 +766,21 @@ pub fn color_range(
 
     for i in min..max {
         if i >= current_range.0 && i < current_range.1 && !forcing_uncolor {
-            set_cube_as_within_range(
-                parsed_values.vals[i].cube_handle,
-                &sort_colors,
-                SortColor::Range,
-                &mut cubes_query,
-            );
+            if i > right_range_start {
+                set_cube_as_within_range(
+                    parsed_values.vals[i].cube_handle,
+                    &sort_colors,
+                    SortColor::Range,
+                    &mut cubes_query,
+                );
+            } else {
+                set_cube_as_within_range(
+                    parsed_values.vals[i].cube_handle,
+                    &sort_colors,
+                    SortColor::RangeRight,
+                    &mut cubes_query,
+                );
+            }
         } else {
             uncolor_cube(
                 i,
