@@ -771,7 +771,7 @@ pub fn ui_system(
      mut font_added, 
      mut text_is_dirty,
      mut text_just_cleaned,
-     mut wasm_on_mobile, // INFO: used in wasm. impacts if text is editable
+     mut wasm_on_mobile, // INFO: used in wasm. DO NOT REMOVE 'mut'. impacts if text is editable
      ): 
     (ResMut<UserText>, 
      Res<NumberRegex>, 

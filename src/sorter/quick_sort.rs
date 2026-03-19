@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bevy::{
     asset::Assets,
     color::Color,
@@ -126,6 +128,7 @@ pub fn increment_sorting(
     (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
     audio_controls: Res<AudioControls>,
     scanned_cube: ResMut<crate::ScannedCube>,
+    sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
 ) {
     // INFO: this system runs when in sorting state and in quick sort state.
     // this system calls other functions, all of which can be systems themselves which trigger on
@@ -154,6 +157,7 @@ pub fn increment_sorting(
                     cube_assets,
                     rng_color_controls,
                     scanned_cube,
+                    sort_colored_cubes,
                 );
             }
             SortStep::Compare => {
@@ -168,6 +172,7 @@ pub fn increment_sorting(
                     scanned_cube,
                     cube_assets,
                     rng_color_controls,
+                    sort_colored_cubes.unwrap(),
                 );
             }
             SortStep::Swap => {
@@ -185,6 +190,7 @@ pub fn increment_sorting(
             cube_assets,
             rng_color_controls,
             scanned_cube,
+            sort_colored_cubes,
         );
         increment_timer.increment_timer.reset();
     }
@@ -204,6 +210,7 @@ pub fn setup_range(
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
+    sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
 ) {
     if let Some(mut sort_state) = sort_state {
         let previous_array = sort_state.current_array;
@@ -237,8 +244,9 @@ pub fn setup_range(
             cubes_query,
             parsed_values,
             quick_sort_colors,
-            cube_assets,
-            rng_color_controls,
+            &cube_assets,
+            &rng_color_controls,
+            &mut sort_colored_cubes.unwrap(),
         );
         sort_state.next_step = SortStep::Compare;
     } else {
@@ -260,6 +268,12 @@ pub fn setup_range(
                 .0,
         );
 
+        let mut sort_colored_cubes = crate::SortColoredCubes {
+            cubes: HashSet::new(),
+        };
+
+        commands.insert_resource(sort_colored_cubes.clone());
+
         // log::info!(
         //     "
         //     current array: ({}, {})
@@ -278,12 +292,14 @@ pub fn setup_range(
             cubes_query,
             parsed_values,
             quick_sort_colors,
-            cube_assets,
-            rng_color_controls,
+            &cube_assets,
+            &rng_color_controls,
+            &mut sort_colored_cubes,
         );
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn increment_j(
     sort_state: &mut ResMut<SortState>,
     quick_sort_colors: &Res<QuickSortColors>,
@@ -296,6 +312,7 @@ pub fn increment_j(
     commands: &mut Commands,
     audio_controls: &Res<AudioControls>,
     scanned_cube: &mut ResMut<crate::ScannedCube>,
+    sort_colored_cubes: &mut ResMut<crate::SortColoredCubes>,
 ) {
     sort_state.j += 1;
     if sort_state.j != sort_state.pivot + 1 {
@@ -314,6 +331,7 @@ pub fn increment_j(
             quick_sort_colors,
             parsed_values,
             cubes_query,
+            sort_colored_cubes,
         );
         crate::play_audio(
             commands,
@@ -341,6 +359,7 @@ pub fn compare(
     mut scanned_cube: ResMut<crate::ScannedCube>,
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
+    mut sort_colored_cubes: ResMut<crate::SortColoredCubes>,
 ) {
     if let Some((i, j)) = sort_state.swapped_cubes {
         // if just swapped, increment j and color the just swapped cubes the J/"covered" color.
@@ -350,6 +369,7 @@ pub fn compare(
             &quick_sort_colors,
             &parsed_values,
             &mut cubes_query,
+            &mut sort_colored_cubes,
         );
         color_cube(
             j,
@@ -357,6 +377,7 @@ pub fn compare(
             &quick_sort_colors,
             &parsed_values,
             &mut cubes_query,
+            &mut sort_colored_cubes,
         );
         // j must increment after swapping.
         increment_j(
@@ -367,6 +388,7 @@ pub fn compare(
             &mut commands,
             &audio_controls,
             &mut scanned_cube,
+            &mut sort_colored_cubes,
         );
         sort_state.swapped_cubes = None;
 
@@ -377,6 +399,7 @@ pub fn compare(
             &quick_sort_colors,
             &parsed_values,
             &mut cubes_query,
+            &mut sort_colored_cubes,
         );
 
         // should wait a step after this for visualization.
@@ -439,6 +462,7 @@ pub fn compare(
                     &quick_sort_colors,
                     &parsed_values,
                     &mut cubes_query,
+                    &mut sort_colored_cubes,
                 );
             } else {
                 // if i is not within the current array (current_array.0 -1), color as simply
@@ -447,8 +471,9 @@ pub fn compare(
                     sort_state.i as usize,
                     &parsed_values,
                     &mut cubes_query,
-                    cube_assets,
-                    rng_color_controls,
+                    &cube_assets,
+                    &rng_color_controls,
+                    &mut sort_colored_cubes,
                 );
             }
         }
@@ -466,6 +491,7 @@ pub fn compare(
                 &mut commands,
                 &audio_controls,
                 &mut scanned_cube,
+                &mut sort_colored_cubes,
             );
             sort_state.next_step = SortStep::Compare;
             return;
@@ -482,6 +508,7 @@ pub fn compare(
             &quick_sort_colors,
             &parsed_values,
             &mut cubes_query,
+            &mut sort_colored_cubes,
         );
         color_cube(
             sort_state.j,
@@ -489,6 +516,7 @@ pub fn compare(
             &quick_sort_colors,
             &parsed_values,
             &mut cubes_query,
+            &mut sort_colored_cubes,
         );
         sort_state.next_step = SortStep::Swap;
     } else {
@@ -502,6 +530,7 @@ pub fn compare(
             &mut commands,
             &audio_controls,
             &mut scanned_cube,
+            &mut sort_colored_cubes,
         );
         sort_state.next_step = SortStep::Compare;
     }
@@ -514,12 +543,14 @@ pub fn complete(
     mut cubes_query: Query<&mut MeshMaterial3d<StandardMaterial>, With<crate::CubeData>>,
     rng_color_controls: Res<crate::RNGColorControls>,
     mut commands: Commands,
+    sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
 ) {
     // INFO: will run at startup: runs when Quicksort is the selected algorithm
     // (which is the default) and OnEnter for NotSorting (which is the default)
     // The if statement is false on startup so wont do anything
     if let Some(sort_state) = sort_state
         && let Some(cube_assets) = cube_assets
+        && let Some(mut sort_colored_cubes) = sort_colored_cubes
     {
         // Reset previously selected range to normal colors.
         for i in sort_state.current_array.0..sort_state.current_array.1 {
@@ -534,8 +565,10 @@ pub fn complete(
                 &cube_assets,
                 parsed_value.rng_color.clone(),
             );
+            sort_colored_cubes.cubes.remove(&i);
         }
         commands.remove_resource::<SortState>();
+        commands.remove_resource::<crate::SortColoredCubes>();
     }
 }
 
@@ -596,6 +629,7 @@ fn color_cube(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
+    sort_colored_cubes: &mut crate::SortColoredCubes,
 ) {
     let (_, mut cube_material, _) = cubes_query
         .get_mut(parsed_values.vals[cube_index].cube_handle)
@@ -606,6 +640,8 @@ fn color_cube(
         .get(&sort_color)
         .unwrap()
         .clone();
+
+    sort_colored_cubes.cubes.insert(cube_index);
 }
 
 fn uncolor_cube(
@@ -616,8 +652,9 @@ fn uncolor_cube(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    cube_assets: Res<CubeAssets>,
-    rng_color_controls: Res<crate::RNGColorControls>,
+    cube_assets: &Res<CubeAssets>,
+    rng_color_controls: &Res<crate::RNGColorControls>,
+    sort_colored_cubes: &mut crate::SortColoredCubes,
 ) {
     let parsed_value = &parsed_values.vals[cube_index];
     let (_, mut cube_material, _) = cubes_query.get_mut(parsed_value.cube_handle).unwrap();
@@ -625,11 +662,13 @@ fn uncolor_cube(
     *cube_material = crate::ui::get_cube_material(
         rng_color_controls.rng_cubes_enabled,
         parsed_value.parsed_warning,
-        &cube_assets,
+        cube_assets,
         parsed_value.rng_color.clone(),
     );
+    sort_colored_cubes.cubes.remove(&cube_index);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn setup_range_color(
     previous_range: (usize, usize),
     current_range: (usize, usize),
@@ -640,8 +679,9 @@ fn setup_range_color(
     )>,
     parsed_values: Res<ParsedValues>,
     quick_sort_colors: Res<QuickSortColors>,
-    cube_assets: Res<CubeAssets>,
-    rng_color_controls: Res<crate::RNGColorControls>,
+    cube_assets: &Res<CubeAssets>,
+    rng_color_controls: &Res<crate::RNGColorControls>,
+    sort_colored_cubes: &mut crate::SortColoredCubes,
 ) {
     let min = usize::min(previous_range.0, current_range.0);
     let max = usize::max(previous_range.1, current_range.1);
@@ -661,29 +701,35 @@ fn setup_range_color(
     // );
     //
     for i in min..max {
-        let parsed_value = &parsed_values.vals[i];
-        let (_, mut cube_material, _) = cubes_query.get_mut(parsed_value.cube_handle).unwrap();
-
         if i >= current_range.0 && i < current_range.1 {
             // exists in current range: give cube at this index the range color.
-            let sort_color: &SortColor = {
+            let sort_color: SortColor = {
                 if i == current_range.1 - 1 {
-                    &SortColor::Pivot
+                    SortColor::Pivot
                 } else if i == current_range.0 {
-                    &SortColor::J
+                    SortColor::J
                 } else {
-                    &SortColor::Range
+                    SortColor::Range
                 }
             };
-            *cube_material = quick_sort_colors.materials.get(sort_color).unwrap().clone();
+            color_cube(
+                i,
+                sort_color,
+                &quick_sort_colors,
+                &parsed_values,
+                &mut cubes_query,
+                sort_colored_cubes,
+            );
         } else {
             // doesn't exist in current range, but did exist in previous one: reset this cube's
             // color to default.
-            *cube_material = crate::ui::get_cube_material(
-                rng_color_controls.rng_cubes_enabled,
-                parsed_value.parsed_warning,
-                &cube_assets,
-                parsed_value.rng_color.clone(),
+            uncolor_cube(
+                i,
+                &parsed_values,
+                &mut cubes_query,
+                cube_assets,
+                rng_color_controls,
+                sort_colored_cubes,
             );
         }
     }
