@@ -7,7 +7,7 @@ use bevy::{platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Margin, RichText, Spacing, style::ScrollStyle, vec2},
+    egui::{self, Color32, CornerRadius, Frame, Margin, RichText, Shadow, Spacing, Stroke, style::ScrollStyle, vec2},
 };
 
 use bevy_panorbit_camera::PanOrbitCamera;
@@ -910,7 +910,30 @@ pub fn ui_system(
 
     let mut first_button_size: egui::Vec2 = Default::default();
 
-    let window_area = egui::Window::new(PROGRAM_TITLE).max_width(width).min_width(width).resizable(false).default_pos([0.0,0.0]).show(ctx, |ui| {
+    let window_area = egui::Window::new(PROGRAM_TITLE)
+        .max_width(width)
+        .min_width(width)
+        .resizable(false)
+        .default_pos([0.0,0.0])
+        .frame(
+            Frame{
+                fill: egui::Color32::from_rgba_premultiplied(27, 27, 27, 240),
+                corner_radius: CornerRadius::from(5),
+                inner_margin: Margin::from(5),
+                stroke: Stroke{
+                    width: 0.8,
+                    color: Color32::DARK_GRAY,
+                },
+                // shadow: Shadow{
+                //     offset: [0, 0],
+                //     blur: 255,
+                //     color: Color32::BLACK,
+                //     spread: 0,
+                // },
+                ..Default::default()
+            }
+        )
+        .show(ctx, |ui| {
         ui.allocate_ui(vec2(ui.available_width(), scroll_height), |ui|{
             egui::ScrollArea::vertical().auto_shrink([true, true]).show(ui, |ui|{
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("symbol_font".into()));
