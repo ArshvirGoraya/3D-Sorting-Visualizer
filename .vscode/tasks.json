@@ -16,6 +16,7 @@
         "esbuild minify css",
         "esbuild bundle js",
         "esbuild minify bundled js",
+        "esbuild minify 3d_sorting js",
         "rm root index"
       ],
       "group": "build"
@@ -30,6 +31,7 @@
         "esbuild minify css",
         "esbuild bundle js",
         "esbuild minify bundled js",
+        "esbuild minify 3d_sorting js",
         "rm root index"
       ],
       "group": "build"
@@ -117,6 +119,12 @@
       "label": "esbuild minify bundled js",
       "type": "shell",
       "command": "npx esbuild docs/main.js --minify --outfile=docs/main.js --allow-overwrite",
+      "group": "build"
+    },
+    {
+      "label": "esbuild minify 3d_sorting js",
+      "type": "shell",
+      "command": "npx esbuild docs/rust_3d_sorting.js --minify --outfile=docs/rust_3d_sorting.js --allow-overwrite",
       "group": "build"
     },
   ]
