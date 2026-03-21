@@ -118,6 +118,11 @@ pub struct HoveredCube {
     using_touch: bool,
 }
 
+#[derive(Resource, Default)]
+pub struct ClickedCube {
+    index: Option<usize>,
+}
+
 #[derive(Resource, Clone, Default)]
 pub struct SortColoredCubes {
     cubes: HashSet<usize>,
@@ -188,6 +193,7 @@ fn main() {
     .init_resource::<ui::FontScale>()
     .init_resource::<ui::UserText>()
     .init_resource::<HoveredCube>()
+    .init_resource::<ClickedCube>()
     .init_resource::<ScannedCube>()
     .init_resource::<RNGValuesControls>()
     .insert_resource(ClearColor {
@@ -366,6 +372,8 @@ pub fn detect_cube_clicked(
     mut event: On<Pointer<Click>>,
     transform: Query<&Transform, With<CubeData>>,
     mut camera_query: Query<&mut PanOrbitCamera>,
+    mut clicked_cube: ResMut<crate::ClickedCube>,
+    cubes_query: Query<&crate::CubeData>,
 ) {
     // INFO: This system is attached to cubes when they are spawned
     center_camera_on_cube(
@@ -373,6 +381,8 @@ pub fn detect_cube_clicked(
         &mut camera_query,
         true,
     );
+    clicked_cube.index = Some(cubes_query.get(event.entity).unwrap().index);
+
     event.propagate(false);
 }
 
@@ -396,14 +406,6 @@ pub fn center_camera_on_all_cubes(
 ) {
     let mut pan_orbit = camera_query.single_mut().unwrap();
     let center = (cube_width * ((end_index) as f32)) / 2.0;
-
-    // log::info!(
-    //     "cube width: {} * cube count: {} = {} / 2 = {}",
-    //     cube_width,
-    //     end_index,
-    //     cube_width * end_index as f32,
-    //     center
-    // );
 
     if !pan_orbit.initialized {
         // INFO: setting target_focus before initialization = doesn't do anything.

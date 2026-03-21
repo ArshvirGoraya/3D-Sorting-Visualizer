@@ -7,7 +7,7 @@ use bevy::{platform::collections::HashMap, prelude::*};
 
 use bevy_egui::{
     EguiContexts,
-    egui::{self, Color32, CornerRadius, Frame, Margin, RichText, Shadow, Spacing, Stroke, style::ScrollStyle, vec2},
+    egui::{self, Color32, CornerRadius, Frame, Margin, RichText, Spacing, Stroke, style::ScrollStyle, vec2},
 };
 
 use bevy_panorbit_camera::PanOrbitCamera;
@@ -195,11 +195,18 @@ pub fn spawn_random_parsed_values(
     )>,
     mut camera_query: Query<&mut PanOrbitCamera>,
 
-    scanned_cube: ResMut<crate::ScannedCube>,
     camera_controls_follow_selected: Local<bool>,
 
     mut cube_scale_controls: ResMut<crate::CubeScaleControls>,
     sort_state_get: Res<State<sorter::SortState>>,
+    (
+        scanned_cube, 
+        mut clicked_cube
+    ): 
+    (
+        ResMut<crate::ScannedCube>, 
+        ResMut<crate::ClickedCube>
+    ),
 ) {
     generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, rng_values_controls.max_decimals, &mut user_text.val, &mut random);
     // user_text.val = "10, 3, 19, 7, 18, 4, 15, 5, 12, 1, 16, 2".to_string();
@@ -221,6 +228,7 @@ pub fn spawn_random_parsed_values(
         &scanned_cube,
         &camera_controls_follow_selected,
         &sort_state_get,
+        &mut clicked_cube,
     );
 }
 
@@ -246,6 +254,7 @@ fn update_parsed_values(
     scanned_cube: &ResMut<crate::ScannedCube>,
     camera_controls_follow_selected: &Local<bool>,
     sort_state_get: &Res<State<sorter::SortState>>,
+    clicked_cube: &mut ResMut<crate::ClickedCube>,
     ){
     *worse_parse_problem = ParsedWarning::Ok;
     let mut index: usize = 0;
@@ -346,12 +355,24 @@ fn update_parsed_values(
 
     let cube_width = get_cube_size_from_width_scale(parsed_values.end_index, cube_scale_controls);
 
-    // Centers camera when new values are generated + if amount has changed.
-        // INFO: Do not want to center the camera when only RNG values are generated (e.g., width
-        // has not changed since in that case, the user may have clicked on a specific cube and
-        // does not want to forcibly have their camera recentered for no reason)
-    if width_changed{
-        // TODO: camera is not centering correctly.
+ 
+    // On text update: only re-center camera if:
+        // clicked cube is NO LONGER within range.
+        // if no clicked cube, then re-center if amount of cubes have changed (center point
+        // of cubes have changed)
+    if let Some(clicked_cube_idx) = clicked_cube.index{
+        if clicked_cube_idx >= parsed_values.end_index{
+            center_camera(
+                cube_width, 
+                parsed_values.end_index, 
+                camera_query,
+                scanned_cube,
+                camera_controls_follow_selected,
+                sort_state_get,
+            );
+            clicked_cube.index = None;
+        }
+    }else if width_changed {
         center_camera(
             cube_width, 
             parsed_values.end_index, 
@@ -361,6 +382,9 @@ fn update_parsed_values(
             sort_state_get,
         );
     }
+    
+
+
 
 
 
@@ -711,6 +735,7 @@ pub fn get_cube_material(rng_color_controls_enabled: bool, parsed_warning: Parse
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn set_cube_colors(
     rng_color_controls_enabled: bool,
     generate_new_random: bool,
@@ -802,6 +827,7 @@ pub fn ui_system(
     (cube_assets,
      mut cubes_query,
      hovered_cube,
+     mut clicked_cube,
      scanned_cube,
      sort_colored_cubes,
     ):
@@ -814,6 +840,7 @@ pub fn ui_system(
             &mut crate::CubeData,
         )>,
         Res<crate::HoveredCube>,
+        ResMut<crate::ClickedCube>,
         ResMut<crate::ScannedCube>,
         Option<Res<crate::SortColoredCubes>>
     ),
@@ -1094,6 +1121,7 @@ pub fn ui_system(
                         if ui.button("Reset ")
                             .on_hover_text("reset the camera to original position")
                             .clicked(){
+                                clicked_cube.index = None;
                                 center_camera(
                                     get_cube_size_from_width_scale(parsed_values.end_index, &cube_scale_controls), 
                                     parsed_values.end_index, 
@@ -1543,6 +1571,7 @@ pub fn ui_system(
                                     &scanned_cube,
                                     &camera_controls_follow_selected,
                                     &sort_state_get,
+                                    &mut clicked_cube,
                                 );
                             }
                             *generated_rng_values = false;
