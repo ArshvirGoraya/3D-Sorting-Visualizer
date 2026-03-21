@@ -314,8 +314,9 @@ fn set_window_icon(
     // https://github.com/bevyengine/bevy/discussions/21250
     window_entities: Query<Entity, With<Window>>,
 ) {
-    let image = image::open("embedded_assets/favicon/favicon_32.png")
-        .expect("favicon.png does not exist!")
+    const IMAGE_BYTES: &[u8] = include_bytes!("../embedded_assets/favicon/favicon_32.png");
+    let image = image::load_from_memory(IMAGE_BYTES)
+        .expect("favicon_32.png missing")
         .into_rgba8();
     let (width, height) = image.dimensions();
     let rgba = image.into_raw();
