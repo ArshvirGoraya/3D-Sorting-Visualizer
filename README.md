@@ -3,6 +3,7 @@
 ## About
 - Wanted to make something in [Rust](https://rust-lang.org/) and [Bevy](https://bevy.org/) and decided on this from watching [sorting algorithm videos](https://youtu.be/kPRA0W1kECg) which became viral for a time.
 - Made mostly for the web (wasm32-unknown-unknown), but can be compiled for x86_64 targets too (at least Windows).
+- More information about this project can be found on my [website](https://arshvirgoraya.com/ProjectPages/3DSortingVisualizer.html)
 
 ## Building
 - Web Builds:

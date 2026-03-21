@@ -1,3 +1,6 @@
+// Makes windows exe not open with terminal (ignored by all targets other than windows)
+#![windows_subsystem = "windows"]
+
 pub mod sorter;
 mod ui;
 
