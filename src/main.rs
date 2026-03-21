@@ -4,7 +4,7 @@ mod ui;
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
 mod wasm_audio_picker;
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
 use wasm_bindgen::prelude::*; // requires for all '#[wasm_bindgen]' usage
@@ -501,13 +501,29 @@ fn change_audio_source(
     audio_controls.audio_source_handle = Some(handle);
 }
 
-fn spawn_audio_sources(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn spawn_audio_sources(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut audio_assets: ResMut<Assets<AudioSource>>,
+) {
     let default_volume = 0.2;
 
-    // load file and add to audio_assets
-    let default_handle: Handle<bevy::audio::AudioSource> =
-        asset_server.load("audio/impactWood_medium_000.ogg");
-    //
+    let default_handle: Handle<bevy::audio::AudioSource> = {
+        if cfg!(target_arch = "wasm32") {
+            // for web: just load in the audio file (don't want to embed to reduce wasm size).
+            asset_server.load("audio/impactWood_medium_000.ogg")
+        } else {
+            // for at least the windows binary: don't want anything other than a .exe file, so embed bytes into
+            // binary.
+            const DEFAULT_AUDIO: &[u8] =
+                include_bytes!("../assets/audio/impactWood_medium_000.ogg");
+            let default_audio_source = AudioSource {
+                bytes: Arc::from(DEFAULT_AUDIO),
+            };
+            audio_assets.add(default_audio_source)
+        }
+    };
+
     let file_name = "impactWood_medium_000.ogg".to_string();
     let high_pitch = 2.0;
     let low_pitch = 0.5;

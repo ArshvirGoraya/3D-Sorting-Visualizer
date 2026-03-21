@@ -1,4 +1,4 @@
-# 3D-Sorting-Visualizer
+# [3D-Sorting-Visualizer](https://arshvirgoraya.github.io/3D-Sorting-Visualizer)
 
 ## About
 - Wanted to make something in [Rust](https://rust-lang.org/) and [Bevy](https://bevy.org/) and decided on this from watching [sorting algorithm videos](https://youtu.be/kPRA0W1kECg) which became viral for a time.
