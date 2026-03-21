@@ -315,6 +315,7 @@ fn update_parsed_values(
             }
             index += 1;
         });
+    let width_changed = parsed_values.end_index != index;
     parsed_values.end_index = index;
  
     // DO NOT PUT THIS IN SECOND LOOP: this loops from end_index to end, not beginning to
@@ -345,16 +346,22 @@ fn update_parsed_values(
 
     let cube_width = get_cube_size_from_width_scale(parsed_values.end_index, cube_scale_controls);
 
-    // center the camera (if amount or width scale has changed. Just centering it each time here as no
-    // variable tracks if width scale has changed and not really expensive to do anyway).
-    center_camera(
-        cube_width, 
-        parsed_values.end_index, 
-        camera_query,
-        scanned_cube,
-        camera_controls_follow_selected,
-        sort_state_get,
-    );
+    // Centers camera when new values are generated + if amount has changed.
+        // INFO: Do not want to center the camera when only RNG values are generated (e.g., width
+        // has not changed since in that case, the user may have clicked on a specific cube and
+        // does not want to forcibly have their camera recentered for no reason)
+    if width_changed{
+        // TODO: camera is not centering correctly.
+        center_camera(
+            cube_width, 
+            parsed_values.end_index, 
+            camera_query,
+            scanned_cube,
+            camera_controls_follow_selected,
+            sort_state_get,
+        );
+    }
+
 
 
     // INFO: update sorted positions regardless of whether we want positional_heights or not.

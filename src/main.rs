@@ -1,5 +1,7 @@
 // Makes windows exe not open with terminal (ignored by all targets other than windows)
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
+// Only for release builds:
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 pub mod sorter;
 mod ui;
@@ -393,7 +395,15 @@ pub fn center_camera_on_all_cubes(
     end_index: usize,
 ) {
     let mut pan_orbit = camera_query.single_mut().unwrap();
-    let center = cube_width * ((end_index) as f32) / 2.0;
+    let center = (cube_width * ((end_index) as f32)) / 2.0;
+
+    // log::info!(
+    //     "cube width: {} * cube count: {} = {} / 2 = {}",
+    //     cube_width,
+    //     end_index,
+    //     cube_width * end_index as f32,
+    //     center
+    // );
 
     if !pan_orbit.initialized {
         // INFO: setting target_focus before initialization = doesn't do anything.
