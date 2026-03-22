@@ -170,7 +170,6 @@ pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, max_decima
     };
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn spawn_random_parsed_values(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -233,7 +232,6 @@ pub fn spawn_random_parsed_values(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
 fn update_parsed_values(
     number_regex: Res<NumberRegex>,
     user_text: &ResMut<UserText>,
@@ -481,7 +479,6 @@ fn update_parsed_values_second_loop(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn add_parsed_value(
     parsed_values: &mut ParsedValues,
     converted_value: f64,
@@ -576,7 +573,6 @@ fn add_parsed_value(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn spawn_a_cube(
     commands: &mut Commands, 
     cube_assets: & Res<CubeAssets>, 
@@ -736,7 +732,6 @@ pub fn get_cube_material(rng_color_controls_enabled: bool, parsed_warning: Parse
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn set_cube_colors(
     rng_color_controls_enabled: bool,
     generate_new_random: bool,
@@ -791,7 +786,6 @@ pub struct UserText{
     pub val: String,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn ui_system(
     (mut commands, mut contexts, keyboard_input): (Commands, EguiContexts, Res<ButtonInput<KeyCode>>),
     mut materials: ResMut<Assets<StandardMaterial>>,

@@ -128,7 +128,6 @@ impl FromWorld for SortColors {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn increment_sorting(
     commands: Commands,
     parsed_values: ResMut<ParsedValues>,
@@ -220,7 +219,6 @@ pub fn increment_sorting(
     increment_timer.increment_timer.reset();
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn increase_width(
     mut sort_state: ResMut<SortState>,
     parsed_values: ResMut<ParsedValues>,
@@ -269,7 +267,6 @@ pub fn increase_width(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn shift_halves(
     mut commands: Commands,
     sort_state: Option<ResMut<SortState>>,
@@ -378,7 +375,6 @@ pub fn shift_halves(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn complete(
     mut commands: Commands,
     sort_state: Option<Res<SortState>>,
@@ -421,7 +417,6 @@ pub fn complete(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn compare_left_right(
     mut sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
@@ -551,7 +546,6 @@ pub fn compare_left_right(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn swap(
     mut moving_index: usize,
     target_index: usize,
@@ -711,7 +705,6 @@ pub fn swap(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn color_range(
     previous_range: (usize, usize),
     current_range: (usize, usize),

@@ -75,6 +75,9 @@ bevy = { version = "0.17.3", default-features = false, features = [
 image = "0.25.9"  # same as what bevy uses (used cargo tree to see which version bevy uses first)
 winit = "0.30.12"  # same as what bevy uses
 
+[lints.clippy]
+too_many_arguments = "allow"
+
 [profile.dev]
 # Very little optimizations on dev builds for fastest compiles
 # All these settings also apply to all dependencies unless overwritten: [profile.dev.packages."*"]

@@ -110,7 +110,6 @@ pub struct SortState {
     next_step: SortStep,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn increment_sorting(
     commands: Commands,
     sort_state: Option<ResMut<SortState>>,
@@ -196,7 +195,6 @@ pub fn increment_sorting(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn setup_range(
     mut commands: Commands,
     parsed_values: Res<ParsedValues>,
@@ -299,7 +297,6 @@ pub fn setup_range(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn increment_j(
     sort_state: &mut ResMut<SortState>,
     quick_sort_colors: &Res<QuickSortColors>,
@@ -343,7 +340,6 @@ pub fn increment_j(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn compare(
     mut cubes_query: Query<(
         &mut Transform,
@@ -536,7 +532,6 @@ pub fn compare(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn complete(
     sort_state: Option<Res<SortState>>,
     cube_assets: Option<Res<CubeAssets>>,
@@ -595,7 +590,6 @@ pub fn swap(
     sort_state.next_step = SortStep::Compare;
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn swap_string_info(
     i_match_string: &mut StringInfo,
     j_match_string: &mut StringInfo,
@@ -671,7 +665,6 @@ fn uncolor_cube(
     sort_colored_cubes.cubes.remove(&cube_index);
 }
 
-#[allow(clippy::too_many_arguments)]
 fn setup_range_color(
     previous_range: (usize, usize),
     current_range: (usize, usize),

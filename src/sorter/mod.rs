@@ -217,7 +217,6 @@ pub fn swap_text(
     (shift_left, text_shift_amount)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn swap_string_info(
     i_match_string: &mut StringInfo,
     j_match_string: &mut StringInfo,

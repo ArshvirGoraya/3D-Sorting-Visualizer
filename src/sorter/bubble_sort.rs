@@ -94,7 +94,6 @@ impl FromWorld for SortColors {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn increment_sorting(
     sort_state: Option<ResMut<SortState>>,
     (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
@@ -223,7 +222,6 @@ pub fn shift_right(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn restart_shifting(
     mut sort_state: ResMut<SortState>,
     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
@@ -270,7 +268,6 @@ pub fn restart_shifting(
     sort_state.next_step = SortStep::Compare;
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn compare(
     mut sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
@@ -350,7 +347,6 @@ pub fn compare(
     sort_state.next_step = SortStep::ShiftRight;
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn complete(
     mut commands: Commands,
     sort_state: Option<ResMut<SortState>>,
