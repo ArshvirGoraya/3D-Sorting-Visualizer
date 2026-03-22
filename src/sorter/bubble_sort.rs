@@ -240,7 +240,7 @@ pub fn restart_shifting(
 ) {
     // Another element bubbled up to the end.
     sort_state.bubble_range_start -= 1;
-    if sort_state.bubble_range_start <= 2 {
+    if sort_state.bubble_range_start <= 1 {
         // only 1 non-bubbled element remains: already know it is sorted.
         sort_select_set.set(sorter::SortState::NotSorting);
         return;
