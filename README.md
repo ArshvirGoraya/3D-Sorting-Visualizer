@@ -1,5 +1,9 @@
 # [3D-Sorting-Visualizer](https://arshvirgoraya.github.io/3D-Sorting-Visualizer)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ArshvirGoraya/ArshvirGoraya/refs/heads/main/.github/Images/sort_gif.gif" alt="3D Sorting Visualizer Showcase gif" />
+</p>
+
 ## About
 - Wanted to make something in [Rust](https://rust-lang.org/) and [Bevy](https://bevy.org/) and decided on this from watching [sorting algorithm videos](https://youtu.be/kPRA0W1kECg) which became viral for a time.
 - Made mostly for the web (wasm32-unknown-unknown), but can be compiled for x86_64 targets too (at least Windows).
