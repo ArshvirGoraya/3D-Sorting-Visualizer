@@ -392,6 +392,7 @@ pub fn complete(
     )>,
     sort_colors: Option<Res<SortColors>>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
+    mut scanned_cube: ResMut<crate::ScannedCube>,
 ) {
     // INFO: run on exit of sorting state when MergeSort is selected as the algorithm
     if let Some(sort_state) = sort_state
@@ -416,6 +417,7 @@ pub fn complete(
         );
         commands.remove_resource::<SortState>();
         commands.remove_resource::<crate::SortColoredCubes>();
+        scanned_cube.transform = None;
     }
 }
 

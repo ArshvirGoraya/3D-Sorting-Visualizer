@@ -350,6 +350,7 @@ pub fn compare(
     sort_state.next_step = SortStep::ShiftRight;
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn complete(
     mut commands: Commands,
     sort_state: Option<ResMut<SortState>>,
@@ -362,6 +363,7 @@ pub fn complete(
         &mut crate::CubeData,
     )>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
+    mut scanned_cube: ResMut<crate::ScannedCube>,
 ) {
     if let Some(_sort_state) = sort_state
         && let Some(cube_assets) = cube_assets
@@ -377,6 +379,7 @@ pub fn complete(
         );
         commands.remove_resource::<SortState>();
         commands.remove_resource::<crate::SortColoredCubes>();
+        scanned_cube.transform = None;
     }
 }
 

@@ -536,6 +536,7 @@ pub fn compare(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn complete(
     sort_state: Option<Res<SortState>>,
     cube_assets: Option<Res<CubeAssets>>,
@@ -544,6 +545,7 @@ pub fn complete(
     rng_color_controls: Res<crate::RNGColorControls>,
     mut commands: Commands,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
+    mut scanned_cube: ResMut<crate::ScannedCube>,
 ) {
     // INFO: will run at startup: runs when Quicksort is the selected algorithm
     // (which is the default) and OnEnter for NotSorting (which is the default)
@@ -569,6 +571,7 @@ pub fn complete(
         }
         commands.remove_resource::<SortState>();
         commands.remove_resource::<crate::SortColoredCubes>();
+        scanned_cube.transform = None;
     }
 }
 
