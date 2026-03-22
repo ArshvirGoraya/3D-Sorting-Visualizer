@@ -3,6 +3,10 @@ name = "rust_3d_sorting"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "3D_Sorting_Visualizer"
+path = "src/main.rs"
+
 [dependencies]
 bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_asset",

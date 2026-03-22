@@ -51,7 +51,7 @@ pub enum WasmAudioReceiverListening {
     Listening,
 }
 
-pub const PROGRAM_TITLE: &str = "3D Sorting";
+pub const PROGRAM_TITLE: &str = "3D Sorting Visualizer";
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum CameraControlsFollow {
@@ -325,7 +325,7 @@ fn set_window_icon(
     // https://github.com/bevyengine/bevy/discussions/21250
     window_entities: Query<Entity, With<Window>>,
 ) {
-    const IMAGE_BYTES: &[u8] = include_bytes!("../embedded_assets/favicon/favicon_32.png");
+    const IMAGE_BYTES: &[u8] = include_bytes!("../embedded_assets/favicon/3d_sorting_icon_32.jpg");
     let image = image::load_from_memory(IMAGE_BYTES)
         .expect("favicon_32.png missing")
         .into_rgba8();
