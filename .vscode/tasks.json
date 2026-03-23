@@ -22,7 +22,19 @@
       "group": "build"
     },
     {
-      "label": "Github Release Build",
+      "label": "Github Exe Release Build",
+      "type": "shell",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "build release exe",
+        "zip release exe",
+        "open release dir",
+        "open release webpage"
+      ],
+      "group": "build"
+    },
+    {
+      "label": "Github Web Release Build",
       "type": "shell",
       "dependsOrder": "sequence",
       "dependsOn": [
@@ -126,6 +138,29 @@
       "type": "shell",
       "command": "npx esbuild docs/rust_3d_sorting.js --minify --outfile=docs/rust_3d_sorting.js --allow-overwrite",
       "group": "build"
+    },
+    // exe
+    {
+      "label": "build release exe",
+      "type": "shell",
+      "command": "cargo build --release",
+      "group": "build"
+    },
+    {
+      "label": "zip release exe",
+      "type": "shell",
+      "command": "cd target/release && 7z a -tzip -aoa 3D_Sorting_Visualizer \"3D_Sorting_Visualizer.exe\"",
+      "group": "build"
+    },
+    {
+      "label": "open release dir",
+      "type": "shell",
+      "command": "explorer target\\release",
+    },
+    {
+      "label": "open release webpage",
+      "type": "shell",
+      "command": "start https://github.com/ArshvirGoraya/3D-Sorting-Visualizer/releases",
     },
   ]
 }
