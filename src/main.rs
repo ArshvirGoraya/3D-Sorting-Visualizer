@@ -152,6 +152,12 @@ impl Default for SortingTime {
     }
 }
 
+#[derive(Resource, Default)]
+pub struct SortingTimeIsolated {
+    // time_elapsed_nano: u128,
+    time_elapsed: std::time::Duration,
+}
+
 #[derive(Component)]
 pub struct DefaultAudio;
 #[derive(Component)]
@@ -210,6 +216,7 @@ fn main() {
     .init_resource::<ScannedCube>()
     .init_resource::<RNGValuesControls>()
     .init_resource::<SortingTime>()
+    .init_resource::<SortingTimeIsolated>()
     .insert_resource(ClearColor {
         ..Default::default()
     })

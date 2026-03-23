@@ -1,4 +1,8 @@
-use std::{collections::HashSet, time::Instant};
+use std::{
+    collections::HashSet,
+    ops::Add,
+    time::{Duration, Instant},
+};
 
 use bevy::{
     asset::Assets,
@@ -9,6 +13,7 @@ use bevy::{
         system::{Commands, Query, Res, ResMut},
         world::{FromWorld, World},
     },
+    // log::info_span,
     pbr::{MeshMaterial3d, StandardMaterial},
     platform::collections::HashMap,
     state::state::NextState,
@@ -35,7 +40,6 @@ pub enum SortColor {
 pub enum SortStep {
     #[default]
     SetupRange,
-    Swap,
     Compare,
 }
 
@@ -128,12 +132,20 @@ pub fn increment_sorting(
     audio_controls: Res<AudioControls>,
     scanned_cube: ResMut<crate::ScannedCube>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
-    mut sorting_time: ResMut<crate::SortingTime>,
+    (mut sorting_time, mut sorting_time_isolated): (
+        ResMut<crate::SortingTime>,
+        ResMut<crate::SortingTimeIsolated>,
+    ),
 ) {
     // INFO: this system runs when in sorting state and in quick sort state.
     // this system calls other functions, all of which can be systems themselves which trigger on
     // events, but I want to avoid them running in parallel at all cost (which bevy may do), so just calling them one
     // by one here.
+
+    // let qs_span = info_span!("Quick_Sort_Increment", name = "Quick_Sort_Increment").entered();
+
+    let isolated_time = Instant::now();
+
     if let Some(sort_state) = sort_state {
         // sort already started, go to next step
         // each of these functions change the next_step to be something else.
@@ -145,12 +157,18 @@ pub fn increment_sorting(
 
         increment_timer.increment_timer.tick(time.delta());
         if !increment_timer.increment_timer.is_finished() {
+            sorting_time_isolated.time_elapsed = sorting_time_isolated
+                .time_elapsed
+                .add(isolated_time.elapsed());
+
             return;
         }
         increment_timer.increment_timer.reset();
 
         match sort_state.next_step {
             SortStep::SetupRange => {
+                // let span =
+                // info_span!("Quick_Sort_SetupRange", name = "Quick_Sort_SetupRange").entered();
                 setup_range(
                     commands,
                     parsed_values.into(),
@@ -162,12 +180,14 @@ pub fn increment_sorting(
                     scanned_cube,
                     sort_colored_cubes,
                 );
+                // span.exit();
             }
             SortStep::Compare => {
+                // let span = info_span!("Quick_Sort_Compare", name = "Quick_Sort_Compare").entered();
                 compare(
                     cubes_query,
                     sort_state,
-                    parsed_values.into(),
+                    parsed_values,
                     quick_sort_colors,
                     sort_select_set,
                     audio_controls,
@@ -176,16 +196,19 @@ pub fn increment_sorting(
                     cube_assets,
                     rng_color_controls,
                     sort_colored_cubes.unwrap(),
+                    user_text,
                 );
-            }
-            SortStep::Swap => {
-                swap(sort_state, parsed_values, cubes_query, user_text);
-            }
+                // span.exit();
+            } // SortStep::Swap => {
+              //     swap(sort_state, parsed_values, cubes_query, user_text);
+              // }
         };
     } else {
+        sorting_time_isolated.time_elapsed = Duration::default();
         sorting_time.time_start = Instant::now();
 
         // sort not started: start first step and begin timer
+        // let span = info_span!("Quick_Sort_SetupRange", name = "Quick_Sort_SetupRange").entered();
         setup_range(
             commands,
             parsed_values.into(),
@@ -197,8 +220,14 @@ pub fn increment_sorting(
             scanned_cube,
             sort_colored_cubes,
         );
+        // span.exit();
         increment_timer.increment_timer.reset();
     }
+
+    sorting_time_isolated.time_elapsed = sorting_time_isolated
+        .time_elapsed
+        .add(isolated_time.elapsed());
+    // qs_span.exit();
 }
 
 pub fn setup_range(
@@ -306,7 +335,7 @@ pub fn setup_range(
 pub fn increment_j(
     sort_state: &mut ResMut<SortState>,
     quick_sort_colors: &Res<QuickSortColors>,
-    parsed_values: &Res<ParsedValues>,
+    parsed_values: &ParsedValues,
     cubes_query: &mut Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
@@ -353,7 +382,7 @@ pub fn compare(
         &mut crate::CubeData,
     )>,
     mut sort_state: ResMut<SortState>,
-    parsed_values: Res<ParsedValues>,
+    parsed_values: ResMut<ParsedValues>,
     quick_sort_colors: Res<QuickSortColors>,
     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
     audio_controls: Res<AudioControls>,
@@ -362,6 +391,7 @@ pub fn compare(
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
     mut sort_colored_cubes: ResMut<crate::SortColoredCubes>,
+    user_text: ResMut<UserText>,
 ) {
     if let Some((i, j)) = sort_state.swapped_cubes {
         // if just swapped, increment j and color the just swapped cubes the J/"covered" color.
@@ -405,7 +435,7 @@ pub fn compare(
         );
 
         // should wait a step after this for visualization.
-        return;
+        // return;
     }
     if sort_state.j == sort_state.pivot + 1 {
         // INFO: when pivot has been reached, j and i swap and j increments by 1. That is when new subarrays
@@ -467,8 +497,7 @@ pub fn compare(
                     &mut sort_colored_cubes,
                 );
             } else {
-                // if i is not within the current array (current_array.0 -1), color as simply
-                // uncolored
+                // if i is not within the current array (current_array.0 -1), uncolor
                 uncolor_cube(
                     sort_state.i as usize,
                     &parsed_values,
@@ -520,7 +549,8 @@ pub fn compare(
             &mut cubes_query,
             &mut sort_colored_cubes,
         );
-        sort_state.next_step = SortStep::Swap;
+        swap(sort_state, parsed_values, cubes_query, user_text);
+        // sort_state.next_step = SortStep::Swap;
     } else {
         // if pivot_value < j_value
         // do not swap. just increment j.
@@ -534,7 +564,7 @@ pub fn compare(
             &mut scanned_cube,
             &mut sort_colored_cubes,
         );
-        sort_state.next_step = SortStep::Compare;
+        // sort_state.next_step = SortStep::Compare;
     }
 }
 
@@ -547,7 +577,11 @@ pub fn complete(
     mut commands: Commands,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
-    mut sorting_time: ResMut<crate::SortingTime>,
+
+    (mut sorting_time, mut sorting_time_isolated): (
+        ResMut<crate::SortingTime>,
+        ResMut<crate::SortingTimeIsolated>,
+    ),
 ) {
     // INFO: will run at startup: runs when Quicksort is the selected algorithm
     // (which is the default) and OnEnter for NotSorting (which is the default)
@@ -556,6 +590,8 @@ pub fn complete(
         && let Some(cube_assets) = cube_assets
         && let Some(mut sort_colored_cubes) = sort_colored_cubes
     {
+        let isolated_time = Instant::now();
+
         sorting_time.time_elapsed = sorting_time.time_start.elapsed();
 
         // Reset previously selected range to normal colors.
@@ -576,11 +612,15 @@ pub fn complete(
         commands.remove_resource::<SortState>();
         commands.remove_resource::<crate::SortColoredCubes>();
         scanned_cube.transform = None;
+
+        sorting_time_isolated.time_elapsed = sorting_time_isolated
+            .time_elapsed
+            .add(isolated_time.elapsed());
     }
 }
 
 pub fn swap(
-    mut sort_state: ResMut<SortState>,
+    sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
     mut cubes_query: Query<(
         &mut Transform,
@@ -596,7 +636,7 @@ pub fn swap(
         &mut cubes_query,
         user_text,
     );
-    sort_state.next_step = SortStep::Compare;
+    // sort_state.next_step = SortStep::Compare;
 }
 
 pub fn swap_string_info(
@@ -629,7 +669,7 @@ fn color_cube(
     cube_index: usize,
     sort_color: SortColor,
     quick_sort_colors: &Res<QuickSortColors>,
-    parsed_values: &Res<ParsedValues>,
+    parsed_values: &ParsedValues,
     cubes_query: &mut Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
@@ -652,7 +692,7 @@ fn color_cube(
 
 fn uncolor_cube(
     cube_index: usize,
-    parsed_values: &Res<ParsedValues>,
+    parsed_values: &ParsedValues,
     cubes_query: &mut Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,

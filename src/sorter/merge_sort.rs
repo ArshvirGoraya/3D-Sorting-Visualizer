@@ -1,6 +1,7 @@
 use std::{
     collections::{HashSet, VecDeque},
-    time::Instant,
+    ops::Add,
+    time::{Duration, Instant},
 };
 
 use bevy::{
@@ -11,6 +12,7 @@ use bevy::{
         system::{Commands, Query, Res, ResMut},
         world::{FromWorld, World},
     },
+    // log::info_span,
     pbr::{MeshMaterial3d, StandardMaterial},
     platform::collections::HashMap,
     state::state::NextState,
@@ -149,17 +151,30 @@ pub fn increment_sorting(
     audio_controls: Res<AudioControls>,
     scanned_cube: ResMut<crate::ScannedCube>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
-    mut sorting_time: ResMut<crate::SortingTime>,
+    (mut sorting_time, mut sorting_time_isolated): (
+        ResMut<crate::SortingTime>,
+        ResMut<crate::SortingTimeIsolated>,
+    ),
 ) {
+    // let qs_span = info_span!("Merge_Sort_Increment", name = "Merge_Sort_Increment").entered();
+
+    let isolated_time = Instant::now();
+
     if let Some(sort_state) = sort_state {
         sorting_time.time_elapsed = sorting_time.time_start.elapsed();
         //
         increment_timer.increment_timer.tick(time.delta());
         if !increment_timer.increment_timer.is_finished() {
+            sorting_time_isolated.time_elapsed = sorting_time_isolated
+                .time_elapsed
+                .add(isolated_time.elapsed());
+
             return;
         }
         match sort_state.next_step {
             SortStep::ShiftHalves => {
+                // let span =
+                // info_span!("Merge_Sort_ShiftHalves", name = "Merge_Sort_ShiftHalves").entered();
                 shift_halves(
                     commands,
                     Some(sort_state),
@@ -170,8 +185,15 @@ pub fn increment_sorting(
                     cube_assets,
                     sort_colored_cubes,
                 );
+                // span.exit();
             }
             SortStep::IncreaseWidth => {
+                // let span = info_span!(
+                //     "Merge_Sort_IncreaseWidth",
+                //     name = "Merge_Sort_IncreaseWidth"
+                // )
+                // .entered();
+
                 increase_width(
                     sort_state,
                     parsed_values,
@@ -182,8 +204,10 @@ pub fn increment_sorting(
                     cube_assets,
                     sort_colored_cubes.unwrap(),
                 );
+                // span.exit();
             }
             SortStep::Compare => {
+                // let span = info_span!("Merge_Sort_Compare", name = "Merge_Sort_Compare").entered();
                 compare_left_right(
                     sort_state,
                     parsed_values,
@@ -195,11 +219,13 @@ pub fn increment_sorting(
                     scanned_cube,
                     sort_colored_cubes.unwrap(),
                 );
+                // span.exit();
             } // SortStep::Swap => {
               //     swap(sort_state, parsed_values, cubes_query, user_text);
               // }
         }
     } else {
+        sorting_time_isolated.time_elapsed = Duration::default();
         // log::info!(
         //     "\n-=-=-=-=-=-=\nstarting text: {}",
         //     parsed_values.vals[..parsed_values.end_index]
@@ -211,6 +237,7 @@ pub fn increment_sorting(
 
         sorting_time.time_start = Instant::now();
 
+        // let span = info_span!("Merge_Sort_ShiftHalves", name = "Merge_Sort_ShiftHalves").entered();
         shift_halves(
             commands,
             sort_state,
@@ -221,7 +248,14 @@ pub fn increment_sorting(
             cube_assets,
             sort_colored_cubes,
         );
+        // span.exit();
     }
+
+    // qs_span.exit();
+
+    sorting_time_isolated.time_elapsed = sorting_time_isolated
+        .time_elapsed
+        .add(isolated_time.elapsed());
 
     increment_timer.increment_timer.reset();
 }
@@ -396,7 +430,10 @@ pub fn complete(
     sort_colors: Option<Res<SortColors>>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
-    mut sorting_time: ResMut<crate::SortingTime>,
+    (mut sorting_time, mut sorting_time_isolated): (
+        ResMut<crate::SortingTime>,
+        ResMut<crate::SortingTimeIsolated>,
+    ),
 ) {
     // INFO: run on exit of sorting state when MergeSort is selected as the algorithm
     if let Some(sort_state) = sort_state
@@ -404,6 +441,7 @@ pub fn complete(
         && let Some(sort_colors) = sort_colors
         && let Some(mut sort_colored_cubes) = sort_colored_cubes
     {
+        let isolated_time = Instant::now();
         sorting_time.time_elapsed = sorting_time.time_start.elapsed();
 
         color_range(
@@ -424,6 +462,10 @@ pub fn complete(
         commands.remove_resource::<SortState>();
         commands.remove_resource::<crate::SortColoredCubes>();
         scanned_cube.transform = None;
+
+        sorting_time_isolated.time_elapsed = sorting_time_isolated
+            .time_elapsed
+            .add(isolated_time.elapsed());
     }
 }
 
