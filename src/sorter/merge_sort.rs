@@ -1,4 +1,7 @@
-use std::collections::{HashSet, VecDeque};
+use std::{
+    collections::{HashSet, VecDeque},
+    time::Instant,
+};
 
 use bevy::{
     asset::Assets,
@@ -146,8 +149,10 @@ pub fn increment_sorting(
     audio_controls: Res<AudioControls>,
     scanned_cube: ResMut<crate::ScannedCube>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     if let Some(sort_state) = sort_state {
+        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
         //
         increment_timer.increment_timer.tick(time.delta());
         if !increment_timer.increment_timer.is_finished() {
@@ -203,6 +208,8 @@ pub fn increment_sorting(
         //         .collect::<Vec<_>>()
         //         .join(", ")
         // );
+
+        sorting_time.time_start = Instant::now();
 
         shift_halves(
             commands,
@@ -389,6 +396,7 @@ pub fn complete(
     sort_colors: Option<Res<SortColors>>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     // INFO: run on exit of sorting state when MergeSort is selected as the algorithm
     if let Some(sort_state) = sort_state
@@ -396,6 +404,8 @@ pub fn complete(
         && let Some(sort_colors) = sort_colors
         && let Some(mut sort_colored_cubes) = sort_colored_cubes
     {
+        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
+
         color_range(
             (
                 sort_state.halves_start_idx.0,

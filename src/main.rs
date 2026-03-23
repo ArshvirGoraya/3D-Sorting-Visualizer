@@ -136,7 +136,20 @@ pub struct CubeData {
 #[derive(Resource, Default)]
 pub struct ScannedCube {
     transform: Option<Transform>,
-    // entity: Option<Entity>,
+}
+
+#[derive(Resource)]
+pub struct SortingTime {
+    time_start: std::time::Instant,
+    time_elapsed: std::time::Duration,
+}
+impl Default for SortingTime {
+    fn default() -> Self {
+        Self {
+            time_start: std::time::Instant::now(),
+            time_elapsed: std::time::Duration::default(),
+        }
+    }
 }
 
 #[derive(Component)]
@@ -196,6 +209,7 @@ fn main() {
     .init_resource::<ClickedCube>()
     .init_resource::<ScannedCube>()
     .init_resource::<RNGValuesControls>()
+    .init_resource::<SortingTime>()
     .insert_resource(ClearColor {
         ..Default::default()
     })

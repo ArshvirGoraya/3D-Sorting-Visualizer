@@ -816,7 +816,16 @@ pub fn ui_system(
     worse_parse_problem: Local<ParsedWarning>,
 
     // timers
-    (time, mut copy_timer, mut increment_timer): (Res<Time>, ResMut<CopyTimer>, ResMut<sorter::IncrementTimer>),
+    (time, 
+     mut copy_timer, 
+     mut increment_timer,
+     mut sorting_time,
+    ): (
+    Res<Time>,
+    ResMut<CopyTimer>, 
+    ResMut<sorter::IncrementTimer>,
+    ResMut<crate::SortingTime>
+    ),
 
     // cubes:
     (cube_assets,
@@ -1102,6 +1111,13 @@ pub fn ui_system(
                                 Duration::from_secs_f64(duration)
                             );
                     }
+                });
+
+                ui.horizontal(|ui|{
+                    // format!("{:.1$}", min + random.rng.f64() * range_helper, max_decimals))
+                    let elapsed_text = format!("Elapsed Time: {}ms", sorting_time.time_elapsed.as_millis());
+                    // let elapsed_text = format!("Elapsed Time: {:.2}ms", sorting_time.time_elapsed.as_millis());
+                    ui.label(elapsed_text);
                 });
 
                 ui.separator();

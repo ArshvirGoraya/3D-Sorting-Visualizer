@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Instant};
 
 use bevy::{
     asset::Assets,
@@ -112,8 +112,11 @@ pub fn increment_sorting(
     rng_color_controls: Res<crate::RNGColorControls>,
     cube_assets: Res<CubeAssets>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     if let Some(sort_state) = sort_state {
+        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
+
         increment_timer.increment_timer.tick(time.delta());
         if !increment_timer.increment_timer.is_finished() {
             return;
@@ -150,6 +153,8 @@ pub fn increment_sorting(
             ),
         }
     } else {
+        sorting_time.time_start = Instant::now();
+
         shift_right(
             None,
             commands,
@@ -360,11 +365,14 @@ pub fn complete(
     )>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     if let Some(_sort_state) = sort_state
         && let Some(cube_assets) = cube_assets
         && let Some(mut sort_colored_cubes) = sort_colored_cubes
     {
+        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
+
         uncolor_range(
             (0, parsed_values.end_index),
             &parsed_values,
