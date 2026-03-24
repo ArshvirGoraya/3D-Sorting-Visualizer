@@ -132,10 +132,7 @@ pub fn increment_sorting(
     audio_controls: Res<AudioControls>,
     scanned_cube: ResMut<crate::ScannedCube>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
-    (mut sorting_time, mut sorting_time_isolated): (
-        ResMut<crate::SortingTime>,
-        ResMut<crate::SortingTimeIsolated>,
-    ),
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     // INFO: this system runs when in sorting state and in quick sort state.
     // this system calls other functions, all of which can be systems themselves which trigger on
@@ -144,7 +141,7 @@ pub fn increment_sorting(
 
     // let qs_span = info_span!("Quick_Sort_Increment", name = "Quick_Sort_Increment").entered();
 
-    let isolated_time = Instant::now();
+    let increment_time_start = Instant::now();
 
     if let Some(sort_state) = sort_state {
         // sort already started, go to next step
@@ -152,18 +149,13 @@ pub fn increment_sorting(
         // compare system: gets out of the SortingState when sort is complete which stops this system from running
 
         // only call the next step once increment timer is complete
-
-        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
+        sorter::increment_between(&mut sorting_time);
 
         increment_timer.increment_timer.tick(time.delta());
         if !increment_timer.increment_timer.is_finished() {
-            sorting_time_isolated.time_elapsed = sorting_time_isolated
-                .time_elapsed
-                .add(isolated_time.elapsed());
-
+            sorter::end_increment(&mut sorting_time, increment_time_start);
             return;
         }
-        increment_timer.increment_timer.reset();
 
         match sort_state.next_step {
             SortStep::SetupRange => {
@@ -204,8 +196,7 @@ pub fn increment_sorting(
               // }
         };
     } else {
-        sorting_time_isolated.time_elapsed = Duration::default();
-        sorting_time.time_start = Instant::now();
+        sorter::first_increment(&mut sorting_time);
 
         // sort not started: start first step and begin timer
         // let span = info_span!("Quick_Sort_SetupRange", name = "Quick_Sort_SetupRange").entered();
@@ -221,12 +212,10 @@ pub fn increment_sorting(
             sort_colored_cubes,
         );
         // span.exit();
-        increment_timer.increment_timer.reset();
     }
 
-    sorting_time_isolated.time_elapsed = sorting_time_isolated
-        .time_elapsed
-        .add(isolated_time.elapsed());
+    sorter::end_increment(&mut sorting_time, increment_time_start);
+    increment_timer.increment_timer.reset();
     // qs_span.exit();
 }
 
@@ -577,11 +566,7 @@ pub fn complete(
     mut commands: Commands,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
-
-    (mut sorting_time, mut sorting_time_isolated): (
-        ResMut<crate::SortingTime>,
-        ResMut<crate::SortingTimeIsolated>,
-    ),
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     // INFO: will run at startup: runs when Quicksort is the selected algorithm
     // (which is the default) and OnEnter for NotSorting (which is the default)
@@ -590,10 +575,7 @@ pub fn complete(
         && let Some(cube_assets) = cube_assets
         && let Some(mut sort_colored_cubes) = sort_colored_cubes
     {
-        let isolated_time = Instant::now();
-
-        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
-
+        sorter::complete(&mut sorting_time, &mut commands, &mut scanned_cube);
         // Reset previously selected range to normal colors.
         for i in sort_state.current_array.0..sort_state.current_array.1 {
             let parsed_value = &parsed_values.vals[i];
@@ -610,12 +592,6 @@ pub fn complete(
             sort_colored_cubes.cubes.remove(&i);
         }
         commands.remove_resource::<SortState>();
-        commands.remove_resource::<crate::SortColoredCubes>();
-        scanned_cube.transform = None;
-
-        sorting_time_isolated.time_elapsed = sorting_time_isolated
-            .time_elapsed
-            .add(isolated_time.elapsed());
     }
 }
 

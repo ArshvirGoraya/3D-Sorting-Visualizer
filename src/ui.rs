@@ -795,7 +795,13 @@ pub struct UserText{
 }
 
 pub fn ui_system(
-    (mut commands, mut contexts, keyboard_input): (Commands, EguiContexts, Res<ButtonInput<KeyCode>>),
+    (mut commands, 
+     mut contexts, 
+     keyboard_input): (
+     Commands, 
+     EguiContexts, 
+     Res<ButtonInput<KeyCode>>,
+     ),
     mut materials: ResMut<Assets<StandardMaterial>>,
 
     // text:
@@ -828,13 +834,11 @@ pub fn ui_system(
      mut copy_timer, 
      mut increment_timer,
      sorting_time,
-     sorting_time_isolated,
     ): (
     Res<Time>,
     ResMut<CopyTimer>, 
     ResMut<sorter::IncrementTimer>,
     Res<crate::SortingTime>,
-    Res<crate::SortingTimeIsolated>
     ),
 
     // cubes:
@@ -922,6 +926,12 @@ pub fn ui_system(
 ) -> Result {
     let is_sorting = *sort_state_get.get() == sorter::SortState::Sorting;
     let is_paused = *paused_state_get.get() == sorter::PausedState::Paused;
+
+
+    // if is_sorting {
+    //     return Ok(())
+    // }
+
 
     let ctx = contexts.ctx_mut()?;
 
@@ -1122,11 +1132,35 @@ pub fn ui_system(
                             );
                     }
                 });
+                ui.horizontal(|ui|{
+                    ui.label(format!("Elapsed Time: {}ms", sorting_time.time_elapsed.as_millis()))
+                        .on_hover_text("total time spent: including time spend sorting + time spent doing other things");
+                    ui.label(format!("| Sorting Time: {}ms", sorting_time.sorting_time_elapsed.as_millis()))
+                        .on_hover_text("time spent just on sorting + visualization functions (not any intermediate game engine functions)");
+                    });
+
+                ui.label(format!("Increment calls: {}", sorting_time.sorting_time_between.len()))
+                    .on_hover_text("calls to sorting + visualization functions");
+                ui.label(format!("Intermediate Time: {}ms", 
+                        sorting_time.sorting_time_between.last().unwrap_or(&(0_u128)))
+                )
+                    .on_hover_text("time taken in-between sorting + visualization functions");
+                ui.label(format!("Intermediate sum: {}ms", sorting_time.sorting_time_between_sum))
+                    .on_hover_text("total time taken in-between sorting + visualization functions");
+                ui.label(format!("Intermediate Grt Time : {}ms", sorting_time.sorting_time_between_greatest))
+                    .on_hover_text("greatest time take in-between sorting + visualization functions");
                 //
-                ui.label(format!("Elapsed Time: {}ms", sorting_time.time_elapsed.as_millis()))
-                    .on_hover_text("total time spent: including time spend sorting + time spent doing other things");
-                ui.label(format!("Sorting Time: {}ms", sorting_time_isolated.time_elapsed.as_millis()))
-                    .on_hover_text("time spent just on sorting functions (not any intermediate game engine functions)");
+                let between_increment_average = {
+                    if !sorting_time.sorting_time_between.is_empty(){
+                        sorting_time.sorting_time_between_sum as f32 / sorting_time.sorting_time_between.len() as f32
+                    }else{
+                        0_f32
+                    }
+                };
+                ui.label(format!("Intermediate Avg Time : {}ms", between_increment_average))
+                    .on_hover_text("average time taken in-between sorting + visualization functions");
+
+
 
                 ui.separator();
 
@@ -1290,8 +1324,8 @@ pub fn ui_system(
                     // RNG values
                     // 
 
-                    ui.horizontal(|ui|{
-                        ui.add_enabled_ui(!is_sorting, |ui|{
+                    ui.add_enabled_ui(!is_sorting, |ui|{
+                        ui.horizontal(|ui|{
                             if ui.button("RNG ")
                                 .on_hover_text("replace your text with random numbers")
                                     .clicked(){
@@ -1305,52 +1339,52 @@ pub fn ui_system(
                                         );
                                         *generated_rng_values = true;
                             }
-                        });
-                        ui.vertical_centered_justified(|ui|{
-                            ui.collapsing("RNG Settings", |ui|{
-                                if ui.add(
-                                    egui::Slider::new(&mut rng_values_controls.amount, 2..=100)
-                                    .clamping(egui::SliderClamping::Never)
-                                    .text("amount")
-                                )
-                                    .on_hover_text("set amount of numbers to generate")
-                                    .changed(){
-                                        rng_values_controls.amount = rng_values_controls.amount.max(2); // at least 2
-                                }
-                                if ui.add(
-                                    egui::Slider::new(&mut rng_values_controls.min, -100.0..=100.0)
-                                    .clamping(egui::SliderClamping::Never)
-                                    .min_decimals(1)
-                                    .text("min")
-                                )
-                                    .on_hover_text("set smallest number that can be generated")
-                                    .changed(){
-                                        // set max to be the same as this, if this is bigger than max.
-                                        rng_values_controls.max = rng_values_controls.max.max(rng_values_controls.min);
-                                }
-                                if ui.add(
-                                    egui::Slider::new(&mut rng_values_controls.max, -100.0..=100.0)
-                                    .clamping(egui::SliderClamping::Never)
-                                    .min_decimals(1)
-                                    .text("max")
-                                )
-                                    .on_hover_text("set largest number that can be generated")
-                                    .changed(){
-                                        // set min to be the same as this, if this is smaller than min.
-                                        rng_values_controls.min = rng_values_controls.min.min(rng_values_controls.max);
-                                }
-                                if ui.add(
-                                    egui::Slider::new(&mut rng_values_controls.max_decimals, 0..=10)
-                                    .clamping(egui::SliderClamping::Never)
-                                    .min_decimals(1)
-                                    .text("decimals")
-                                )
-                                    .on_hover_text("max amount of decimal places after RNG value")
-                                    .changed(){
-                                        rng_values_controls.max_decimals = rng_values_controls.max_decimals.max(0); // at least 0
-                                }
+                            ui.vertical_centered_justified(|ui|{
+                                ui.collapsing("RNG Settings", |ui|{
+                                    if ui.add(
+                                        egui::Slider::new(&mut rng_values_controls.amount, 2..=100)
+                                        .clamping(egui::SliderClamping::Never)
+                                        .text("amount")
+                                    )
+                                        .on_hover_text("set amount of numbers to generate")
+                                            .changed(){
+                                                rng_values_controls.amount = rng_values_controls.amount.max(2); // at least 2
+                                    }
+                                    if ui.add(
+                                        egui::Slider::new(&mut rng_values_controls.min, -100.0..=100.0)
+                                        .clamping(egui::SliderClamping::Never)
+                                        .min_decimals(1)
+                                        .text("min")
+                                    )
+                                        .on_hover_text("set smallest number that can be generated")
+                                            .changed(){
+                                                // set max to be the same as this, if this is bigger than max.
+                                                rng_values_controls.max = rng_values_controls.max.max(rng_values_controls.min);
+                                            }
+                                    if ui.add(
+                                        egui::Slider::new(&mut rng_values_controls.max, -100.0..=100.0)
+                                        .clamping(egui::SliderClamping::Never)
+                                        .min_decimals(1)
+                                        .text("max")
+                                    )
+                                        .on_hover_text("set largest number that can be generated")
+                                            .changed(){
+                                                // set min to be the same as this, if this is smaller than min.
+                                                rng_values_controls.min = rng_values_controls.min.min(rng_values_controls.max);
+                                            }
+                                    if ui.add(
+                                        egui::Slider::new(&mut rng_values_controls.max_decimals, 0..=10)
+                                        .clamping(egui::SliderClamping::Never)
+                                        .min_decimals(1)
+                                        .text("decimals")
+                                    )
+                                        .on_hover_text("max amount of decimal places after RNG value")
+                                            .changed(){
+                                                rng_values_controls.max_decimals = rng_values_controls.max_decimals.max(0); // at least 0
+                                    }
+                                })
                             })
-                        })
+                        });
                     });
 
                     ui.separator();

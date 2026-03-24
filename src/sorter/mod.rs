@@ -1,9 +1,14 @@
 pub mod bubble_sort;
 pub mod merge_sort;
 pub mod quick_sort;
+pub mod test_sort;
 
 use bevy::prelude::*;
 use core::fmt;
+use std::{
+    ops::Add,
+    time::{Duration, Instant},
+};
 
 use crate::ui::{ParsedValues, StringInfo, UserText};
 
@@ -22,10 +27,11 @@ pub enum PausedState {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum Algorithms {
-    #[default]
     QuickSort,
     MergeSort,
     BubbleSort,
+    #[default]
+    TestSort,
 }
 impl fmt::Display for Algorithms {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -33,14 +39,16 @@ impl fmt::Display for Algorithms {
             Algorithms::QuickSort => write!(f, "Quick Sort"),
             Algorithms::MergeSort => write!(f, "Merge Sort"),
             Algorithms::BubbleSort => write!(f, "Bubble Sort"),
+            Algorithms::TestSort => write!(f, "Test Sort"),
         }
     }
 }
 impl Algorithms {
-    pub const ALL: [Algorithms; 3] = [
+    pub const ALL: [Algorithms; 4] = [
         Algorithms::QuickSort,
         Algorithms::MergeSort,
         Algorithms::BubbleSort,
+        Algorithms::TestSort,
     ];
 }
 
@@ -97,6 +105,64 @@ pub fn swap(
 
     // TODO remove this line:
     // log::info!("{}", user_text.val);
+}
+
+pub fn first_increment(sorting_time: &mut ResMut<crate::SortingTime>) {
+    // called when a sorting algorithm first starts.
+    sorting_time.time_start = Instant::now();
+    sorting_time.sorting_time_between.clear();
+    sorting_time.sorting_time_between_sum = 0;
+    sorting_time.sorting_time_between_greatest = 0;
+    sorting_time.sorting_time_elapsed = Duration::default();
+}
+
+pub fn increment_between(sorting_time: &mut ResMut<crate::SortingTime>) {
+    // called between increments.
+    if let Some(time_between_start) = sorting_time.sorting_time_between_start {
+        let time_between_elapsed = time_between_start.elapsed().as_millis();
+        sorting_time.sorting_time_between.push(time_between_elapsed);
+        sorting_time.sorting_time_between_sum += time_between_elapsed;
+        if time_between_elapsed > sorting_time.sorting_time_between_greatest {
+            sorting_time.sorting_time_between_greatest = time_between_elapsed;
+        }
+    }
+    sorting_time.time_elapsed = sorting_time.time_start.elapsed();
+}
+
+pub fn end_increment(sorting_time: &mut ResMut<crate::SortingTime>, increment_time_start: Instant) {
+    // called at the end of a sorting algorithm's increment (not necessary after increment timer is up and
+    // one of its sort steps has ran). Not on complete.
+
+    sorting_time.sorting_time_elapsed = sorting_time
+        .sorting_time_elapsed
+        .add(increment_time_start.elapsed());
+    sorting_time.sorting_time_between_start = Some(Instant::now());
+}
+
+pub fn complete(
+    sorting_time: &mut ResMut<crate::SortingTime>,
+    commands: &mut Commands,
+    scanned_cube: &mut ResMut<crate::ScannedCube>,
+) {
+    // called by all sorting algorithms when they 'complete'.
+
+    commands.remove_resource::<crate::SortColoredCubes>();
+    scanned_cube.transform = None;
+
+    increment_between(sorting_time);
+
+    sorting_time.sorting_time_between.sort();
+    log::info!(
+        "sorting_time_between (sorted): {}",
+        sorting_time
+            .sorting_time_between
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    sorting_time.sorting_time_between_start = None;
 }
 
 pub fn swap_text(

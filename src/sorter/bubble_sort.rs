@@ -116,22 +116,16 @@ pub fn increment_sorting(
     rng_color_controls: Res<crate::RNGColorControls>,
     cube_assets: Res<CubeAssets>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
-    (mut sorting_time, mut sorting_time_isolated): (
-        ResMut<crate::SortingTime>,
-        ResMut<crate::SortingTimeIsolated>,
-    ),
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
-    let isolated_time = Instant::now();
+    let increment_time_start = Instant::now();
 
     if let Some(sort_state) = sort_state {
-        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
+        sorter::increment_between(&mut sorting_time);
 
         increment_timer.increment_timer.tick(time.delta());
         if !increment_timer.increment_timer.is_finished() {
-            sorting_time_isolated.time_elapsed = sorting_time_isolated
-                .time_elapsed
-                .add(isolated_time.elapsed());
-
+            sorter::end_increment(&mut sorting_time, increment_time_start);
             return;
         }
         match sort_state.next_step {
@@ -166,8 +160,7 @@ pub fn increment_sorting(
             ),
         }
     } else {
-        sorting_time.time_start = Instant::now();
-        sorting_time_isolated.time_elapsed = Duration::default();
+        sorter::first_increment(&mut sorting_time);
 
         shift_right(
             None,
@@ -179,9 +172,7 @@ pub fn increment_sorting(
         )
     }
 
-    sorting_time_isolated.time_elapsed = sorting_time_isolated
-        .time_elapsed
-        .add(isolated_time.elapsed());
+    sorter::end_increment(&mut sorting_time, increment_time_start);
 
     increment_timer.increment_timer.reset();
 }
@@ -385,19 +376,13 @@ pub fn complete(
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
 
-    (mut sorting_time, mut sorting_time_isolated): (
-        ResMut<crate::SortingTime>,
-        ResMut<crate::SortingTimeIsolated>,
-    ),
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     if let Some(_sort_state) = sort_state
         && let Some(cube_assets) = cube_assets
         && let Some(mut sort_colored_cubes) = sort_colored_cubes
     {
-        let isolated_time = Instant::now();
-
-        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
-
+        sorter::complete(&mut sorting_time, &mut commands, &mut scanned_cube);
         uncolor_range(
             (0, parsed_values.end_index),
             &parsed_values,
@@ -407,12 +392,6 @@ pub fn complete(
             &mut sort_colored_cubes,
         );
         commands.remove_resource::<SortState>();
-        commands.remove_resource::<crate::SortColoredCubes>();
-        scanned_cube.transform = None;
-
-        sorting_time_isolated.time_elapsed = sorting_time_isolated
-            .time_elapsed
-            .add(isolated_time.elapsed());
     }
 }
 

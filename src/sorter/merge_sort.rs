@@ -1,7 +1,6 @@
 use std::{
     collections::{HashSet, VecDeque},
-    ops::Add,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use bevy::{
@@ -151,23 +150,18 @@ pub fn increment_sorting(
     audio_controls: Res<AudioControls>,
     scanned_cube: ResMut<crate::ScannedCube>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
-    (mut sorting_time, mut sorting_time_isolated): (
-        ResMut<crate::SortingTime>,
-        ResMut<crate::SortingTimeIsolated>,
-    ),
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     // let qs_span = info_span!("Merge_Sort_Increment", name = "Merge_Sort_Increment").entered();
 
-    let isolated_time = Instant::now();
+    let increment_time_start = Instant::now();
 
     if let Some(sort_state) = sort_state {
-        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
-        //
+        sorter::increment_between(&mut sorting_time);
+
         increment_timer.increment_timer.tick(time.delta());
         if !increment_timer.increment_timer.is_finished() {
-            sorting_time_isolated.time_elapsed = sorting_time_isolated
-                .time_elapsed
-                .add(isolated_time.elapsed());
+            sorter::end_increment(&mut sorting_time, increment_time_start);
 
             return;
         }
@@ -225,7 +219,6 @@ pub fn increment_sorting(
               // }
         }
     } else {
-        sorting_time_isolated.time_elapsed = Duration::default();
         // log::info!(
         //     "\n-=-=-=-=-=-=\nstarting text: {}",
         //     parsed_values.vals[..parsed_values.end_index]
@@ -235,9 +228,10 @@ pub fn increment_sorting(
         //         .join(", ")
         // );
 
-        sorting_time.time_start = Instant::now();
-
         // let span = info_span!("Merge_Sort_ShiftHalves", name = "Merge_Sort_ShiftHalves").entered();
+
+        sorter::first_increment(&mut sorting_time);
+
         shift_halves(
             commands,
             sort_state,
@@ -252,10 +246,7 @@ pub fn increment_sorting(
     }
 
     // qs_span.exit();
-
-    sorting_time_isolated.time_elapsed = sorting_time_isolated
-        .time_elapsed
-        .add(isolated_time.elapsed());
+    sorter::end_increment(&mut sorting_time, increment_time_start);
 
     increment_timer.increment_timer.reset();
 }
@@ -430,10 +421,7 @@ pub fn complete(
     sort_colors: Option<Res<SortColors>>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
-    (mut sorting_time, mut sorting_time_isolated): (
-        ResMut<crate::SortingTime>,
-        ResMut<crate::SortingTimeIsolated>,
-    ),
+    mut sorting_time: ResMut<crate::SortingTime>,
 ) {
     // INFO: run on exit of sorting state when MergeSort is selected as the algorithm
     if let Some(sort_state) = sort_state
@@ -441,9 +429,7 @@ pub fn complete(
         && let Some(sort_colors) = sort_colors
         && let Some(mut sort_colored_cubes) = sort_colored_cubes
     {
-        let isolated_time = Instant::now();
-        sorting_time.time_elapsed = sorting_time.time_start.elapsed();
-
+        sorter::complete(&mut sorting_time, &mut commands, &mut scanned_cube);
         color_range(
             (
                 sort_state.halves_start_idx.0,
@@ -460,12 +446,6 @@ pub fn complete(
             &mut sort_colored_cubes,
         );
         commands.remove_resource::<SortState>();
-        commands.remove_resource::<crate::SortColoredCubes>();
-        scanned_cube.transform = None;
-
-        sorting_time_isolated.time_elapsed = sorting_time_isolated
-            .time_elapsed
-            .add(isolated_time.elapsed());
     }
 }
 

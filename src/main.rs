@@ -142,20 +142,26 @@ pub struct ScannedCube {
 pub struct SortingTime {
     time_start: std::time::Instant,
     time_elapsed: std::time::Duration,
+    //
+    sorting_time_elapsed: std::time::Duration,
+    //
+    sorting_time_between: Vec<u128>,
+    sorting_time_between_sum: u128,
+    sorting_time_between_start: Option<std::time::Instant>,
+    sorting_time_between_greatest: u128,
 }
 impl Default for SortingTime {
     fn default() -> Self {
         Self {
             time_start: std::time::Instant::now(),
             time_elapsed: std::time::Duration::default(),
+            sorting_time_elapsed: std::time::Duration::default(),
+            sorting_time_between: Vec::new(),
+            sorting_time_between_sum: u128::default(),
+            sorting_time_between_start: None,
+            sorting_time_between_greatest: u128::default(),
         }
     }
-}
-
-#[derive(Resource, Default)]
-pub struct SortingTimeIsolated {
-    // time_elapsed_nano: u128,
-    time_elapsed: std::time::Duration,
 }
 
 #[derive(Component)]
@@ -216,7 +222,6 @@ fn main() {
     .init_resource::<ScannedCube>()
     .init_resource::<RNGValuesControls>()
     .init_resource::<SortingTime>()
-    .init_resource::<SortingTimeIsolated>()
     .insert_resource(ClearColor {
         ..Default::default()
     })
@@ -335,6 +340,18 @@ fn main() {
         .add_systems(
             OnEnter(sorter::SortState::NotSorting),
             sorter::bubble_sort::complete.run_if(in_state(sorter::Algorithms::BubbleSort)),
+        )
+        // Test Sort:
+        .add_systems(
+            Update,
+            sorter::test_sort::increment_sorting
+                .run_if(in_state(sorter::SortState::Sorting))
+                .run_if(in_state(sorter::PausedState::NotPaused))
+                .run_if(in_state(sorter::Algorithms::TestSort)),
+        )
+        .add_systems(
+            OnEnter(sorter::SortState::NotSorting),
+            sorter::test_sort::complete.run_if(in_state(sorter::Algorithms::TestSort)),
         );
 
     app.run();
