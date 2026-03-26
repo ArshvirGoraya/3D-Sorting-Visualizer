@@ -1,8 +1,4 @@
-use std::{
-    collections::HashSet,
-    ops::Add,
-    time::{Duration, Instant},
-};
+use std::{collections::HashSet, time::Instant};
 
 use bevy::{
     asset::Assets,
@@ -111,6 +107,7 @@ pub fn increment_sorting(
     )>,
     user_text: ResMut<UserText>,
     audio_controls: Res<AudioControls>,
+    audio: Res<bevy_kira_audio::Audio>,
     scanned_cube: ResMut<crate::ScannedCube>,
     sort_colors: Res<SortColors>,
     rng_color_controls: Res<crate::RNGColorControls>,
@@ -152,8 +149,8 @@ pub fn increment_sorting(
                 parsed_values,
                 cubes_query,
                 user_text,
-                commands,
                 audio_controls,
+                audio,
                 scanned_cube,
                 sort_colors,
                 sort_colored_cubes.unwrap(),
@@ -292,14 +289,14 @@ pub fn compare(
         &mut crate::CubeData,
     )>,
     user_text: ResMut<UserText>,
-    mut commands: Commands,
     audio_controls: Res<AudioControls>,
+    audio: Res<bevy_kira_audio::Audio>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
     sort_colors: Res<SortColors>,
     mut sort_colored_cubes: ResMut<crate::SortColoredCubes>,
 ) {
     crate::play_audio(
-        &mut commands,
+        &audio,
         &audio_controls,
         parsed_values.vals[sort_state.j].sorted_position,
         parsed_values.end_index,

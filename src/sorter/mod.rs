@@ -27,10 +27,10 @@ pub enum PausedState {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
 pub enum Algorithms {
+    #[default]
     QuickSort,
     MergeSort,
     BubbleSort,
-    #[default]
     TestSort,
 }
 impl fmt::Display for Algorithms {

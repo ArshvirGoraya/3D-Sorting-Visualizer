@@ -3,13 +3,14 @@
 
 use bevy::{
     asset::Assets,
-    audio::AudioSource,
     ecs::{
         resource::Resource,
         system::{Commands, ResMut},
     },
     state::state::NextState,
 };
+use bevy_kira_audio::AudioSource;
+
 use web_sys::{
     HtmlInputElement, console,
     js_sys::Uint8Array,

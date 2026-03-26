@@ -30,13 +30,13 @@ pub fn is_mobile() -> bool {
 
 use bevy::{
     asset::AssetMetaCheck,
-    audio::{PlaybackMode, Volume},
     core_pipeline::tonemapping::Tonemapping,
     input::mouse::MouseWheel,
     platform::collections::HashMap,
     post_process::bloom::{Bloom, BloomCompositeMode, BloomPrefilter},
     prelude::*,
 };
+use bevy_kira_audio::prelude::*;
 
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
@@ -208,6 +208,7 @@ fn main() {
     .add_plugins(PanOrbitCameraPlugin)
     .add_plugins(EguiPlugin::default())
     .add_plugins(MeshPickingPlugin)
+    .add_plugins(AudioPlugin)
     .insert_resource(MeshPickingSettings {
         require_markers: true,
         ..Default::default()
@@ -502,14 +503,12 @@ fn detect_cube_hover_exit(
     }
 }
 
-fn stop_all_audio(mut commands: Commands, audio_query: Query<Entity, With<AudioPlayer>>) {
-    for e in audio_query.iter() {
-        commands.entity(e).despawn();
-    }
+fn stop_all_audio(audio: Res<bevy_kira_audio::Audio>) {
+    audio.stop();
 }
 
 fn play_audio(
-    commands: &mut Commands,
+    audio: &Res<bevy_kira_audio::Audio>,
     audio_controls: &Res<AudioControls>,
     cube_index: usize,
     total_cubes: usize,
@@ -525,15 +524,10 @@ fn play_audio(
         .clone()
         .unwrap_or(audio_controls.audio_source_handle_default.clone());
 
-    commands.spawn((
-        AudioPlayer::new(audio_source_handle),
-        PlaybackSettings {
-            volume: Volume::Linear(audio_controls.volume),
-            speed: pitch,
-            mode: PlaybackMode::Despawn,
-            ..Default::default()
-        },
-    ));
+    audio
+        .play(audio_source_handle)
+        .with_volume(audio_controls.volume)
+        .with_playback_rate(pitch as f64);
 }
 
 fn change_audio_source(
@@ -549,8 +543,12 @@ fn change_audio_source(
         // counting? So, not necessary?)
         audio_assets.remove(handle);
     }
+
+    let audio_cursor = std::io::Cursor::new(bytes);
+
     let handle = audio_assets.add(AudioSource {
-        bytes: bytes.into(),
+        sound: StaticSoundData::from_cursor(audio_cursor)
+            .expect("kira could not create sound data from cursor"),
     });
     audio_controls.audio_source_handle = Some(handle);
 }
@@ -562,7 +560,7 @@ fn spawn_audio_sources(
 ) {
     let default_volume = 0.2;
 
-    let default_handle: Handle<bevy::audio::AudioSource> = {
+    let default_handle: Handle<AudioSource> = {
         if cfg!(target_arch = "wasm32") {
             // for web: just load in the audio file (don't want to embed to reduce wasm size).
             asset_server.load("audio/impactWood_medium_000.ogg")
@@ -571,8 +569,12 @@ fn spawn_audio_sources(
             // binary.
             const DEFAULT_AUDIO: &[u8] =
                 include_bytes!("../assets/audio/impactWood_medium_000.ogg");
+
+            let audio_cursor = std::io::Cursor::new(DEFAULT_AUDIO);
+
             let default_audio_source = AudioSource {
-                bytes: Arc::from(DEFAULT_AUDIO),
+                sound: StaticSoundData::from_cursor(audio_cursor)
+                    .expect("kira could not create sound data from cursor"),
             };
             audio_assets.add(default_audio_source)
         }

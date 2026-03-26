@@ -18,6 +18,7 @@
         "esbuild minify bundled js",
         "esbuild minify 3d_sorting js",
         "rm root index"
+        // usually followed up with live-server task
       ],
       "group": "build"
     },

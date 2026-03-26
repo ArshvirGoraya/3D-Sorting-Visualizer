@@ -10,6 +10,7 @@ use bevy_egui::{
     egui::{self, Color32, CornerRadius, Frame, Margin, RichText, Spacing, Stroke, style::ScrollStyle, vec2},
 };
 
+use bevy_kira_audio::AudioSource;
 use bevy_panorbit_camera::PanOrbitCamera;
 use regex_lite::Regex;
 
@@ -882,12 +883,14 @@ pub fn ui_system(
      mut audio_assets,
      audio_receiver_listening_set, // INFO: USED IN WASM BUILD DO NOT REMOVE
      mut stop_all_audio_event,
+     audio,
     ): 
         (
             ResMut<AudioControls>,
             ResMut<Assets<AudioSource>>,
             Option<ResMut<NextState<crate::WasmAudioReceiverListening>>>,
             MessageWriter<crate::StopAllAudio>,
+            Res<bevy_kira_audio::Audio>
         ),
     // random:
     (mut random,
@@ -1259,7 +1262,7 @@ pub fn ui_system(
                                                 #[cfg(target_arch = "x86_64")]
                                                 {
                                                     #[allow(clippy::collapsible_if)]
-                                                    if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["aac", "flac", "wav", "ogg", "mp3"]).pick_file(){
+                                                    if let Some(path) = rfd::FileDialog::new().add_filter("audio", &["flac", "wav", "ogg", "mp3"]).pick_file(){
                                                         if let Ok(bytes) = std::fs::read(&path){
                                                             let file_name = path.file_name().unwrap().to_string_lossy().to_string();
                                                             crate::change_audio_source(&mut audio_controls, &mut audio_assets, file_name, bytes);
@@ -1311,7 +1314,7 @@ pub fn ui_system(
                                             // play base pitch by calling audio and making it think
                                             // we selected the middle cube (of 3 cubes (0, 1, 2), 1
                                             // is selected)
-                                            crate::play_audio(&mut commands, &audio_controls.into(), 1, 2);
+                                            crate::play_audio(&audio, &audio_controls.into(), 1, 2);
                                     }
                                 });
                             });

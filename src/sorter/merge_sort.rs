@@ -148,6 +148,7 @@ pub fn increment_sorting(
     rng_color_controls: Res<crate::RNGColorControls>,
     user_text: ResMut<UserText>,
     audio_controls: Res<AudioControls>,
+    audio: Res<bevy_kira_audio::Audio>,
     scanned_cube: ResMut<crate::ScannedCube>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut sorting_time: ResMut<crate::SortingTime>,
@@ -208,8 +209,8 @@ pub fn increment_sorting(
                     sort_colors,
                     cubes_query,
                     user_text,
-                    commands,
                     audio_controls,
+                    audio,
                     scanned_cube,
                     sort_colored_cubes.unwrap(),
                 );
@@ -459,8 +460,8 @@ pub fn compare_left_right(
         &mut crate::CubeData,
     )>,
     user_text: ResMut<UserText>,
-    mut commands: Commands,
     audio_controls: Res<AudioControls>,
+    audio: Res<bevy_kira_audio::Audio>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
     mut sort_colored_cubes: ResMut<crate::SortColoredCubes>,
 ) {
@@ -547,8 +548,8 @@ pub fn compare_left_right(
         cubes_query,
         user_text,
         sort_colors,
-        &mut commands,
         &audio_controls,
+        &audio,
         &mut sort_colored_cubes,
     );
 
@@ -592,8 +593,8 @@ pub fn swap(
     )>,
     user_text: ResMut<UserText>,
     sort_colors: Res<SortColors>,
-    commands: &mut Commands,
     audio_controls: &Res<AudioControls>,
+    audio: &Res<bevy_kira_audio::Audio>,
     sort_colored_cubes: &mut ResMut<crate::SortColoredCubes>,
 ) {
     ////////////////////////////////////////////////////////////////////////////////////
@@ -659,7 +660,7 @@ pub fn swap(
         );
 
         crate::play_audio(
-            commands,
+            audio,
             audio_controls,
             // target_index,
             parsed_values.vals[target_index].sorted_position,
@@ -714,7 +715,7 @@ pub fn swap(
     );
 
     crate::play_audio(
-        commands,
+        audio,
         audio_controls,
         // target_index,
         parsed_values.vals[target_index].sorted_position,

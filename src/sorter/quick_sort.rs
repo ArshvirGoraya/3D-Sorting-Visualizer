@@ -1,8 +1,4 @@
-use std::{
-    collections::HashSet,
-    ops::Add,
-    time::{Duration, Instant},
-};
+use std::{collections::HashSet, time::Instant};
 
 use bevy::{
     asset::Assets,
@@ -130,6 +126,7 @@ pub fn increment_sorting(
     rng_color_controls: Res<crate::RNGColorControls>,
     (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
     audio_controls: Res<AudioControls>,
+    audio: Res<bevy_kira_audio::Audio>,
     scanned_cube: ResMut<crate::ScannedCube>,
     sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
     mut sorting_time: ResMut<crate::SortingTime>,
@@ -183,7 +180,7 @@ pub fn increment_sorting(
                     quick_sort_colors,
                     sort_select_set,
                     audio_controls,
-                    commands,
+                    audio,
                     scanned_cube,
                     cube_assets,
                     rng_color_controls,
@@ -330,8 +327,8 @@ pub fn increment_j(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    commands: &mut Commands,
     audio_controls: &Res<AudioControls>,
+    audio: &Res<bevy_kira_audio::Audio>,
     scanned_cube: &mut ResMut<crate::ScannedCube>,
     sort_colored_cubes: &mut ResMut<crate::SortColoredCubes>,
 ) {
@@ -355,7 +352,7 @@ pub fn increment_j(
             sort_colored_cubes,
         );
         crate::play_audio(
-            commands,
+            &audio,
             audio_controls,
             // sort_state.j,
             parsed_values.vals[sort_state.j].sorted_position,
@@ -375,7 +372,7 @@ pub fn compare(
     quick_sort_colors: Res<QuickSortColors>,
     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
     audio_controls: Res<AudioControls>,
-    mut commands: Commands,
+    audio: Res<bevy_kira_audio::Audio>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
@@ -406,8 +403,8 @@ pub fn compare(
             &quick_sort_colors,
             &parsed_values,
             &mut cubes_query,
-            &mut commands,
             &audio_controls,
+            &audio,
             &mut scanned_cube,
             &mut sort_colored_cubes,
         );
@@ -508,8 +505,8 @@ pub fn compare(
                 &quick_sort_colors,
                 &parsed_values,
                 &mut cubes_query,
-                &mut commands,
                 &audio_controls,
+                &audio,
                 &mut scanned_cube,
                 &mut sort_colored_cubes,
             );
@@ -548,8 +545,8 @@ pub fn compare(
             &quick_sort_colors,
             &parsed_values,
             &mut cubes_query,
-            &mut commands,
             &audio_controls,
+            &audio,
             &mut scanned_cube,
             &mut sort_colored_cubes,
         );

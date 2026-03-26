@@ -10,7 +10,7 @@ path = "src/main.rs"
 [dependencies]
 bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_asset",
-  "bevy_audio",
+  # "bevy_audio",
   "bevy_camera",
   "bevy_color",
   "bevy_core_pipeline",
@@ -25,18 +25,25 @@ bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_state",
   "bevy_winit",
   # "debug",
-  "mp3",
+  # "mp3",
   "png",
-  "symphonia-aac",
-  "symphonia-flac",
-  "symphonia-wav",
+  # "symphonia-aac",
+  # "symphonia-flac",
+  # "symphonia-wav",
   "tonemapping_luts",
   # "trace",
   # "trace_tracy",
-  "vorbis",
+  # "vorbis",
   "zstd_rust",
 ] }
 bevy_egui = "0.38.1"
+# for instant audio playback (bevy demands you go through commands.spawn(), but sometimes you need to run audio in the middle of a system, not queue it after the system.) This plugin also works on the web. Cannot use bevy features: bevy_audio, vorbis,
+bevy_kira_audio = { version = "0.24.0", default-features = false, features = [
+  "flac",
+  "mp3",
+  "ogg",
+  "wav",
+] }
 bevy_panorbit_camera = { version = "0.33.0" }
 fastrand = { version = "2.3.0" }
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
