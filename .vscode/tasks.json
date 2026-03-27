@@ -13,10 +13,10 @@
       "dependsOn": [
         "index to root",
         "Trunk Build Local",
-        "esbuild minify css",
+        // "esbuild minify css",
         "esbuild bundle js",
-        "esbuild minify bundled js",
-        "esbuild minify 3d_sorting js",
+        // "esbuild minify bundled js",
+        // "esbuild minify 3d_sorting js",
         "rm root index"
         // usually followed up with live-server task
       ],

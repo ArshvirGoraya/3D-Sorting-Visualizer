@@ -5,10 +5,8 @@ pub mod test_sort;
 
 use bevy::prelude::*;
 use core::fmt;
-use std::{
-    ops::Add,
-    time::{Duration, Instant},
-};
+use std::ops::Add;
+use web_time::{Duration, Instant};
 
 use crate::ui::{ParsedValues, StringInfo, UserText};
 

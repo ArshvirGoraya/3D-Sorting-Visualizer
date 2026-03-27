@@ -1,4 +1,4 @@
-use std::{collections::HashSet, time::Instant};
+use std::collections::HashSet;
 
 use bevy::{
     asset::Assets,
@@ -16,6 +16,7 @@ use bevy::{
     time::Time,
     transform::components::Transform,
 };
+use web_time::Instant;
 
 use crate::{
     AudioControls, sorter,

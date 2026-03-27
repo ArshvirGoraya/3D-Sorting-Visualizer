@@ -49,6 +49,7 @@ fastrand = { version = "2.3.0" }
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 regex-lite = "0.1.8"
 rfd = "0.17.2"  # required in wasm as well: Error goes away: no method named `get` found for struct `FileList` in the current scope
+web-time = "1.1.0"  # to replace std::time::Instant for the web, but uses the normal way on x64 targets
 
 [dev-dependencies]
 bevy = { version = "0.17.3", default-features = false, features = ["debug"] }

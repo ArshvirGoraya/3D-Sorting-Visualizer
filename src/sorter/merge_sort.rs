@@ -1,7 +1,6 @@
-use std::{
-    collections::{HashSet, VecDeque},
-    time::Instant,
-};
+use std::collections::{HashSet, VecDeque};
+
+use web_time::Instant;
 
 use bevy::{
     asset::Assets,

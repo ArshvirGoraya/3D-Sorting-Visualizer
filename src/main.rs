@@ -42,6 +42,8 @@ use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
+use web_time::{Duration, Instant};
+
 // INFO: Not added into the system on non-wasm builds, in which case this enum definition just
 // exists but an instance of it is never created.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, States)]
@@ -140,22 +142,22 @@ pub struct ScannedCube {
 
 #[derive(Resource)]
 pub struct SortingTime {
-    time_start: std::time::Instant,
-    time_elapsed: std::time::Duration,
+    time_start: Instant,
+    time_elapsed: Duration,
     //
-    sorting_time_elapsed: std::time::Duration,
+    sorting_time_elapsed: Duration,
     //
     sorting_time_between: Vec<u128>,
     sorting_time_between_sum: u128,
-    sorting_time_between_start: Option<std::time::Instant>,
+    sorting_time_between_start: Option<Instant>,
     sorting_time_between_greatest: u128,
 }
 impl Default for SortingTime {
     fn default() -> Self {
         Self {
-            time_start: std::time::Instant::now(),
-            time_elapsed: std::time::Duration::default(),
-            sorting_time_elapsed: std::time::Duration::default(),
+            time_start: Instant::now(),
+            time_elapsed: Duration::default(),
+            sorting_time_elapsed: Duration::default(),
             sorting_time_between: Vec::new(),
             sorting_time_between_sum: u128::default(),
             sorting_time_between_start: None,

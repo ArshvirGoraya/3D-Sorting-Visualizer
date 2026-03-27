@@ -1,7 +1,7 @@
 use crate::{AudioControls, PROGRAM_TITLE, sorter};
 
 use core::{f64, fmt};
-use std::time::Duration;
+use web_time::Duration;
 
 use bevy::{platform::collections::HashMap, prelude::*};
 

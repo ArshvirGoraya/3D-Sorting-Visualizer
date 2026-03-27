@@ -1,0 +1,58 @@
+<html>
+  <head>
+    <!-- https://trunk-rs.github.io/trunk/guide/assets/index.html -->
+    <!-- INFO: this html file gets moved to the root directory before building so all paths should be relative to the root directory -->
+    
+    <link rel="stylesheet" href="/3D-Sorting-Visualizer/index.css"/>
+    
+<script type="module">
+import init, * as bindings from '/3D-Sorting-Visualizer/rust_3d_sorting.js';
+const wasm = await init({ module_or_path: '/3D-Sorting-Visualizer/rust_3d_sorting_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+    <link rel="icon" href="/3D-Sorting-Visualizer/favicon.ico"/>
+    <script src="/3D-Sorting-Visualizer/main.js"></script>
+  <link rel="modulepreload" href="/3D-Sorting-Visualizer/rust_3d_sorting.js" crossorigin="anonymous"><link rel="preload" href="/3D-Sorting-Visualizer/rust_3d_sorting_bg.wasm" crossorigin="anonymous" as="fetch" type="application/wasm"></head>
+  <style>
+    /* maybe remove when embedding in canvas that is NOT fullscreen on browser? */
+    canvas {
+      outline: none;
+    }
+    body {
+      margin: 1px;
+      background-color: 2b2c2f;
+    }
+  </style>
+  <body>
+    <div class="loading_screen" id="loading_screen">
+      <!-- loading_screen div removed by bevy on startup -->
+      <div class="loader"></div>
+      <p class="loader_text">Loading...</p>
+      <p class="loader_text javascript_disabled" style="display: none">JavaScript disabled: app will not start!</p>
+    </div>
+    <input
+      type="file"
+      id="audio_picker"
+      accept=".ogg,.flac,.wav,.mp3"
+      style="display: none"
+    />
+    <noscript>
+      <style>
+      .loader_text{
+        display: none !important;
+      }
+      .javascript_disabled{
+        display: block !important;
+        color: #Ff0000;
+        text-wrap: nowrap;
+      }
+      </style>
+    </noscript>
+  </body>
+</html>
