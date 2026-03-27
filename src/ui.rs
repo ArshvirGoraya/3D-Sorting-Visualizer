@@ -1231,9 +1231,9 @@ pub fn ui_system(
                     ui.vertical_centered_justified(|ui|{
                         ui.collapsing("Audio Settings", |ui|{
                             ui.add(
-                                egui::Slider::new(&mut audio_controls.volume, 0.1..=10.0).text("Volume")
-                                .max_decimals(1)
-                                .step_by(0.1)
+                                egui::Slider::new(&mut audio_controls.volume, -59.0..=30.0).text("Volume")
+                                .max_decimals(0)
+                                .step_by(1.0)
                             ).on_hover_text("adjust volume of selected sound");
 
                             if ui.add(

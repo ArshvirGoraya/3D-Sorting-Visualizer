@@ -558,8 +558,6 @@ fn spawn_audio_sources(
     asset_server: Res<AssetServer>,
     mut audio_assets: ResMut<Assets<AudioSource>>,
 ) {
-    let default_volume = 0.2;
-
     let default_handle: Handle<AudioSource> = {
         if cfg!(target_arch = "wasm32") {
             // for web: just load in the audio file (don't want to embed to reduce wasm size).
@@ -585,7 +583,7 @@ fn spawn_audio_sources(
     let low_pitch = 0.5;
     let pitch_range = high_pitch - low_pitch;
     commands.insert_resource(AudioControls {
-        volume: default_volume,
+        volume: -15.0,
         low_pitch,
         high_pitch,
         pitch_range,
