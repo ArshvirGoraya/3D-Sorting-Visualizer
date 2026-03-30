@@ -161,10 +161,16 @@ pub fn generate_random_string_nums(amount: usize, min: f64, max: f64, max_decima
     let range_helper = max - min;
 
     for index in 0..amount{
-        text.push_str((
-                format!("{:.1$}", min + random.rng.f64() * range_helper, max_decimals))
-            .trim_end_matches("0")
-            .trim_end_matches("."));
+        let mut string = format!("{:.1$}", min + random.rng.f64() * range_helper, max_decimals);
+
+        if max_decimals != 0 {
+            string = string.trim_end_matches("0").trim_end_matches(".").to_string();
+            if string.is_empty(){
+                string = "0".to_string();
+            }
+        }
+        text.push_str(&string);
+
         if index != amount -1 {
             text.push_str(", ");
         }
@@ -209,13 +215,13 @@ pub fn spawn_random_parsed_values(
     ),
 ) {
     // TODO
-    // generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, rng_values_controls.max_decimals, &mut user_text.val, &mut random);
+    generate_random_string_nums(rng_values_controls.amount, rng_values_controls.min, rng_values_controls.max, rng_values_controls.max_decimals, &mut user_text.val, &mut random);
     // user_text.val = "1, 34, 93, 78, 37, 8, 87, 89, 81, 39, 56, 92, 47, 44, 33, 44, 74, 2, 93, 4, 78, 44, 26, 34, 1, 3, 29, 97, 14, 15, 4, 73, 41, 38, 1, 39, 54, 33, 75, 31, 91, 32, 52, 68, 17, 73, 52, 36, 24, 4, 52, 86, 26, 36, 71, 11, 64, 86, 7, 48, 7, 39, 78, 93, 37, 84, 88, 87, 69, 23, 74, 18, 95, 65, 49, 24, 18, 2, 24, 36, 4, 44, 65, 42, 81, 3, 38, 76, 56, 68, 87, 84, 37, 87, 53, 44, 77, 74, 71, 86".to_string();
     //
     // Quick sort worst case: merge sort should be faster
     // user_text.val = "1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 4, 7, 7, 8, 11, 14, 15, 17, 18, 18, 23, 24".to_string();
     // Quick sort should be faster than merge sort with more randomized output:
-    user_text.val = "42, 7, 19, 3, 88, 14, 55, 27, 61, 9".to_string();
+    // user_text.val = "42, 7, 19, 3, 88, 14, 55, 27, 61, 9".to_string();
 
     // user_text.val = "25, 23, 9, 5".to_string();
     // user_text.val = "10, 3, 19, 7, 18, 4, 15, 5, 12, 1, 16, 2".to_string();
@@ -1616,6 +1622,7 @@ pub fn ui_system(
                             }
 
                             if !is_sorting && text_edit_widget.changed(){
+                                // log::info!("txt size: {} ", user_text.val.len());
                                 user_text.val.truncate(
                                     // arbitrary limit
                                     50_000,
