@@ -1351,7 +1351,10 @@ pub fn ui_system(
                                     )
                                         .on_hover_text("set amount of numbers to generate")
                                             .changed(){
-                                                rng_values_controls.amount = rng_values_controls.amount.max(2); // at least 2
+                                                rng_values_controls.amount = rng_values_controls.amount.clamp(
+                                                    2, // at least 2 needed
+                                                    1_000 // arbitrary limit
+                                                );
                                     }
                                     if ui.add(
                                         egui::Slider::new(&mut rng_values_controls.min, -100.0..=100.0)
@@ -1362,6 +1365,11 @@ pub fn ui_system(
                                         .on_hover_text("set smallest number that can be generated")
                                             .changed(){
                                                 // set max to be the same as this, if this is bigger than max.
+                                                rng_values_controls.min= rng_values_controls.min.clamp(
+                                                    // arbitrary limit
+                                                    -1_000_000_f64, 
+                                                    1_000_000_f64 
+                                                );
                                                 rng_values_controls.max = rng_values_controls.max.max(rng_values_controls.min);
                                             }
                                     if ui.add(
@@ -1373,18 +1381,18 @@ pub fn ui_system(
                                         .on_hover_text("set largest number that can be generated")
                                             .changed(){
                                                 // set min to be the same as this, if this is smaller than min.
+                                                rng_values_controls.max = rng_values_controls.max.clamp(
+                                                    // arbitrary limit
+                                                    -1_000_000_f64, 
+                                                    1_000_000_f64
+                                                );
                                                 rng_values_controls.min = rng_values_controls.min.min(rng_values_controls.max);
                                             }
-                                    if ui.add(
+                                    ui.add(
                                         egui::Slider::new(&mut rng_values_controls.max_decimals, 0..=10)
-                                        .clamping(egui::SliderClamping::Never)
-                                        .min_decimals(1)
                                         .text("decimals")
                                     )
                                         .on_hover_text("max amount of decimal places after RNG value")
-                                            .changed(){
-                                                rng_values_controls.max_decimals = rng_values_controls.max_decimals.max(0); // at least 0
-                                    }
                                 })
                             })
                         });
@@ -1468,6 +1476,11 @@ pub fn ui_system(
                         )
                             .on_hover_text("set height scale for cubes")
                             .changed(){
+                                cube_scale_controls.height_scale =  cube_scale_controls.height_scale.clamp(
+                                    // arbitrary limit
+                                    -1_000_000_f64, 
+                                    1_000_000_f64
+                                );
                                 control_cube_heights(&mut parsed_values, &cube_scale_controls, &mut cubes_query);
                         }
                     });
@@ -1492,6 +1505,12 @@ pub fn ui_system(
                         )
                             .on_hover_text("set total width that the cubes can encompass")
                             .changed(){
+                                cube_scale_controls.width_scale =  cube_scale_controls.width_scale.clamp(
+                                    // arbitrary limit
+                                    -1_000_000_f64, 
+                                    1_000_000_f64
+                                );
+
                                 control_cube_widths(
                                     &mut parsed_values, 
                                     &cube_scale_controls, 
@@ -1597,6 +1616,12 @@ pub fn ui_system(
                             }
 
                             if !is_sorting && text_edit_widget.changed(){
+                                user_text.val.truncate(
+                                    // arbitrary limit
+                                    50_000,
+                                );
+
+
                                 if !*generated_rng_values{
                                     // if rng values were generated, already clean.
                                     // if text change without rng values generated, mark as dirty.
@@ -1635,6 +1660,7 @@ pub fn ui_system(
                     });
                     #[cfg(any(target_arch = "wasm32", rust_analyzer))]
                     {
+                        ui.separator();
                         if *wasm_on_mobile{
                             if ui.add(
                                 egui::Label::new(
@@ -1653,6 +1679,13 @@ pub fn ui_system(
                             };
                         }
                     }
+                    ui.separator();
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new("INFO: This program is for visualizing sorting algorithms only. It is not reflective of how long sorting algorithms actually take, especially not in relation to one another.")
+                            .color(egui::Color32::LIGHT_GRAY)
+                        ).wrap_mode(egui::TextWrapMode::Wrap)
+                    );
             });
         });
 
