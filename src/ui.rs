@@ -1118,7 +1118,7 @@ pub fn ui_system(
                 ui.style_mut().override_text_style = None;
 
                 ui.horizontal(|ui|{
-                    ui.label("Sort speed 󰔛 ");
+                    ui.label("Visual Pause 󰔛 ");
                     ui.spacing_mut().slider_width = ui.available_width() - ui.spacing().interact_size.x - ui.spacing().item_spacing.x - 1.0;
                     if ui.add(
                         egui::Slider::new(&mut increment_timer.duration_f64, 0.0..=1.0)
@@ -1126,44 +1126,44 @@ pub fn ui_system(
                         .max_decimals(2)
                         .clamping(egui::SliderClamping::Never)
                     )
-                        .on_hover_text("seconds waited between each increment when sorting")
+                        .on_hover_text("seconds waited between each visual update during sorting")
                         .changed(){
-                            increment_timer.duration_f64 = increment_timer.duration_f64.max(0.0);
+                            increment_timer.duration_f64 = increment_timer.duration_f64.clamp(0.0, 9.99);
+                            
                             let duration = increment_timer.duration_f64;
                             increment_timer.increment_timer.set_duration(
                                 Duration::from_secs_f64(duration)
                             );
                     }
                 });
-                ui.horizontal(|ui|{
-                    ui.label(format!("Elapsed Time: {}ms", sorting_time.time_elapsed.as_millis()))
-                        .on_hover_text("total time spent: including time spend sorting + time spent doing other things");
-                    ui.label(format!("| Sorting Time: {}ms", sorting_time.sorting_time_elapsed.as_millis()))
-                        .on_hover_text("time spent just on sorting + visualization functions (not any intermediate game engine functions)");
-                    });
-
-                ui.label(format!("Increment calls: {}", sorting_time.sorting_time_between.len()))
-                    .on_hover_text("calls to sorting + visualization functions");
-                ui.label(format!("Intermediate Time: {}ms", 
-                        sorting_time.sorting_time_between.last().unwrap_or(&(0_u128)))
-                )
-                    .on_hover_text("time taken in-between sorting + visualization functions");
-                ui.label(format!("Intermediate sum: {}ms", sorting_time.sorting_time_between_sum))
-                    .on_hover_text("total time taken in-between sorting + visualization functions");
-                ui.label(format!("Intermediate Grt Time : {}ms", sorting_time.sorting_time_between_greatest))
-                    .on_hover_text("greatest time take in-between sorting + visualization functions");
-                //
-                let between_increment_average = {
-                    if !sorting_time.sorting_time_between.is_empty(){
-                        sorting_time.sorting_time_between_sum as f32 / sorting_time.sorting_time_between.len() as f32
-                    }else{
-                        0_f32
-                    }
-                };
-                ui.label(format!("Intermediate Avg Time : {}ms", between_increment_average))
-                    .on_hover_text("average time taken in-between sorting + visualization functions");
-
-
+                if sorting_time.enabled{
+                    ui.horizontal(|ui|{
+                        ui.label(format!("Elapsed Time: {}ms", sorting_time.time_elapsed.as_millis()))
+                            .on_hover_text("total time spent: including time spend sorting + time spent doing other things");
+                        ui.label(format!("| Sorting Time: {}ms", sorting_time.sorting_time_elapsed.as_millis()))
+                            .on_hover_text("time spent just on sorting + visualization functions (not any intermediate game engine functions)");
+                        });
+                    ui.label(format!("Increment calls: {}", sorting_time.sorting_time_between.len()))
+                        .on_hover_text("calls to sorting + visualization functions");
+                    ui.label(format!("Intermediate Time: {}ms", 
+                            sorting_time.sorting_time_between.last().unwrap_or(&(0_u128)))
+                    )
+                        .on_hover_text("time taken in-between sorting + visualization functions");
+                    ui.label(format!("Intermediate sum: {}ms", sorting_time.sorting_time_between_sum))
+                        .on_hover_text("total time taken in-between sorting + visualization functions");
+                    ui.label(format!("Intermediate Grt Time : {}ms", sorting_time.sorting_time_between_greatest))
+                        .on_hover_text("greatest time take in-between sorting + visualization functions");
+                    //
+                    let between_increment_average = {
+                        if !sorting_time.sorting_time_between.is_empty(){
+                            sorting_time.sorting_time_between_sum as f32 / sorting_time.sorting_time_between.len() as f32
+                        }else{
+                            0_f32
+                        }
+                    };
+                    ui.label(format!("Intermediate Avg Time : {}ms", between_increment_average))
+                        .on_hover_text("average time taken in-between sorting + visualization functions");
+                }
 
                 ui.separator();
 

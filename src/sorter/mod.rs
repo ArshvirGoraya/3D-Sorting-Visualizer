@@ -107,6 +107,9 @@ pub fn swap(
 
 pub fn first_increment(sorting_time: &mut ResMut<crate::SortingTime>) {
     // called when a sorting algorithm first starts.
+    if !sorting_time.enabled {
+        return;
+    }
     sorting_time.time_start = Instant::now();
     sorting_time.sorting_time_between.clear();
     sorting_time.sorting_time_between_sum = 0;
@@ -115,6 +118,9 @@ pub fn first_increment(sorting_time: &mut ResMut<crate::SortingTime>) {
 }
 
 pub fn increment_between(sorting_time: &mut ResMut<crate::SortingTime>) {
+    if !sorting_time.enabled {
+        return;
+    }
     // called between increments.
     if let Some(time_between_start) = sorting_time.sorting_time_between_start {
         let time_between_elapsed = time_between_start.elapsed().as_millis();
@@ -131,6 +137,9 @@ pub fn end_increment(sorting_time: &mut ResMut<crate::SortingTime>, increment_ti
     // called at the end of a sorting algorithm's increment (not necessary after increment timer is up and
     // one of its sort steps has ran). Not on complete.
 
+    if !sorting_time.enabled {
+        return;
+    }
     sorting_time.sorting_time_elapsed = sorting_time
         .sorting_time_elapsed
         .add(increment_time_start.elapsed());
@@ -149,18 +158,20 @@ pub fn complete(
 
     increment_between(sorting_time);
 
-    sorting_time.sorting_time_between.sort();
-    log::info!(
-        "sorting_time_between (sorted): {}",
-        sorting_time
-            .sorting_time_between
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    if sorting_time.enabled {
+        sorting_time.sorting_time_between.sort();
+        log::info!(
+            "sorting_time_between (sorted): {}",
+            sorting_time
+                .sorting_time_between
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
 
-    sorting_time.sorting_time_between_start = None;
+        sorting_time.sorting_time_between_start = None;
+    }
 }
 
 pub fn swap_text(

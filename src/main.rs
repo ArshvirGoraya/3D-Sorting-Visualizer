@@ -142,6 +142,7 @@ pub struct ScannedCube {
 
 #[derive(Resource)]
 pub struct SortingTime {
+    enabled: bool,
     time_start: Instant,
     time_elapsed: Duration,
     //
@@ -155,6 +156,7 @@ pub struct SortingTime {
 impl Default for SortingTime {
     fn default() -> Self {
         Self {
+            enabled: false,
             time_start: Instant::now(),
             time_elapsed: Duration::default(),
             sorting_time_elapsed: Duration::default(),
