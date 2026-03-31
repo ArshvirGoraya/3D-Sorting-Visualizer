@@ -345,19 +345,19 @@ fn main() {
         .add_systems(
             OnEnter(sorter::SortState::NotSorting),
             sorter::bubble_sort::complete.run_if(in_state(sorter::Algorithms::BubbleSort)),
-        )
-        // Test Sort:
-        .add_systems(
-            Update,
-            sorter::test_sort::increment_sorting
-                .run_if(in_state(sorter::SortState::Sorting))
-                .run_if(in_state(sorter::PausedState::NotPaused))
-                .run_if(in_state(sorter::Algorithms::TestSort)),
-        )
-        .add_systems(
-            OnEnter(sorter::SortState::NotSorting),
-            sorter::test_sort::complete.run_if(in_state(sorter::Algorithms::TestSort)),
         );
+    // Test Sort:
+    // .add_systems(
+    //     Update,
+    //     sorter::test_sort::increment_sorting
+    //         .run_if(in_state(sorter::SortState::Sorting))
+    //         .run_if(in_state(sorter::PausedState::NotPaused))
+    //         .run_if(in_state(sorter::Algorithms::TestSort)),
+    // )
+    // .add_systems(
+    //     OnEnter(sorter::SortState::NotSorting),
+    //     sorter::test_sort::complete.run_if(in_state(sorter::Algorithms::TestSort)),
+    // );
 
     app.run();
 }

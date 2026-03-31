@@ -29,7 +29,7 @@ pub enum Algorithms {
     QuickSort,
     MergeSort,
     BubbleSort,
-    TestSort,
+    // TestSort,
 }
 impl fmt::Display for Algorithms {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -37,16 +37,16 @@ impl fmt::Display for Algorithms {
             Algorithms::QuickSort => write!(f, "Quick Sort"),
             Algorithms::MergeSort => write!(f, "Merge Sort"),
             Algorithms::BubbleSort => write!(f, "Bubble Sort"),
-            Algorithms::TestSort => write!(f, "Test Sort"),
+            // Algorithms::TestSort => write!(f, "Test Sort"),
         }
     }
 }
 impl Algorithms {
-    pub const ALL: [Algorithms; 4] = [
+    pub const ALL: [Algorithms; 3] = [
         Algorithms::QuickSort,
         Algorithms::MergeSort,
         Algorithms::BubbleSort,
-        Algorithms::TestSort,
+        // Algorithms::TestSort,
     ];
 }
 
