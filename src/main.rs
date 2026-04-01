@@ -159,7 +159,7 @@ pub struct SortingTime {
 impl Default for SortingTime {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             time_start: Instant::now(),
             time_elapsed: Duration::default(),
             sorting_time_elapsed: Duration::default(),
@@ -169,7 +169,7 @@ impl Default for SortingTime {
             sorting_time_between_greatest: u128::default(),
             //
             accumulated_time: Duration::default(),
-            frame_budget: Duration::from_millis(16),
+            frame_budget: Duration::from_millis(4),
         }
     }
 }
@@ -205,7 +205,7 @@ fn main() {
                     mode: bevy::window::WindowMode::Windowed,
                     fit_canvas_to_parent: true, // wasm "fullscreen"
                     prevent_default_event_handling: true,
-                    present_mode: bevy::window::PresentMode::Immediate, // vsync off (speeds up
+                    // present_mode: bevy::window::PresentMode::Immediate, // vsync off (speeds up
                     // time between systems). doesnt seem to be set in debug builds?
                     ..Default::default()
                 }),

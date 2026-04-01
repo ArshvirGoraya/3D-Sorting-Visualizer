@@ -590,7 +590,7 @@ pub fn swap(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    user_text: ResMut<UserText>,
+    mut user_text: ResMut<UserText>,
     sort_colors: Res<SortColors>,
     audio_controls: &Res<AudioControls>,
     audio: &Res<bevy_kira_audio::Audio>,
@@ -733,7 +733,7 @@ pub fn swap(
         right_index,
         parsed_values,
         &mut cubes_query,
-        user_text,
+        &mut user_text,
     );
 }
 

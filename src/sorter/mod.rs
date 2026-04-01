@@ -67,7 +67,7 @@ pub fn swap(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    mut user_text: ResMut<UserText>,
+    user_text: &mut ResMut<UserText>,
 ) {
     let [i_data, j_data] = parsed_values.vals.get_disjoint_mut([i, j]).unwrap();
 
@@ -97,7 +97,7 @@ pub fn swap(
         &mut j_data.matched_string,
         &mut i_data.raw_string,
         &mut j_data.raw_string,
-        &mut user_text,
+        user_text,
     );
     update_text_indices(i, j, parsed_values, shift_left, text_shift_amount);
 

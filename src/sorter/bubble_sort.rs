@@ -289,7 +289,7 @@ pub fn compare(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    user_text: ResMut<UserText>,
+    mut user_text: ResMut<UserText>,
     audio_controls: Res<AudioControls>,
     audio: Res<bevy_kira_audio::Audio>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
@@ -334,7 +334,7 @@ pub fn compare(
             sort_state.j,
             &mut parsed_values,
             &mut cubes_query,
-            user_text,
+            &mut user_text,
         );
         sort_state.swapped_cubes = Some((sort_state.i, sort_state.j));
     } else {
