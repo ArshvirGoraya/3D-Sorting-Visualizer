@@ -29,8 +29,8 @@
       "dependsOn": [
         "build release exe",
         "zip release exe",
-        "open release dir",
-        "open release webpage"
+        // "open release dir",
+        // "open release webpage"
       ],
       "group": "build"
     },

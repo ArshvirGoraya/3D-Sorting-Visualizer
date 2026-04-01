@@ -10,12 +10,10 @@ path = "src/main.rs"
 [dependencies]
 bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_asset",
-  # "bevy_audio",
   "bevy_camera",
   "bevy_color",
   "bevy_core_pipeline",
   "bevy_image",
-  "bevy_log",
   "bevy_mesh",
   "bevy_pbr",
   "bevy_picking",
@@ -24,16 +22,8 @@ bevy = { version = "0.17.3", default-features = false, features = [
   "bevy_shader",
   "bevy_state",
   "bevy_winit",
-  # "debug",
-  # "mp3",
   "png",
-  # "symphonia-aac",
-  # "symphonia-flac",
-  # "symphonia-wav",
   "tonemapping_luts",
-  # "trace",
-  # "trace_tracy",
-  # "vorbis",
   "zstd_rust",
 ] }
 bevy_egui = "0.38.1"
@@ -46,13 +36,16 @@ bevy_kira_audio = { version = "0.24.0", default-features = false, features = [
 ] }
 bevy_panorbit_camera = { version = "0.33.0" }
 fastrand = { version = "2.3.0" }
-log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
+log = { version = "*", features = ["max_level_debug", "release_max_level_off"] }
 regex-lite = "0.1.8"
 rfd = "0.17.2"  # required in wasm as well: Error goes away: no method named `get` found for struct `FileList` in the current scope
 web-time = "1.1.0"  # to replace std::time::Instant for the web, but uses the normal way on x64 targets
 
 [dev-dependencies]
-bevy = { version = "0.17.3", default-features = false, features = ["debug"] }
+bevy = { version = "0.17.3", default-features = false, features = [
+  "bevy_log",
+  "debug"
+] }
 bevy_egui = { version = "0.38.1", features = [
   "log_file_dnd_messages",
   "log_input_messages"
@@ -100,7 +93,7 @@ panic = "unwind"
 codegen-units = 16
 
 [profile.release]
-opt-level = 3  # different from wasm: "z"
+opt-level = 3
 debug = false
 strip = true  # different from wasm: "debuginfo": cannot strip for wasm compilation
 lto = "fat"
@@ -110,7 +103,5 @@ codegen-units = 1
 [profile.release-wasm32]
 # used by trunk: trunk build --release --cargo-profile release-wasm32
 inherits = "release"
-# opt-level = "z"  # different from x86 (opt-level = 3)
-opt-level = 3
-strip = "debuginfo"  # different from x86 (strip = true)
+strip = "debuginfo"  # different from x86 (strip = true): cannot strip for wasm compilation
 panic = "unwind"  # gives me smaller wasm than panic = "abort"

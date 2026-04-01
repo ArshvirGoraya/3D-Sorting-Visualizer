@@ -9,7 +9,7 @@ mod ui;
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
 mod wasm_audio_picker;
 
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 
 #[cfg(any(target_arch = "wasm32", rust_analyzer))]
 use wasm_bindgen::prelude::*; // requires for all '#[wasm_bindgen]' usage
@@ -152,6 +152,9 @@ pub struct SortingTime {
     sorting_time_between_sum: u128,
     sorting_time_between_start: Option<Instant>,
     sorting_time_between_greatest: u128,
+    //
+    accumulated_time: Duration,
+    frame_budget: Duration,
 }
 impl Default for SortingTime {
     fn default() -> Self {
@@ -164,6 +167,9 @@ impl Default for SortingTime {
             sorting_time_between_sum: u128::default(),
             sorting_time_between_start: None,
             sorting_time_between_greatest: u128::default(),
+            //
+            accumulated_time: Duration::default(),
+            frame_budget: Duration::from_millis(16),
         }
     }
 }
@@ -199,6 +205,8 @@ fn main() {
                     mode: bevy::window::WindowMode::Windowed,
                     fit_canvas_to_parent: true, // wasm "fullscreen"
                     prevent_default_event_handling: true,
+                    present_mode: bevy::window::PresentMode::Immediate, // vsync off (speeds up
+                    // time between systems). doesnt seem to be set in debug builds?
                     ..Default::default()
                 }),
                 ..Default::default()
