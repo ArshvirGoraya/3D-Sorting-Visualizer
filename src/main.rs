@@ -159,7 +159,7 @@ pub struct SortingTime {
 impl Default for SortingTime {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             time_start: Instant::now(),
             time_elapsed: Duration::default(),
             sorting_time_elapsed: Duration::default(),
@@ -698,10 +698,10 @@ fn spawn_cube_assets(
     });
 }
 
-fn auto_rotate_camera(mut camera_query: Query<&mut PanOrbitCamera>) {
+fn auto_rotate_camera(mut camera_query: Query<&mut PanOrbitCamera>, time: Res<Time>) {
     // INFO: only runs in auto rotate state
     let mut pan_orbit = camera_query.single_mut().unwrap();
-    pan_orbit.target_yaw += 0.02;
+    pan_orbit.target_yaw += 1.5 * time.delta_secs();
 }
 
 fn spawn_3d_camera(mut commands: Commands) {
