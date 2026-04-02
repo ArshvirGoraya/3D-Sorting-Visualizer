@@ -68,6 +68,10 @@ pub enum CameraControlsAutoRotate {
     NotAutoRotate,
     AutoRotate,
 }
+#[derive(Resource)]
+pub struct CameraRotateSpeed {
+    rotation_per_second: f32,
+}
 
 #[derive(Resource, Default)]
 pub struct AudioControls {
@@ -142,7 +146,8 @@ pub struct ScannedCube {
 
 #[derive(Resource)]
 pub struct SortingTime {
-    enabled: bool,
+    // TODO: fix counting for timing when enable_ui = true or remove entirely if not going to use.
+    enable_ui: bool,
     time_start: Instant,
     time_elapsed: Duration,
     //
@@ -155,11 +160,15 @@ pub struct SortingTime {
     //
     accumulated_time: Duration,
     frame_budget: Duration,
+    frame_budget_egui: u64,
+    //
+    visual_pause: Instant,
+    visual_pause_target: u64,
 }
 impl Default for SortingTime {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enable_ui: false,
             time_start: Instant::now(),
             time_elapsed: Duration::default(),
             sorting_time_elapsed: Duration::default(),
@@ -167,9 +176,13 @@ impl Default for SortingTime {
             sorting_time_between_sum: u128::default(),
             sorting_time_between_start: None,
             sorting_time_between_greatest: u128::default(),
-            //
             accumulated_time: Duration::default(),
+            //
             frame_budget: Duration::from_millis(4),
+            frame_budget_egui: 4,
+            //
+            visual_pause: Instant::now(),
+            visual_pause_target: 0,
         }
     }
 }
@@ -206,7 +219,7 @@ fn main() {
                     fit_canvas_to_parent: true, // wasm "fullscreen"
                     prevent_default_event_handling: true,
                     // present_mode: bevy::window::PresentMode::Immediate, // vsync off (speeds up
-                    // time between systems). doesnt seem to be set in debug builds?
+                    // time between systems). Doesn't seem to be set in debug builds?
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -220,6 +233,12 @@ fn main() {
     .add_plugins(PanOrbitCameraPlugin)
     .add_plugins(EguiPlugin::default())
     .add_plugins(MeshPickingPlugin)
+    .insert_resource(AudioSettings {
+        // amount of sounds that can play at once
+        // increasing = sounds can sound static-y when many are playing at once.
+        // new sounds are not played once this is reached!
+        sound_capacity: 75,
+    })
     .add_plugins(AudioPlugin)
     .insert_resource(MeshPickingSettings {
         require_markers: true,
@@ -241,10 +260,6 @@ fn main() {
     .insert_resource(ui::CopyTimer {
         copy_timer: Timer::from_seconds(1.0, TimerMode::Once),
     })
-    .insert_resource(sorter::IncrementTimer {
-        increment_timer: Timer::from_seconds(0.0, TimerMode::Once),
-        duration_f64: 0.0,
-    })
     .insert_resource(RNGColorControls {
         rng_cubes_enabled: true,
         background_color: [43, 44, 47],
@@ -255,6 +270,9 @@ fn main() {
         height_scale: 1.0,
         width_scale_enable: false,
         width_scale: 5.0,
+    })
+    .insert_resource(CameraRotateSpeed {
+        rotation_per_second: 1.5,
     })
     .init_state::<CameraControlsFollow>()
     .init_state::<CameraControlsAutoRotate>();
@@ -608,12 +626,8 @@ fn spawn_audio_sources(
     });
 }
 
-fn finish_timers(
-    mut copy_timer: ResMut<ui::CopyTimer>,
-    mut increment_timer: ResMut<sorter::IncrementTimer>,
-) {
+fn finish_timers(mut copy_timer: ResMut<ui::CopyTimer>) {
     copy_timer.copy_timer.finish();
-    increment_timer.increment_timer.finish();
 }
 
 fn font_scale_inputs(
@@ -698,11 +712,21 @@ fn spawn_cube_assets(
     });
 }
 
-fn auto_rotate_camera(mut camera_query: Query<&mut PanOrbitCamera>) {
+fn auto_rotate_camera(
+    mut camera_query: Query<&mut PanOrbitCamera>,
+    rotate_speed: Res<CameraRotateSpeed>,
+    time: Res<Time>,
+) {
     // INFO: only runs in auto rotate state
     let mut pan_orbit = camera_query.single_mut().unwrap();
-    pan_orbit.target_yaw += 0.02;
+    pan_orbit.target_yaw += rotate_speed.rotation_per_second * time.delta_secs();
 }
+
+// fn auto_rotate_camera(mut camera_query: Query<&mut PanOrbitCamera>) {
+//     // INFO: only runs in auto rotate state
+//     let mut pan_orbit = camera_query.single_mut().unwrap();
+//     pan_orbit.target_yaw += 0.02;
+// }
 
 fn spawn_3d_camera(mut commands: Commands) {
     commands.spawn((

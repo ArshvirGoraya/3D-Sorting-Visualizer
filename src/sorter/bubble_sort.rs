@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 use web_time::Instant;
 
 use bevy::{
@@ -12,7 +12,6 @@ use bevy::{
     pbr::{MeshMaterial3d, StandardMaterial},
     platform::collections::HashMap,
     state::state::NextState,
-    time::Time,
     transform::components::Transform,
 };
 
@@ -36,6 +35,7 @@ pub struct SortState {
     j: usize,
     bubble_range_start: usize,
     swapped_cubes: Option<(usize, usize)>,
+    finished: bool,
 }
 
 #[derive(Default, Hash, Eq, PartialEq, Clone, Copy)]
@@ -96,194 +96,10 @@ impl FromWorld for SortColors {
 }
 
 pub fn increment_sorting(
-    sort_state: Option<ResMut<SortState>>,
-    (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
-    commands: Commands,
-    parsed_values: ResMut<ParsedValues>,
-    sort_select_set: ResMut<NextState<sorter::SortState>>,
-    cubes_query: Query<(
-        &mut Transform,
-        &mut MeshMaterial3d<StandardMaterial>,
-        &mut crate::CubeData,
-    )>,
-    user_text: ResMut<UserText>,
-    audio_controls: Res<AudioControls>,
-    audio: Res<bevy_kira_audio::Audio>,
-    scanned_cube: ResMut<crate::ScannedCube>,
-    sort_colors: Res<SortColors>,
-    rng_color_controls: Res<crate::RNGColorControls>,
-    cube_assets: Res<CubeAssets>,
-    sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
-    mut sorting_time: ResMut<crate::SortingTime>,
-) {
-    let increment_time_start = Instant::now();
-
-    if let Some(sort_state) = sort_state {
-        sorter::increment_between(&mut sorting_time);
-
-        increment_timer.increment_timer.tick(time.delta());
-        if !increment_timer.increment_timer.is_finished() {
-            sorter::end_increment(&mut sorting_time, increment_time_start);
-            return;
-        }
-        match sort_state.next_step {
-            SortStep::ShiftRight => shift_right(
-                Some(sort_state),
-                commands,
-                parsed_values,
-                sort_colors,
-                cubes_query,
-                sort_colored_cubes,
-            ),
-            SortStep::RestartShifting => restart_shifting(
-                sort_state,
-                sort_select_set,
-                sort_colors,
-                parsed_values,
-                cubes_query,
-                rng_color_controls,
-                cube_assets,
-                sort_colored_cubes.unwrap(),
-            ),
-            SortStep::Compare => compare(
-                sort_state,
-                parsed_values,
-                cubes_query,
-                user_text,
-                audio_controls,
-                audio,
-                scanned_cube,
-                sort_colors,
-                sort_colored_cubes.unwrap(),
-            ),
-        }
-    } else {
-        sorter::first_increment(&mut sorting_time);
-
-        shift_right(
-            None,
-            commands,
-            parsed_values,
-            sort_colors,
-            cubes_query,
-            sort_colored_cubes,
-        )
-    }
-
-    sorter::end_increment(&mut sorting_time, increment_time_start);
-
-    increment_timer.increment_timer.reset();
-}
-
-pub fn shift_right(
-    sort_state: Option<ResMut<SortState>>,
+    mut sort_state: Option<ResMut<SortState>>,
     mut commands: Commands,
-    parsed_values: ResMut<ParsedValues>,
-    sort_colors: Res<SortColors>,
-    mut cubes_query: Query<(
-        &mut Transform,
-        &mut MeshMaterial3d<StandardMaterial>,
-        &mut crate::CubeData,
-    )>,
-    sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
-) {
-    if let Some(mut sort_state) = sort_state {
-        if let Some(swapped_cubes) = sort_state.swapped_cubes {
-            let mut sort_colored_cubes = sort_colored_cubes.unwrap();
-            color_cube(
-                swapped_cubes.0,
-                SortColor::Covered,
-                &sort_colors,
-                &parsed_values,
-                &mut cubes_query,
-                &mut sort_colored_cubes,
-            );
-            color_cube(
-                swapped_cubes.1,
-                SortColor::Covered,
-                &sort_colors,
-                &parsed_values,
-                &mut cubes_query,
-                &mut sort_colored_cubes,
-            );
-            sort_state.swapped_cubes = None;
-        }
-
-        // Check if next element is valid:
-        let next_element = sort_state.j + 1;
-        if next_element == sort_state.bubble_range_start {
-            // next element is at a bubble sorted index. Restart from left.
-            sort_state.next_step = SortStep::RestartShifting;
-            return;
-        }
-
-        // Shift right
-        sort_state.i += 1;
-        sort_state.j += 1;
-        sort_state.next_step = SortStep::Compare;
-    } else {
-        commands.insert_resource(crate::SortColoredCubes {
-            cubes: HashSet::new(),
-        });
-        commands.insert_resource(SortState {
-            next_step: SortStep::Compare,
-            i: 0,
-            j: 1,
-            bubble_range_start: parsed_values.end_index,
-            swapped_cubes: None,
-        })
-    }
-}
-
-pub fn restart_shifting(
-    mut sort_state: ResMut<SortState>,
-    mut sort_select_set: ResMut<NextState<sorter::SortState>>,
-    sort_colors: Res<SortColors>,
-    parsed_values: ResMut<ParsedValues>,
-    mut cubes_query: Query<(
-        &mut Transform,
-        &mut MeshMaterial3d<StandardMaterial>,
-        &mut crate::CubeData,
-    )>,
-    rng_color_controls: Res<crate::RNGColorControls>,
-    cube_assets: Res<CubeAssets>,
-    mut sort_colored_cubes: ResMut<crate::SortColoredCubes>,
-) {
-    // Another element bubbled up to the end.
-    sort_state.bubble_range_start -= 1;
-    if sort_state.bubble_range_start <= 1 {
-        // only 1 non-bubbled element remains: already know it is sorted.
-        sort_select_set.set(sorter::SortState::NotSorting);
-        return;
-    }
-
-    color_cube(
-        sort_state.j,
-        SortColor::Bubbled,
-        &sort_colors,
-        &parsed_values,
-        &mut cubes_query,
-        &mut sort_colored_cubes,
-    );
-    // Uncolor entire Covered Range
-    uncolor_range(
-        (0, sort_state.bubble_range_start),
-        &parsed_values.into(),
-        &rng_color_controls,
-        &cube_assets,
-        &mut cubes_query,
-        &mut sort_colored_cubes,
-    );
-
-    sort_state.i = 0;
-    sort_state.j = 1;
-
-    sort_state.next_step = SortStep::Compare;
-}
-
-pub fn compare(
-    mut sort_state: ResMut<SortState>,
     mut parsed_values: ResMut<ParsedValues>,
+    mut sort_select_set: ResMut<NextState<sorter::SortState>>,
     mut cubes_query: Query<(
         &mut Transform,
         &mut MeshMaterial3d<StandardMaterial>,
@@ -294,11 +110,195 @@ pub fn compare(
     audio: Res<bevy_kira_audio::Audio>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
     sort_colors: Res<SortColors>,
-    mut sort_colored_cubes: ResMut<crate::SortColoredCubes>,
+    rng_color_controls: Res<crate::RNGColorControls>,
+    cube_assets: Res<CubeAssets>,
+    mut sort_colored_cubes: Option<ResMut<crate::SortColoredCubes>>,
+    mut sorting_time: ResMut<crate::SortingTime>,
+) {
+    let increment_time_start = Instant::now();
+
+    if let Some(sort_state) = &mut sort_state
+        && let Some(sort_colored_cubes) = &mut sort_colored_cubes
+    {
+        sorter::increment_between(&mut sorting_time);
+
+        while increment_time_start.elapsed() < sorting_time.frame_budget && !sort_state.finished {
+            // log::info!(
+            //     "accumulated_time: {}ms",
+            //     increment_time_start.elapsed().as_millis()
+            // );
+
+            if (sorting_time.visual_pause.elapsed().as_millis() as u64)
+                < sorting_time.visual_pause_target
+            {
+                continue;
+            }
+            sorting_time.visual_pause = Instant::now();
+
+            match sort_state.next_step {
+                SortStep::ShiftRight => shift_right(
+                    sort_state,
+                    &mut parsed_values,
+                    &sort_colors,
+                    &mut cubes_query,
+                    sort_colored_cubes,
+                ),
+                SortStep::RestartShifting => restart_shifting(
+                    sort_state,
+                    &mut sort_select_set,
+                    &sort_colors,
+                    &mut parsed_values,
+                    &mut cubes_query,
+                    &rng_color_controls,
+                    &cube_assets,
+                    sort_colored_cubes,
+                ),
+                SortStep::Compare => compare(
+                    sort_state,
+                    &mut parsed_values,
+                    &mut cubes_query,
+                    &mut user_text,
+                    &audio_controls,
+                    &audio,
+                    &mut scanned_cube,
+                    &sort_colors,
+                    sort_colored_cubes,
+                ),
+            }
+        }
+    } else {
+        sorter::first_increment(&mut sorting_time);
+        initialize(&mut commands, &mut parsed_values)
+    }
+
+    sorter::end_increment(&mut sorting_time, increment_time_start);
+    sorting_time.accumulated_time = Duration::default();
+}
+
+pub fn initialize(commands: &mut Commands, parsed_values: &mut ResMut<ParsedValues>) {
+    commands.insert_resource(crate::SortColoredCubes {
+        cubes: HashSet::new(),
+    });
+    commands.insert_resource(SortState {
+        next_step: SortStep::Compare,
+        i: 0,
+        j: 1,
+        bubble_range_start: parsed_values.end_index,
+        swapped_cubes: None,
+        finished: false,
+    })
+}
+
+pub fn shift_right(
+    sort_state: &mut ResMut<SortState>,
+    parsed_values: &mut ResMut<ParsedValues>,
+    sort_colors: &Res<SortColors>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    sort_colored_cubes: &mut ResMut<crate::SortColoredCubes>,
+) {
+    if let Some(swapped_cubes) = sort_state.swapped_cubes {
+        color_cube(
+            swapped_cubes.0,
+            SortColor::Covered,
+            sort_colors,
+            parsed_values,
+            cubes_query,
+            sort_colored_cubes,
+        );
+        color_cube(
+            swapped_cubes.1,
+            SortColor::Covered,
+            sort_colors,
+            parsed_values,
+            cubes_query,
+            sort_colored_cubes,
+        );
+        sort_state.swapped_cubes = None;
+    }
+
+    // Check if next element is valid:
+    let next_element = sort_state.j + 1;
+    if next_element == sort_state.bubble_range_start {
+        // next element is at a bubble sorted index. Restart from left.
+        sort_state.next_step = SortStep::RestartShifting;
+        return;
+    }
+
+    // Shift right
+    sort_state.i += 1;
+    sort_state.j += 1;
+    sort_state.next_step = SortStep::Compare;
+}
+
+pub fn restart_shifting(
+    sort_state: &mut ResMut<SortState>,
+    sort_select_set: &mut ResMut<NextState<sorter::SortState>>,
+    sort_colors: &Res<SortColors>,
+    parsed_values: &mut ResMut<ParsedValues>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    rng_color_controls: &Res<crate::RNGColorControls>,
+    cube_assets: &Res<CubeAssets>,
+    sort_colored_cubes: &mut ResMut<crate::SortColoredCubes>,
+) {
+    // Another element bubbled up to the end.
+    sort_state.bubble_range_start -= 1;
+    if sort_state.bubble_range_start <= 1 {
+        // only 1 non-bubbled element remains: already know it is sorted.
+        sort_select_set.set(sorter::SortState::NotSorting);
+        sort_state.finished = true;
+        return;
+    }
+
+    color_cube(
+        sort_state.j,
+        SortColor::Bubbled,
+        sort_colors,
+        parsed_values,
+        cubes_query,
+        sort_colored_cubes,
+    );
+    // Uncolor entire Covered Range
+    uncolor_range(
+        (0, sort_state.bubble_range_start),
+        parsed_values,
+        rng_color_controls,
+        cube_assets,
+        cubes_query,
+        sort_colored_cubes,
+    );
+
+    sort_state.i = 0;
+    sort_state.j = 1;
+
+    sort_state.next_step = SortStep::Compare;
+}
+
+pub fn compare(
+    sort_state: &mut ResMut<SortState>,
+    parsed_values: &mut ResMut<ParsedValues>,
+    cubes_query: &mut Query<(
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+        &mut crate::CubeData,
+    )>,
+    user_text: &mut ResMut<UserText>,
+    audio_controls: &Res<AudioControls>,
+    audio: &Res<bevy_kira_audio::Audio>,
+    scanned_cube: &mut ResMut<crate::ScannedCube>,
+    sort_colors: &Res<SortColors>,
+    sort_colored_cubes: &mut ResMut<crate::SortColoredCubes>,
 ) {
     crate::play_audio(
-        &audio,
-        &audio_controls,
+        audio,
+        audio_controls,
         parsed_values.vals[sort_state.j].sorted_position,
         parsed_values.end_index,
     );
@@ -316,25 +316,25 @@ pub fn compare(
         color_cube(
             sort_state.i,
             SortColor::Swap,
-            &sort_colors,
-            &parsed_values,
-            &mut cubes_query,
-            &mut sort_colored_cubes,
+            sort_colors,
+            parsed_values,
+            cubes_query,
+            sort_colored_cubes,
         );
         color_cube(
             sort_state.j,
             SortColor::Swap,
-            &sort_colors,
-            &parsed_values,
-            &mut cubes_query,
-            &mut sort_colored_cubes,
+            sort_colors,
+            parsed_values,
+            cubes_query,
+            sort_colored_cubes,
         );
         crate::sorter::swap(
             sort_state.i,
             sort_state.j,
-            &mut parsed_values,
-            &mut cubes_query,
-            &mut user_text,
+            parsed_values,
+            cubes_query,
+            user_text,
         );
         sort_state.swapped_cubes = Some((sort_state.i, sort_state.j));
     } else {
@@ -342,19 +342,19 @@ pub fn compare(
             color_cube(
                 sort_state.i,
                 SortColor::Covered,
-                &sort_colors,
-                &parsed_values,
-                &mut cubes_query,
-                &mut sort_colored_cubes,
+                sort_colors,
+                parsed_values,
+                cubes_query,
+                sort_colored_cubes,
             );
         }
         color_cube(
             sort_state.j,
             SortColor::Covered,
-            &sort_colors,
-            &parsed_values,
-            &mut cubes_query,
-            &mut sort_colored_cubes,
+            sort_colors,
+            parsed_values,
+            cubes_query,
+            sort_colored_cubes,
         );
     }
     sort_state.next_step = SortStep::ShiftRight;
@@ -364,7 +364,7 @@ pub fn complete(
     mut commands: Commands,
     sort_state: Option<ResMut<SortState>>,
     cube_assets: Option<Res<CubeAssets>>,
-    parsed_values: Res<ParsedValues>,
+    parsed_values: ResMut<ParsedValues>,
     rng_color_controls: Res<crate::RNGColorControls>,
     mut cubes_query: Query<(
         &mut Transform,
@@ -395,7 +395,7 @@ pub fn complete(
 
 pub fn uncolor_range(
     range: (usize, usize),
-    parsed_values: &Res<ParsedValues>,
+    parsed_values: &ResMut<ParsedValues>,
     rng_color_controls: &Res<crate::RNGColorControls>,
     cube_assets: &Res<CubeAssets>,
     cubes_query: &mut Query<(
@@ -419,7 +419,7 @@ pub fn uncolor_range(
 
 pub fn uncolor_cube(
     cube_index: usize,
-    parsed_values: &Res<ParsedValues>,
+    parsed_values: &ResMut<ParsedValues>,
     rng_color_controls: &Res<crate::RNGColorControls>,
     cube_assets: &Res<CubeAssets>,
     cubes_query: &mut Query<(

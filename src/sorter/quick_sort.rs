@@ -13,7 +13,6 @@ use bevy::{
     pbr::{MeshMaterial3d, StandardMaterial},
     platform::collections::HashMap,
     state::state::NextState,
-    time::Time,
     transform::components::Transform,
 };
 use web_time::Instant;
@@ -126,7 +125,6 @@ pub fn increment_sorting(
     quick_sort_colors: Res<QuickSortColors>,
     cube_assets: Res<CubeAssets>,
     rng_color_controls: Res<crate::RNGColorControls>,
-    (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
     audio_controls: Res<AudioControls>,
     audio: Res<bevy_kira_audio::Audio>,
     mut scanned_cube: ResMut<crate::ScannedCube>,
@@ -151,16 +149,16 @@ pub fn increment_sorting(
         sorter::increment_between(&mut sorting_time);
 
         while increment_time_start.elapsed() < sorting_time.frame_budget && !sort_state.finished {
-            log::info!(
-                "accumulated_time: {}ms",
-                increment_time_start.elapsed().as_millis()
-            );
-
-            increment_timer.increment_timer.tick(time.delta());
-            if !increment_timer.increment_timer.is_finished() {
+            // log::info!(
+            //     "accumulated_time: {}ms",
+            //     increment_time_start.elapsed().as_millis()
+            // );
+            if (sorting_time.visual_pause.elapsed().as_millis() as u64)
+                < sorting_time.visual_pause_target
+            {
                 continue;
             }
-            increment_timer.increment_timer.reset();
+            sorting_time.visual_pause = Instant::now();
 
             match sort_state.next_step {
                 SortStep::SetupRange => {

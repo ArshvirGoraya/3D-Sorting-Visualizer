@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use web_time::Instant;
 
 use bevy::{
@@ -6,7 +8,6 @@ use bevy::{
         system::{Commands, Res, ResMut},
     },
     state::state::NextState,
-    time::Time,
 };
 
 use crate::sorter;
@@ -14,11 +15,11 @@ use crate::sorter;
 #[derive(Resource, Clone)]
 pub struct SortState {
     i: usize,
+    finished: bool,
 }
 
 pub fn increment_sorting(
     sort_state: Option<ResMut<SortState>>,
-    (time, mut increment_timer): (Res<Time>, ResMut<sorter::IncrementTimer>),
     mut sorting_time: ResMut<crate::SortingTime>,
     mut commands: Commands,
     mut sort_select_set: ResMut<NextState<sorter::SortState>>,
@@ -28,24 +29,40 @@ pub fn increment_sorting(
 
     if let Some(mut sort_state) = sort_state {
         sorter::increment_between(&mut sorting_time);
-        increment_timer.increment_timer.tick(time.delta());
-        if !increment_timer.increment_timer.is_finished() {
-            sorter::end_increment(&mut sorting_time, increment_time_start);
-            return;
-        } else {
+
+        while increment_time_start.elapsed() < sorting_time.frame_budget && !sort_state.finished {
+            // log::info!(
+            //     "accumulated_time: {}ms",
+            //     increment_time_start.elapsed().as_millis()
+            // );
+            if (sorting_time.visual_pause.elapsed().as_millis() as u64)
+                < sorting_time.visual_pause_target
+            {
+                continue;
+            }
+            sorting_time.visual_pause = Instant::now();
+
             // sort step:
             sort_state.i += 1;
             if sort_state.i >= rng_values_controls.amount {
                 sort_select_set.set(sorter::SortState::NotSorting);
+                sort_state.finished = true;
             }
         }
     } else {
-        commands.insert_resource(SortState { i: 0 });
+        initialize(&mut commands);
         sorter::first_increment(&mut sorting_time);
     }
 
     sorter::end_increment(&mut sorting_time, increment_time_start);
-    increment_timer.increment_timer.reset();
+    sorting_time.accumulated_time = Duration::default();
+}
+
+pub fn initialize(commands: &mut Commands) {
+    commands.insert_resource(SortState {
+        i: 0,
+        finished: false,
+    });
 }
 
 pub fn complete(
