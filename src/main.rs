@@ -146,7 +146,7 @@ pub struct ScannedCube {
 
 #[derive(Resource)]
 pub struct SortingTime {
-    // TODO: fix counting for timing when enable_ui = true or remove entirely if not going to use.
+    // TODO: remove entirely if not going to use or FIX the counting.
     enable_ui: bool,
     time_start: Instant,
     time_elapsed: Duration,
@@ -182,7 +182,7 @@ impl Default for SortingTime {
             frame_budget_egui: 4,
             //
             visual_pause: Instant::now(),
-            visual_pause_target: 0,
+            visual_pause_target: 1, // ms
         }
     }
 }
