@@ -50,12 +50,6 @@ impl Algorithms {
     ];
 }
 
-#[derive(Resource)]
-pub struct IncrementTimer {
-    pub increment_timer: Timer,
-    pub duration_f64: f64,
-}
-
 // Swapping
 
 pub fn swap(
@@ -67,7 +61,7 @@ pub fn swap(
         &mut MeshMaterial3d<StandardMaterial>,
         &mut crate::CubeData,
     )>,
-    mut user_text: ResMut<UserText>,
+    user_text: &mut ResMut<UserText>,
 ) {
     let [i_data, j_data] = parsed_values.vals.get_disjoint_mut([i, j]).unwrap();
 
@@ -97,7 +91,7 @@ pub fn swap(
         &mut j_data.matched_string,
         &mut i_data.raw_string,
         &mut j_data.raw_string,
-        &mut user_text,
+        user_text,
     );
     update_text_indices(i, j, parsed_values, shift_left, text_shift_amount);
 
@@ -107,18 +101,18 @@ pub fn swap(
 
 pub fn first_increment(sorting_time: &mut ResMut<crate::SortingTime>) {
     // called when a sorting algorithm first starts.
-    if !sorting_time.enabled {
-        return;
+    if sorting_time.enable_ui {
+        sorting_time.time_start = Instant::now();
+        sorting_time.sorting_time_between.clear();
+        sorting_time.sorting_time_between_sum = 0;
+        sorting_time.sorting_time_between_greatest = 0;
+        sorting_time.sorting_time_elapsed = Duration::default();
     }
-    sorting_time.time_start = Instant::now();
-    sorting_time.sorting_time_between.clear();
-    sorting_time.sorting_time_between_sum = 0;
-    sorting_time.sorting_time_between_greatest = 0;
-    sorting_time.sorting_time_elapsed = Duration::default();
+    sorting_time.visual_pause = Instant::now();
 }
 
 pub fn increment_between(sorting_time: &mut ResMut<crate::SortingTime>) {
-    if !sorting_time.enabled {
+    if !sorting_time.enable_ui {
         return;
     }
     // called between increments.
@@ -137,7 +131,7 @@ pub fn end_increment(sorting_time: &mut ResMut<crate::SortingTime>, increment_ti
     // called at the end of a sorting algorithm's increment (not necessary after increment timer is up and
     // one of its sort steps has ran). Not on complete.
 
-    if !sorting_time.enabled {
+    if !sorting_time.enable_ui {
         return;
     }
     sorting_time.sorting_time_elapsed = sorting_time
@@ -158,7 +152,7 @@ pub fn complete(
 
     increment_between(sorting_time);
 
-    if sorting_time.enabled {
+    if sorting_time.enable_ui {
         sorting_time.sorting_time_between.sort();
         log::info!(
             "sorting_time_between (sorted): {}",

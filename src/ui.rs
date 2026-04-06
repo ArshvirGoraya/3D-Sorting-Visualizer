@@ -825,13 +825,11 @@ pub fn ui_system(
     // timers
     (time, 
      mut copy_timer, 
-     mut increment_timer,
-     sorting_time,
+     mut sorting_time,
     ): (
     Res<Time>,
     ResMut<CopyTimer>, 
-    ResMut<sorter::IncrementTimer>,
-    Res<crate::SortingTime>,
+    ResMut<crate::SortingTime>,
     ),
 
     // cubes:
@@ -861,12 +859,14 @@ pub fn ui_system(
      mut camera_controls_auto_rotate,
      mut camera_controls_follow_selected,
      mut camera_controls_auto_rotate_set,
+     mut rotate_speed,
      mut camera_controls_follow_set,
      ): (
      Query<&mut PanOrbitCamera>, 
      Local<bool>,
      Local<bool>,
      ResMut<NextState<crate::CameraControlsAutoRotate>>,
+     ResMut<crate::CameraRotateSpeed>,
      ResMut<NextState<crate::CameraControlsFollow>>,
      ),
 
@@ -1109,26 +1109,59 @@ pub fn ui_system(
 
                 ui.style_mut().override_text_style = None;
 
-                ui.horizontal(|ui|{
-                    ui.label("Visual Pause 󰔛 ");
-                    ui.spacing_mut().slider_width = ui.available_width() - ui.spacing().interact_size.x - ui.spacing().item_spacing.x - 1.0;
-                    if ui.add(
-                        egui::Slider::new(&mut increment_timer.duration_f64, 0.0..=1.0)
-                        .step_by(0.01)
-                        .max_decimals(2)
+                ui.horizontal_top(|ui|{
+                    ui.label("Visual Pause 󰔛 ").on_hover_text("time waited between each visual update during sorting");
+                    ui.spacing_mut().slider_width = 
+                        ui.available_width() - ui.spacing().item_spacing.x - ui.spacing().interact_size.x - (26.0 * scale);
+                    let slider = ui.add(
+                        egui::Slider::new(&mut sorting_time.visual_pause_target, 0..=1000)
+                        .step_by(1.0)
+                        .max_decimals(0)
+                        .suffix("ms")
                         .clamping(egui::SliderClamping::Never)
-                    )
-                        .on_hover_text("seconds waited between each visual update during sorting")
-                        .changed(){
-                            increment_timer.duration_f64 = increment_timer.duration_f64.clamp(0.0, 9.99);
-                            
-                            let duration = increment_timer.duration_f64;
-                            increment_timer.increment_timer.set_duration(
-                                Duration::from_secs_f64(duration)
-                            );
+                        .show_value(false)
+                    ).on_hover_text("time waited between each visual update during sorting");
+                    let value = ui.vertical_centered(|ui|{
+                        ui.add_sized(
+                            [ui.available_width(), 0.0],
+                            egui::DragValue::new(&mut sorting_time.visual_pause_target)
+                            .suffix("ms")
+                            .range(0..=1000)
+                        ).on_hover_text("time waited between each visual update during sorting")
+                    }).inner;
+                    if slider.changed() || value.changed(){
+                        sorting_time.visual_pause_target = sorting_time.visual_pause_target.clamp(0, 10_000);
                     }
                 });
-                if sorting_time.enabled{
+
+                ui.horizontal_top(|ui|{
+                    ui.label("Frame Budget 󰔛 ").on_hover_text("time spent on sorting algorithm each frame");
+                    ui.spacing_mut().slider_width = 
+                        ui.available_width() - ui.spacing().item_spacing.x - ui.spacing().interact_size.x - (26.0 * scale);
+                    let slider = ui.add(
+                        egui::Slider::new(&mut sorting_time.frame_budget_egui, 0..=20)
+                        .step_by(1.0)
+                        .max_decimals(0)
+                        .suffix("ms")
+                        .clamping(egui::SliderClamping::Never)
+                        .show_value(false)
+                    ).on_hover_text("time spent on sorting algorithm each frame");
+                    let value = ui.vertical_centered(|ui|{
+                        ui.add_sized(
+                            [ui.available_width(), 0.0],
+                            egui::DragValue::new(&mut sorting_time.frame_budget_egui)
+                            .suffix("ms")
+                            .range(0..=20)
+                        ).on_hover_text("time spent on sorting algorithm each frame")
+                    }).inner;
+                    if slider.changed() || value.changed(){
+                        sorting_time.frame_budget_egui = sorting_time.frame_budget_egui.clamp(1, 1000);
+                        let duration = sorting_time.frame_budget_egui;
+                        sorting_time.frame_budget = Duration::from_millis(duration)
+                    }
+                });
+
+                if sorting_time.enable_ui{
                     ui.horizontal(|ui|{
                         ui.label(format!("Elapsed Time: {}ms", sorting_time.time_elapsed.as_millis()))
                             .on_hover_text("total time spent: including time spend sorting + time spent doing other things");
@@ -1164,10 +1197,10 @@ pub fn ui_system(
                 // 
 
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Name("medium".into()));
-                ui.columns(3, |cols|{
+                ui.columns(2, |cols|{
                     cols[0].vertical_centered_justified(|ui|{
                         if ui.button("Reset ")
-                            .on_hover_text("reset the camera to original position")
+                            .on_hover_text("reset the camera position (excluding zoom)")
                             .clicked(){
                                 clicked_cube.index = None;
                                 center_camera(
@@ -1184,17 +1217,6 @@ pub fn ui_system(
                         }
                     });
                     cols[1].vertical_centered_justified(|ui|{
-                        if ui.checkbox(&mut camera_controls_auto_rotate, "Rotate 󱦙")
-                            .on_hover_text("continuously rotate camera")
-                            .changed(){
-                                if *camera_controls_auto_rotate{
-                                    camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::AutoRotate);
-                                }else{
-                                    camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::NotAutoRotate);
-                                }
-                        }
-                    });
-                    cols[2].vertical_centered_justified(|ui|{
                         if ui.checkbox(&mut camera_controls_follow_selected, "Follow 󰮄")
                             .on_hover_text("follow the sorting algorithm as it scans across the cubes")
                             .changed(){
@@ -1204,6 +1226,38 @@ pub fn ui_system(
                                     camera_controls_follow_set.set(crate::CameraControlsFollow::NotFollowing);
                                 }
                         }
+                    });
+                });
+
+
+
+                ui.horizontal_top(|ui|{
+                    if ui.checkbox(&mut camera_controls_auto_rotate, "Rotate 󱦙")
+                        .on_hover_text("continuously rotate camera")
+                        .changed(){
+                            if *camera_controls_auto_rotate{
+                                camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::AutoRotate);
+                            }else{
+                                camera_controls_auto_rotate_set.set(crate::CameraControlsAutoRotate::NotAutoRotate);
+                            }
+                    }
+                    ui.spacing_mut().slider_width = 
+                        ui.available_width() - ui.spacing().item_spacing.x - ui.spacing().interact_size.x - (26.0 * scale);
+                    ui.add(
+                        egui::Slider::new(&mut rotate_speed.rotation_per_second, 0.05..=30.0)
+                        .clamping(egui::SliderClamping::Always)
+                        .drag_value_speed(0.01)
+                        .step_by(0.01)
+                        .min_decimals(2)
+                        .show_value(false)
+                    ).on_hover_text("rotation speed");
+                    ui.vertical_centered(|ui|{
+                        ui.add_sized(
+                            [ui.available_width(), 0.0],
+                            egui::DragValue::new(&mut rotate_speed.rotation_per_second)
+                            .speed(0.01)
+                            .range(0.01..=100.0)
+                        ).on_hover_text("rotation speed")
                     });
                 });
 
